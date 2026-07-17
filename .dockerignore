@@ -1,0 +1,14 @@
+.git
+.idea
+.vscode
+node_modules
+vendor
+storage/logs/*
+storage/app/private/*
+storage/app/public/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/testing/*
+storage/framework/views/*
+bootstrap/cache/*.php
+.env

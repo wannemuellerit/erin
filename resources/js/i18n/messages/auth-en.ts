@@ -1,0 +1,43 @@
+export default {
+    confirmPasswordTitle: 'Confirm password',
+    confirmPasswordDescription:
+        'This is a secure area. Please confirm your password before continuing.',
+    confirmWithPasskey: 'Confirm with a passkey',
+    confirming: 'Confirming …',
+    orConfirmWithPassword: 'Or confirm with your password',
+    confirmPasswordAction: 'Confirm password',
+    forgotPasswordTitle: 'Forgot password',
+    forgotPasswordDescription:
+        'Enter your email address to receive a password reset link.',
+    sendResetLink: 'Send password reset link',
+    orReturnTo: 'Or return to',
+    logIn: 'sign in',
+    resetPasswordTitle: 'Reset password',
+    resetPasswordDescription: 'Set your new password below.',
+    resetPasswordAction: 'Reset password',
+    verifyEmailTitle: 'Verify email address',
+    verifyEmailDescription:
+        'Please verify your email address using the link we just sent you.',
+    verificationLinkSent:
+        'A new verification link has been sent to your email address.',
+    resendVerification: 'Resend verification link',
+    logOut: 'Sign out',
+    twoFactorTitle: 'Two-factor authentication',
+    recoveryCodeTitle: 'Recovery code',
+    recoveryCodeDescription: 'Confirm access with one of your recovery codes.',
+    authenticationCodeTitle: 'Authentication code',
+    authenticationCodeDescription:
+        'Enter the six-digit code from your authenticator app.',
+    useAuthenticationCode: 'sign in with an authentication code',
+    useRecoveryCode: 'sign in with a recovery code',
+    continueAction: 'Continue',
+    orYouCan: 'Alternatively, you can',
+    recoveryCodePlaceholder: 'Enter recovery code',
+    authenticationCodeLabel: 'Six-digit authentication code',
+    recoveryCodeLabel: 'Recovery code',
+    signInWithPasskey: 'Sign in with a passkey',
+    authenticating: 'Authenticating …',
+    orContinueWithEmail: 'Or continue with email',
+    showPassword: 'Show password',
+    hidePassword: 'Hide password',
+};
