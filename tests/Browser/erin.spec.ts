@@ -339,6 +339,9 @@ test.describe('Onboarding und Abrechnung', () => {
         await submitLogin(page, accounts.onboardingCandidate.email);
         await expect(page).toHaveURL(/\/onboarding$/);
         await expect(page.getByTestId('candidate-onboarding')).toBeVisible();
+        await page
+            .getByRole('button', { name: 'Einrichtung abschließen' })
+            .hover();
         await expectNoSeriousAccessibilityViolations(page);
 
         await page.locator('#occupation_id').selectOption({ index: 1 });
