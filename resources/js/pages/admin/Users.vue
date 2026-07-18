@@ -1,6 +1,12 @@
 <script setup lang="ts">
-import { Head, router, useForm } from '@inertiajs/vue3';
-import { Search, ShieldAlert, Users as UsersIcon, X } from '@lucide/vue';
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import {
+    History,
+    Search,
+    ShieldAlert,
+    Users as UsersIcon,
+    X,
+} from '@lucide/vue';
 import { reactive } from 'vue';
 import EmptyState from '@/components/product/EmptyState.vue';
 import PageHeader from '@/components/product/PageHeader.vue';
@@ -332,6 +338,13 @@ function updateRole(user: UserRow, event: Event): void {
                                         })
                                     }}
                                 </p>
+                                <Link
+                                    :href="`/admin/audit?actor_id=${user.id}`"
+                                    class="erin-focus mt-2 inline-flex items-center gap-1.5 rounded-lg text-xs font-bold text-blue-600 hover:text-blue-700"
+                                >
+                                    <History class="size-3.5" />
+                                    {{ t('users.showHistory') }}
+                                </Link>
                             </td>
                             <td class="px-5 py-4">
                                 <select

@@ -226,6 +226,7 @@ export default {
         companyMemberships:
             '{count} company membership | {count} company memberships',
         createdAt: 'Created {date}',
+        showHistory: 'Activity history',
         roleConfirm: 'Really change the platform role for {name} to “{role}”?',
     },
     companies: {
@@ -520,6 +521,25 @@ export default {
         seatEnabled: 'Additional seats enabled',
         seatPrice: 'Price per additional seat in cents',
         referralCommission: 'Referral commission in cents',
+        uploadsTitle: 'Uploads & storage',
+        uploadsDescription:
+            'Platform-wide limits for individual files and storage consumption per user account.',
+        uploadsHint:
+            'Lower feature-specific limits, such as for profile photos, continue to apply.',
+        maxFileSize: 'Maximum file size in MB',
+        userStorageQuota: 'Storage limit per user in MB',
+        adTitle: 'Dashboard advertisement',
+        adDescription:
+            'Scheduled advertisement for professionals, companies or both audiences.',
+        adEnabled: 'Advertisement enabled',
+        adAudience: 'Audience',
+        adAudienceAll: 'All users',
+        adAudienceCandidates: 'Professionals only',
+        adAudienceCompanies: 'Companies only',
+        adCtaGerman: 'German button label',
+        adCtaEnglish: 'English button label',
+        adStartsAt: 'Visible from',
+        adEndsAt: 'Visible until',
         savePlatform: 'Save platform configuration',
     },
     support: {

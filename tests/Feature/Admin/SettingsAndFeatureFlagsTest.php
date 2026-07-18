@@ -63,6 +63,23 @@ it('keeps billing add-ons disabled until a price is configured', function () {
             'seat_addon_price_cents' => null,
             'referral_commission_cents' => 25000,
         ],
+        'uploads' => [
+            'max_file_size_mb' => 25,
+            'user_quota_mb' => 2048,
+        ],
+        'dashboard_ad' => [
+            'enabled' => false,
+            'audience' => 'all',
+            'title_de' => '',
+            'title_en' => '',
+            'body_de' => '',
+            'body_en' => '',
+            'cta_label_de' => '',
+            'cta_label_en' => '',
+            'url' => null,
+            'starts_at' => null,
+            'ends_at' => null,
+        ],
     ];
 
     $this->actingAs($admin)
@@ -76,7 +93,9 @@ it('keeps billing add-ons disabled until a price is configured', function () {
         ->assertRedirect();
 
     expect(app(PlatformSettings::class)->get('billing.visa_credit_enabled'))->toBeTrue()
-        ->and(app(PlatformSettings::class)->get('billing.visa_credit_price_cents'))->toBe(149900);
+        ->and(app(PlatformSettings::class)->get('billing.visa_credit_price_cents'))->toBe(149900)
+        ->and(app(PlatformSettings::class)->get('uploads.max_file_size_mb'))->toBe(25)
+        ->and(app(PlatformSettings::class)->get('uploads.user_quota_mb'))->toBe(2048);
 });
 
 it('lets only superadmins manage feature flags and audits changes', function () {

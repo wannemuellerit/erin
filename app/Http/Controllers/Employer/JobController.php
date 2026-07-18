@@ -15,6 +15,7 @@ use App\Services\Activity\ActivityRecorder;
 use App\Services\Audit\AuditLogger;
 use App\Services\Billing\EntitlementService;
 use App\Services\Companies\CurrentCompany;
+use App\Services\Documents\UploadPolicy;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -61,6 +62,7 @@ class JobController extends Controller
         $company = $currentCompany->forRequest($request);
         $this->assertCanRecruit($request, $currentCompany);
         $validated = $this->validateJob($request);
+        $this->assertUploadQuota($request);
 
         $job = DB::transaction(function () use ($request, $company, $validated): JobPosting {
             $job = $company->jobPostings()->create([
@@ -132,6 +134,7 @@ class JobController extends Controller
         $this->assertOwned($job, $company->getKey());
         $this->assertCanRecruit($request, $currentCompany);
         $validated = $this->validateJob($request);
+        $this->assertUploadQuota($request);
         $before = $job->toArray();
 
         DB::transaction(function () use ($job, $validated, $request): void {
@@ -264,7 +267,11 @@ class JobController extends Controller
             'screening_questions.*.is_required' => ['boolean'],
             'screening_questions.*.options' => ['nullable', 'array', 'max:10'],
             'media' => ['array', 'max:10'],
-            'media.*' => ['file', 'mimes:jpg,jpeg,png,gif,pdf,doc,docx', 'max:10240'],
+            'media.*' => [
+                'file',
+                'mimes:jpg,jpeg,png,gif,pdf,doc,docx',
+                'max:'.app(UploadPolicy::class)->maxFileKilobytes(10240),
+            ],
         ]);
     }
 
@@ -302,6 +309,7 @@ class JobController extends Controller
             $path = $file->store("companies/{$job->company_id}/jobs/{$job->getKey()}", 'private');
             abort_if($path === false, 500);
             $media = $job->media()->create([
+                'uploaded_by' => $request->user()?->getKey(),
                 'type' => str_starts_with((string) $file->getMimeType(), 'image/') ? 'image' : 'document',
                 'disk' => 'private',
                 'path' => $path,
@@ -330,6 +338,18 @@ class JobController extends Controller
     private function assertCanRecruit(Request $request, CurrentCompany $currentCompany): void
     {
         abort_unless($currentCompany->membership($request)->role->canRecruit(), 403);
+    }
+
+    private function assertUploadQuota(Request $request): void
+    {
+        $files = $request->file('media', []);
+        if (! is_array($files) || $files === []) {
+            return;
+        }
+
+        $user = $request->user();
+        abort_if($user === null, 401);
+        app(UploadPolicy::class)->assertCanStore($user, array_values($files), 'media');
     }
 
     private function assertOwned(JobPosting $job, int $companyId): void

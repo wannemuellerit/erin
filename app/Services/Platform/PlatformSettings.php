@@ -7,6 +7,27 @@ use Illuminate\Support\Facades\DB;
 
 class PlatformSettings
 {
+    /** @var array{max_file_size_mb: int, user_quota_mb: int} */
+    public const DEFAULT_UPLOAD_LIMITS = [
+        'max_file_size_mb' => 50,
+        'user_quota_mb' => 1024,
+    ];
+
+    /** @var array<string, bool|string|null> */
+    public const DEFAULT_DASHBOARD_AD = [
+        'enabled' => false,
+        'audience' => 'all',
+        'title_de' => '',
+        'title_en' => '',
+        'body_de' => '',
+        'body_en' => '',
+        'cta_label_de' => '',
+        'cta_label_en' => '',
+        'url' => null,
+        'starts_at' => null,
+        'ends_at' => null,
+    ];
+
     /** @var array<string, string> */
     public const DEFAULT_COLORS = [
         'primary' => '#2563EB',

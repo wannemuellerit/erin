@@ -215,5 +215,8 @@
     "Für diese E-Mail existiert bereits eine andere Rolle.": "Für diese E-Mail existiert bereits eine andere Rolle.",
     "Prüfung und Freigabe müssen durch zwei verschiedene Superadmins erfolgen.": "Prüfung und Freigabe müssen durch zwei verschiedene Superadmins erfolgen.",
     "Vor der weiteren Nutzung ist ein Passwortwechsel erforderlich.": "Vor der weiteren Nutzung ist ein Passwortwechsel erforderlich.",
-    "Ändere jetzt dein Passwort erneut und richte anschließend Zwei-Faktor-Authentifizierung ein.": "Ändere jetzt dein Passwort erneut und richte anschließend Zwei-Faktor-Authentifizierung ein."
+    "Ändere jetzt dein Passwort erneut und richte anschließend Zwei-Faktor-Authentifizierung ein.": "Ändere jetzt dein Passwort erneut und richte anschließend Zwei-Faktor-Authentifizierung ein.",
+    "Aktive Anzeigen benötigen einen Titel in beiden Sprachen.": "Aktive Anzeigen benötigen einen Titel in beiden Sprachen.",
+    "Aktive Anzeigen benötigen einen Text in beiden Sprachen.": "Aktive Anzeigen benötigen einen Text in beiden Sprachen.",
+    "Dein Speicherlimit ist erreicht. Verwendet: :used MB, Limit: :limit MB.": "Dein Speicherlimit ist erreicht. Verwendet: :used MB, Limit: :limit MB."
 }

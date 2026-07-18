@@ -276,6 +276,39 @@ test.describe('Login und Rollenbereiche', () => {
         ).toBeVisible();
     });
 
+    test('zeigt dem Superadmin Uploadlimits, Dashboard-Anzeigen und Nutzerhistorien', async ({
+        page,
+    }) => {
+        await logIn(page, accounts.admin.email);
+        await page.goto('/admin/settings');
+
+        await expect(
+            page.getByRole('heading', {
+                level: 2,
+                name: 'Uploads & Speicher',
+            }),
+        ).toBeVisible();
+        await expect(
+            page.getByLabel('Maximale Dateigröße in MB'),
+        ).toBeVisible();
+        await expect(
+            page.getByLabel('Speicherlimit je Nutzer in MB'),
+        ).toBeVisible();
+        await expect(
+            page.getByRole('heading', {
+                level: 2,
+                name: 'Dashboard-Anzeige',
+            }),
+        ).toBeVisible();
+        await expect(page.getByLabel('Zielgruppe')).toBeVisible();
+
+        await page.goto('/admin/users');
+        await expect(
+            page.getByRole('link', { name: 'Aktivitätshistorie' }).first(),
+        ).toBeVisible();
+        await expectNoSeriousAccessibilityViolations(page);
+    });
+
     test('meldet eine Fachkraft an und zeigt ausschließlich ihre Navigation', async ({
         page,
     }) => {

@@ -4,27 +4,13 @@ namespace App\Policies;
 
 use App\Models\CandidateDocument;
 use App\Models\User;
+use App\Services\Documents\CandidateDocumentAccess;
 
 class CandidateDocumentPolicy
 {
     public function view(User $user, CandidateDocument $candidateDocument): bool
     {
-        if ($candidateDocument->candidateProfile->user_id === $user->id || $user->isPlatformStaff()) {
-            return true;
-        }
-
-        if (! $candidateDocument->isAvailableForSharing()) {
-            return false;
-        }
-
-        $companyIds = $user->companyMemberships()
-            ->whereNotNull('accepted_at')
-            ->pluck('company_id');
-
-        return $candidateDocument->candidateProfile->applications()
-            ->whereNotNull('documents_shared_at')
-            ->whereHas('jobPosting', fn ($query) => $query->whereIn('company_id', $companyIds))
-            ->exists();
+        return app(CandidateDocumentAccess::class)->canDownload($user, $candidateDocument);
     }
 
     public function update(User $user, CandidateDocument $candidateDocument): bool

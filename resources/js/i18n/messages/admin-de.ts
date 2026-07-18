@@ -228,6 +228,7 @@ export default {
         companyMemberships:
             '{count} Firmenmitgliedschaft | {count} Firmenmitgliedschaften',
         createdAt: 'Erstellt {date}',
+        showHistory: 'Aktivitätshistorie',
         roleConfirm: 'Plattformrolle von {name} wirklich auf „{role}“ ändern?',
     },
     companies: {
@@ -523,6 +524,25 @@ export default {
         seatEnabled: 'Zusätzliche Sitze aktiviert',
         seatPrice: 'Preis pro Zusatzsitz in Cent',
         referralCommission: 'Referral-Provision in Cent',
+        uploadsTitle: 'Uploads & Speicher',
+        uploadsDescription:
+            'Plattformweite Obergrenzen für einzelne Dateien und den Speicherverbrauch je Nutzerkonto.',
+        uploadsHint:
+            'Niedrigere fachliche Grenzen, etwa für Profilbilder, bleiben zusätzlich bestehen.',
+        maxFileSize: 'Maximale Dateigröße in MB',
+        userStorageQuota: 'Speicherlimit je Nutzer in MB',
+        adTitle: 'Dashboard-Anzeige',
+        adDescription:
+            'Zeitlich steuerbare Anzeige für Fachkräfte, Unternehmen oder beide Zielgruppen.',
+        adEnabled: 'Anzeige aktiv',
+        adAudience: 'Zielgruppe',
+        adAudienceAll: 'Alle Nutzer',
+        adAudienceCandidates: 'Nur Fachkräfte',
+        adAudienceCompanies: 'Nur Unternehmen',
+        adCtaGerman: 'Buttontext Deutsch',
+        adCtaEnglish: 'Buttontext Englisch',
+        adStartsAt: 'Sichtbar ab',
+        adEndsAt: 'Sichtbar bis',
         savePlatform: 'Plattformkonfiguration speichern',
     },
     support: {

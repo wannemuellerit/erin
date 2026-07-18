@@ -9,6 +9,7 @@ use Illuminate\Support\Carbon;
 /**
  * @property int $id
  * @property int $job_posting_id
+ * @property int|null $uploaded_by
  * @property string $disk
  * @property string $path
  * @property string $original_name
@@ -35,5 +36,13 @@ class JobMedia extends Model
     public function jobPosting(): BelongsTo
     {
         return $this->belongsTo(JobPosting::class);
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function uploader(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'uploaded_by');
     }
 }

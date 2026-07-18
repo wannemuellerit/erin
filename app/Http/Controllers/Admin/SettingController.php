@@ -32,6 +32,20 @@ class SettingController extends AdminController
                 'seat_addon_price_cents' => $settings->get('billing.seat_addon_price_cents'),
                 'referral_commission_cents' => $settings->get('referrals.default_commission_cents'),
             ],
+            'uploads' => [
+                'max_file_size_mb' => (int) $settings->get(
+                    'uploads.max_file_size_mb',
+                    PlatformSettings::DEFAULT_UPLOAD_LIMITS['max_file_size_mb'],
+                ),
+                'user_quota_mb' => (int) $settings->get(
+                    'uploads.user_quota_mb',
+                    PlatformSettings::DEFAULT_UPLOAD_LIMITS['user_quota_mb'],
+                ),
+            ],
+            'dashboard_ad' => array_replace(
+                PlatformSettings::DEFAULT_DASHBOARD_AD,
+                (array) $settings->get('ads.dashboard', []),
+            ),
         ]);
     }
 
@@ -76,6 +90,11 @@ class SettingController extends AdminController
                 'seat_addon_price_cents' => $settings->get('billing.seat_addon_price_cents'),
                 'referral_commission_cents' => $settings->get('referrals.default_commission_cents'),
             ],
+            'uploads' => [
+                'max_file_size_mb' => $settings->get('uploads.max_file_size_mb'),
+                'user_quota_mb' => $settings->get('uploads.user_quota_mb'),
+            ],
+            'dashboard_ad' => $settings->get('ads.dashboard'),
         ];
 
         $userId = $request->user()?->getKey();
@@ -119,6 +138,27 @@ class SettingController extends AdminController
             $validated['billing']['referral_commission_cents'] ?? null,
             'referrals',
             false,
+            $userId,
+        );
+        $settings->put(
+            'uploads.max_file_size_mb',
+            $validated['uploads']['max_file_size_mb'],
+            'uploads',
+            false,
+            $userId,
+        );
+        $settings->put(
+            'uploads.user_quota_mb',
+            $validated['uploads']['user_quota_mb'],
+            'uploads',
+            false,
+            $userId,
+        );
+        $settings->put(
+            'ads.dashboard',
+            $validated['dashboard_ad'],
+            'ads',
+            true,
             $userId,
         );
 

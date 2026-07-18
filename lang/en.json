@@ -215,5 +215,8 @@
     "Für diese E-Mail existiert bereits eine andere Rolle.": "A different role already exists for this email address.",
     "Prüfung und Freigabe müssen durch zwei verschiedene Superadmins erfolgen.": "Verification and approval must be performed by two different super administrators.",
     "Vor der weiteren Nutzung ist ein Passwortwechsel erforderlich.": "You must change your password before continuing.",
-    "Ändere jetzt dein Passwort erneut und richte anschließend Zwei-Faktor-Authentifizierung ein.": "Change your password again now, then set up two-factor authentication."
+    "Ändere jetzt dein Passwort erneut und richte anschließend Zwei-Faktor-Authentifizierung ein.": "Change your password again now, then set up two-factor authentication.",
+    "Aktive Anzeigen benötigen einen Titel in beiden Sprachen.": "Active advertisements require a title in both languages.",
+    "Aktive Anzeigen benötigen einen Text in beiden Sprachen.": "Active advertisements require text in both languages.",
+    "Dein Speicherlimit ist erreicht. Verwendet: :used MB, Limit: :limit MB.": "Your storage limit has been reached. Used: :used MB, limit: :limit MB."
 }

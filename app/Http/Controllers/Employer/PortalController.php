@@ -15,6 +15,7 @@ use App\Models\VisaCase;
 use App\Models\VisaStep;
 use App\Services\Billing\EntitlementService;
 use App\Services\Companies\CurrentCompany;
+use App\Services\Documents\UploadPolicy;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -53,8 +54,11 @@ class PortalController extends Controller
         ]);
     }
 
-    public function updateCompanyProfile(Request $request, CurrentCompany $currentCompany): RedirectResponse
-    {
+    public function updateCompanyProfile(
+        Request $request,
+        CurrentCompany $currentCompany,
+        UploadPolicy $uploads,
+    ): RedirectResponse {
         $company = $currentCompany->forRequest($request);
         $this->assertManage($request, $currentCompany);
         $validated = $request->validate([
@@ -81,10 +85,28 @@ class PortalController extends Controller
             'locations.*.postal_code' => ['nullable', 'string', 'max:20'],
             'locations.*.address_line1' => ['nullable', 'string', 'max:180'],
             'locations.*.is_headquarters' => ['boolean'],
-            'logo' => ['nullable', 'file', 'mimes:jpg,jpeg,png,gif,webp', 'max:5120'],
+            'logo' => [
+                'nullable',
+                'file',
+                'mimes:jpg,jpeg,png,gif,webp',
+                'max:'.$uploads->maxFileKilobytes(5120),
+            ],
             'media' => ['array', 'max:12'],
-            'media.*' => ['file', 'mimes:jpg,jpeg,png,gif,webp,mp4,webm,pdf', 'max:51200'],
+            'media.*' => [
+                'file',
+                'mimes:jpg,jpeg,png,gif,webp,mp4,webm,pdf',
+                'max:'.$uploads->maxFileKilobytes(51200),
+            ],
         ]);
+        $user = $request->user();
+        abort_if($user === null, 401);
+        $files = array_values(array_filter([
+            $request->file('logo'),
+            ...$request->file('media', []),
+        ]));
+        if ($files !== []) {
+            $uploads->assertCanStore($user, $files, 'media');
+        }
 
         DB::transaction(function () use ($request, $company, $validated): void {
             $company->update(Arr::except($validated, ['locations', 'logo', 'media']));

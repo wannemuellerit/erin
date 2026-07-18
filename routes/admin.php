@@ -26,9 +26,6 @@ Route::middleware(['auth', 'verified', 'role:super_admin,support', 'staff.2fa'])
         Route::get('/', DashboardController::class)->name('dashboard');
         Route::get('users', [UserController::class, 'index'])->name('users.index');
         Route::get('companies', [CompanyController::class, 'index'])->name('companies.index');
-        Route::get('documents', [DocumentController::class, 'index'])->name('documents.index');
-        Route::patch('documents/{document}/review', [DocumentController::class, 'review'])
-            ->name('documents.review');
         Route::get('visa', [VisaController::class, 'index'])->name('visa.index');
         Route::get('support', [SupportController::class, 'index'])->name('support.index');
         Route::patch('support/{ticket}', [SupportController::class, 'update'])
@@ -44,6 +41,9 @@ Route::middleware(['auth', 'verified', 'role:super_admin,support', 'staff.2fa'])
         Route::get('system', [SystemController::class, 'index'])->name('system.index');
 
         Route::middleware('role:super_admin')->group(function (): void {
+            Route::get('documents', [DocumentController::class, 'index'])->name('documents.index');
+            Route::patch('documents/{document}/review', [DocumentController::class, 'review'])
+                ->name('documents.review');
             Route::patch('users/{user}/status', [UserController::class, 'updateStatus'])
                 ->name('users.status.update');
             Route::patch('users/{user}/role', [UserController::class, 'updateRole'])
