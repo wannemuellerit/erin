@@ -93,6 +93,7 @@ jobs:
           cp .env.example .env
           php artisan key:generate --no-interaction
           php artisan migrate --force --no-interaction
+          php artisan wayfinder:generate --with-form
 
       - name: Build production assets
         run: npm run build
