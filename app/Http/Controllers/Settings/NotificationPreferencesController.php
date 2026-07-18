@@ -48,6 +48,7 @@ class NotificationPreferencesController extends Controller
             'push_subscription_count' => $user->pushSubscriptions()->count(),
             'push_subscription_store_url' => route('push-subscriptions.store'),
             'push_subscription_destroy_url' => route('push-subscriptions.destroy'),
+            'push_subscription_test_url' => route('push-subscriptions.test'),
         ]);
     }
 

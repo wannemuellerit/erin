@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $id
  * @property string $slug
  * @property string $name
+ * @property string|null $description
  * @property int|null $price_cents
  * @property string $currency
  * @property int|null $term_months
@@ -19,6 +20,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $ai_credits_monthly
  * @property int|null $job_boosts_per_term
  * @property int|null $visa_credits_per_term
+ * @property bool $is_enterprise
+ * @property bool $is_active
+ * @property string|null $stripe_product_id
+ * @property string|null $stripe_price_id
  */
 class Plan extends Model
 {

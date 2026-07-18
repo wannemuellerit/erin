@@ -7,22 +7,23 @@ ships with a Docker-first development environment.
 
 ## Runtime containers
 
-| Service | Purpose | Host port |
-| --- | --- | --- |
-| `laravel` | Laravel development server, PHP 8.4 | `8000` |
-| `vite` | Vite development/HMR server, Node 22 | `5173` |
-| `mysql` | MySQL 8.4 LTS | `3306` |
-| `redis` | Cache, queues and distributed locks | `6379` |
-| `queue` | Redis-backed Laravel worker | - |
-| `scheduler` | Laravel scheduler | - |
-| `reverb` | Pusher-compatible WebSocket server | `8080` |
-| `meilisearch` | Full-text and faceted search | `7700` |
-| `minio` | Private S3-compatible object storage | `9000` |
-| `minio-init` | Creates the private application bucket | - |
-| `clamav` | Malware scanner for uploaded files | internal `3310` |
-| `mailpit` | Local SMTP inbox and web UI | `8025` |
-| `setup` | Composer install, key generation and migrations | - |
-| `node-setup` | Deterministic `npm ci` install | - |
+| Service       | Purpose                                         | Host port       |
+| ------------- | ----------------------------------------------- | --------------- |
+| `laravel`     | Laravel development server, PHP 8.4             | `8000`          |
+| `vite`        | Vite development/HMR server, Node 22            | `5173`          |
+| `mysql`       | MySQL 8.4 LTS                                   | `3306`          |
+| `redis`       | Cache, queues and distributed locks             | `6379`          |
+| `queue`       | Redis-backed Laravel worker                     | -               |
+| `scheduler`   | Laravel scheduler                               | -               |
+| `reverb`      | Pusher-compatible WebSocket server              | `8080`          |
+| `meilisearch` | Full-text and faceted search                    | `7700`          |
+| `minio`       | Private S3-compatible object storage            | `9000`          |
+| `minio-init`  | Creates the private application bucket          | -               |
+| `clamav`      | Malware scanner for uploaded files              | internal `3310` |
+| `mailpit`     | Local SMTP inbox and web UI                     | `8025`          |
+| `setup`       | Composer install, key generation and migrations | -               |
+| `node-setup`  | Deterministic `npm ci` install                  | -               |
+| `stripe-cli`  | Optional local Stripe webhook forwarding        | -               |
 
 Persistent state is stored in named Docker volumes. Source code, `vendor` and
 `node_modules` are bind-mounted so the IDE and all containers use the same
@@ -55,6 +56,22 @@ database migrations. Open:
 The credentials in `.env.example` belong only to the local containers. Replace
 them with secrets from a secret manager in every deployed environment.
 
+## Demo accounts
+
+With `APP_DEMO_MODE=true`, the default seeder creates verified accounts for the
+Superadmin, two sample companies and ten sample candidates. Every demo account
+uses the password `password`:
+
+| Role | Email |
+| --- | --- |
+| Superadmin | `admin@wannemueller.dev` |
+| Müller Elektrotechnik | `unternehmen.mueller@wannemueller.dev` |
+| RheinCargo Logistik | `unternehmen.rheincargo@wannemueller.dev` |
+| Candidates 1–10 | `candidate01@wannemueller.dev` through `candidate10@wannemueller.dev` |
+
+The login page can insert the Superadmin credentials automatically while demo
+mode is active. Demo credentials and the seeder are disabled in production.
+
 ## Isolated tools
 
 Pest uses the separate `erin_testing` MySQL database. Tool containers run only
@@ -68,6 +85,16 @@ docker compose run --rm node-setup npm run types:check
 docker compose run --rm node-setup npm run lint:check
 docker compose run --rm node-setup npm run format:check
 docker compose run --rm playwright
+```
+
+The browser suite uses deterministic demo fixtures for all roles, onboarding,
+tenant isolation, read-only support views, mobile layouts and serious WCAG
+violations. Reset those fixtures before a local run:
+
+```bash
+docker compose exec laravel php artisan db:seed --force --no-interaction
+docker compose exec laravel php artisan db:seed --class='Database\Seeders\BrowserTestSeeder' --force --no-interaction
+docker compose --profile tools run --rm playwright
 ```
 
 Run Artisan or Composer inside PHP:
@@ -146,7 +173,61 @@ STRIPE_PRICE_PREMIUM=
 ```
 
 Never enable paid access from the browser redirect alone. The application must
-wait for a verified, idempotently processed Stripe webhook.
+wait for a verified, idempotently processed Stripe webhook. Subscription
+webhooks are serialized per customer and reloaded from Stripe before Cashier is
+mutated; opaque event IDs are used only for exact deduplication.
+
+The catalog command is a dry-run unless `--apply` is explicitly provided. It
+stores newly created immutable Product and recurring Price IDs on the plan and
+never prints Stripe keys or raw provider errors:
+
+```bash
+docker compose exec laravel php artisan erin:stripe:sync-plans
+docker compose exec laravel php artisan erin:stripe:sync-plans --plan=basic
+docker compose exec laravel php artisan erin:stripe:sync-plans --apply
+```
+
+Use `--apply` only with a Stripe test key during setup. Live mutations additionally
+require `--allow-live`, `APP_ENV=production`, a public HTTPS `APP_URL` and an
+interactive confirmation. Non-interactive live runs are always rejected, including
+calls with `--no-interaction`; the read-only readiness overview is available to
+Superadmins under `Admin → Paket & Abrechnung`.
+
+For local webhook testing, put only a Stripe test secret into `.env`, start the
+optional listener and copy the emitted `whsec_…` value to
+`STRIPE_WEBHOOK_SECRET`:
+
+```bash
+docker compose --profile stripe up -d stripe-cli
+docker compose logs -f stripe-cli
+docker compose restart laravel
+docker compose --profile stripe run --rm stripe-cli trigger customer.subscription.created
+```
+
+The automated test suite does not call Stripe and uses signed local webhook
+payloads. Production products, prices, webhook endpoints and keys must be
+configured through the protected deployment process.
+
+Zammad remains an external managed service. Erin stores every support message
+locally first and then synchronizes tickets and public replies through queued,
+retryable API jobs. Stable operation markers reconcile uncertain writes before
+a retry creates anything remotely. Configure a dedicated Zammad agent token
+and a regular webhook with the following values:
+
+```dotenv
+ZAMMAD_ENABLED=true
+ZAMMAD_URL=https://support.example.com
+ZAMMAD_TOKEN=
+ZAMMAD_GROUP=Users
+ZAMMAD_WEBHOOK_SECRET=
+ZAMMAD_TIMEOUT=10
+```
+
+The Zammad webhook endpoint is
+`https://<erin-domain>/integrations/zammad/webhook`. Set the same HMAC-SHA1
+signature token as `ZAMMAD_WEBHOOK_SECRET`; Erin validates `X-Hub-Signature`
+and deduplicates deliveries by `X-Zammad-Delivery`. Internal Zammad notes stay
+staff-only, while public replies appear live in the shared Erin support chat.
 
 OpenAI and LiveKit are external managed services and therefore do not get local
 containers. Their placeholders live in `.env.example`. Sensitive-document AI

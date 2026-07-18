@@ -1,9 +1,15 @@
 <script setup lang="ts">
 import { Head, router, useForm } from '@inertiajs/vue3';
-import { BriefcaseBusiness, Clock3, MapPin, Search } from '@lucide/vue';
+import { BriefcaseBusiness, Clock3, MapPin } from '@lucide/vue';
 import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
+import FilterChip from '@/components/product/FilterChip.vue';
+import FilterToolbar from '@/components/product/FilterToolbar.vue';
 import PageHeader from '@/components/product/PageHeader.vue';
+import SearchField from '@/components/product/SearchField.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
+import { useFormatters } from '@/composables/useFormatters';
+import { useLocalizedField } from '@/composables/useLocalizedField';
 import { jobs as jobsIndex } from '@/routes/candidate';
 import { apply } from '@/routes/candidate/jobs';
 
@@ -64,6 +70,9 @@ const props = withDefaults(
         profile_completeness: 0,
     },
 );
+const { t, te } = useI18n();
+const { formatCurrency, formatDate } = useFormatters();
+const { localizedField } = useLocalizedField();
 const search = ref(props.filters.search ?? '');
 const applyingJobId = ref<number | null>(null);
 const applicationForm = useForm({
@@ -110,98 +119,101 @@ const money = (job: Job) => {
         job.compensation_min_cents == null &&
         job.compensation_max_cents == null
     ) {
-        return 'Vergütung auf Anfrage';
+        return t('candidate.jobs.compensationOnRequest');
     }
 
-    const formatter = new Intl.NumberFormat('de-DE', {
-        style: 'currency',
-        currency: job.currency ?? 'EUR',
+    const options = {
         maximumFractionDigits: 0,
-    });
+    } satisfies Intl.NumberFormatOptions;
     const minimum =
         job.compensation_min_cents != null
-            ? formatter.format(job.compensation_min_cents / 100)
+            ? formatCurrency(
+                  job.compensation_min_cents / 100,
+                  job.currency ?? 'EUR',
+                  options,
+              )
             : '';
     const maximum =
         job.compensation_max_cents != null
-            ? formatter.format(job.compensation_max_cents / 100)
+            ? formatCurrency(
+                  job.compensation_max_cents / 100,
+                  job.currency ?? 'EUR',
+                  options,
+              )
             : '';
 
     return [minimum, maximum].filter(Boolean).join(' – ');
 };
+const employmentTypeLabel = (value: string) => {
+    const key = `candidate.jobs.employmentTypes.${value}`;
+
+    return te(key) ? t(key) : value.replaceAll('_', ' ');
+};
 </script>
 
 <template>
-    <Head title="Passende Jobs" />
+    <Head :title="t('candidate.jobs.metaTitle')" />
     <div class="erin-page">
         <PageHeader
-            eyebrow="Job Discovery"
-            title="Passende Jobs für dich"
-            description="Diese Stellen passen zu deinen Skills, deiner Sprache und deinen persönlichen Wünschen."
+            :eyebrow="t('candidate.jobs.eyebrow')"
+            :title="t('candidate.jobs.title')"
+            :description="t('candidate.jobs.description')"
             :icon="BriefcaseBusiness"
         >
             <template #actions
-                ><StatusBadge :label="`${jobs.length} Matches`" tone="teal"
+                ><StatusBadge
+                    :label="t('candidate.jobs.matches', { count: jobs.length })"
+                    tone="teal"
             /></template>
         </PageHeader>
         <div
             v-if="!can_apply"
             class="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800"
         >
-            Dein Profil ist zu {{ profile_completeness }} % vollständig. Für
-            Bewerbungen muss es veröffentlicht und mindestens zu 80 %
-            vollständig sein.
+            {{
+                t('candidate.jobs.profileIncomplete', {
+                    percentage: profile_completeness,
+                })
+            }}
         </div>
-        <section class="erin-panel p-4">
-            <form
-                class="flex flex-col gap-3 lg:flex-row"
-                @submit.prevent="submitSearch"
-            >
-                <div class="relative flex-1">
-                    <Search
-                        class="absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-slate-400"
-                    /><input
-                        v-model="search"
-                        type="search"
-                        placeholder="Beruf, Unternehmen oder Ort suchen …"
-                        class="h-11 w-full rounded-xl border border-slate-200 pl-10 text-sm"
-                    />
-                </div>
-                <button
-                    type="submit"
-                    class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[var(--erin-primary)] px-4 text-sm font-bold text-white"
-                >
-                    Suchen
-                </button>
+        <FilterToolbar>
+            <form @submit.prevent="submitSearch">
+                <SearchField
+                    v-model="search"
+                    :placeholder="t('candidate.jobs.searchPlaceholder')"
+                />
             </form>
-            <div
-                v-if="Object.values(filters).some(Boolean)"
-                class="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3"
-            >
-                <span
+            <template #actions>
+                <button
+                    type="button"
+                    class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[var(--erin-primary)] px-4 text-sm font-bold text-white"
+                    @click="submitSearch"
+                >
+                    {{ t('candidate.jobs.search') }}
+                </button>
+            </template>
+            <template v-if="Object.values(filters).some(Boolean)" #filters>
+                <FilterChip
                     v-if="filters.employment_type"
-                    class="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700"
-                    >{{ filters.employment_type }}</span
-                >
-                <span
+                    :label="employmentTypeLabel(filters.employment_type)"
+                />
+                <FilterChip
                     v-if="filters.visa_support"
-                    class="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700"
-                    >Visa-Unterstützung</span
-                >
-                <span
+                    :label="t('candidate.jobs.visaSupport')"
+                />
+                <FilterChip
                     v-if="filters.remote"
-                    class="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700"
-                    >Remote</span
-                >
+                    :label="t('candidate.jobs.remote')"
+                />
                 <button
                     type="button"
                     class="text-xs font-bold text-slate-400"
                     @click="router.get(jobsIndex.url())"
                 >
-                    Filter löschen
+                    {{ t('candidate.jobs.clearFilters') }}
                 </button>
-            </div>
-        </section>
+            </template>
+        </FilterToolbar>
 
         <div v-if="jobs.length" class="grid gap-4 xl:grid-cols-2">
             <article
@@ -221,14 +233,14 @@ const money = (job: Job) => {
                             </h2>
                             <StatusBadge
                                 v-if="job.boosted_until"
-                                label="Boost"
+                                :label="t('candidate.jobs.boost')"
                                 tone="orange"
                             />
                         </div>
                         <p class="mt-1 text-xs font-medium text-slate-500">
                             {{
                                 job.company?.name ??
-                                'Unternehmen nicht verfügbar'
+                                t('candidate.common.companyUnavailable')
                             }}
                         </p>
                         <div
@@ -240,7 +252,7 @@ const money = (job: Job) => {
                                 />{{
                                     job.location?.city ??
                                     job.company?.city ??
-                                    'Standort offen'
+                                    t('candidate.jobs.locationOpen')
                                 }}</span
                             >
                             <span
@@ -249,9 +261,9 @@ const money = (job: Job) => {
                                 ><Clock3
                                     class="size-3.5 text-[var(--erin-primary)]"
                                 />{{
-                                    new Intl.DateTimeFormat('de-DE', {
+                                    formatDate(job.published_at, {
                                         dateStyle: 'medium',
-                                    }).format(new Date(job.published_at))
+                                    })
                                 }}</span
                             >
                         </div>
@@ -262,26 +274,27 @@ const money = (job: Job) => {
                             >{{ job.match.score ?? 0 }} %</span
                         ><span
                             class="block text-[9px] font-bold text-slate-400 uppercase"
-                            >Match</span
+                            >{{ t('candidate.jobs.match') }}</span
                         >
                     </div>
                 </div>
                 <p class="mt-4 line-clamp-3 text-sm leading-6 text-slate-600">
-                    {{ job.description || 'Keine Beschreibung hinterlegt.' }}
+                    {{
+                        job.description ||
+                        t('candidate.jobs.descriptionMissing')
+                    }}
                 </p>
                 <div class="mt-4 flex flex-wrap gap-1.5">
                     <span
                         v-for="skill in job.skills ?? []"
                         :key="skill.id"
                         class="rounded-lg bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-600"
-                        >{{
-                            skill.name_de ?? skill.name_en ?? skill.slug
-                        }}</span
+                        >{{ localizedField(skill, 'name', skill.slug) }}</span
                     >
                     <span
                         v-if="job.visa_package_available"
                         class="rounded-lg bg-teal-50 px-2.5 py-1 text-[10px] font-bold text-teal-700"
-                        >Visa-Support</span
+                        >{{ t('candidate.jobs.visaSupportShort') }}</span
                     >
                 </div>
                 <div
@@ -299,11 +312,15 @@ const money = (job: Job) => {
                     >
                         {{
                             job.screening_questions?.length
-                                ? 'Bewerbung starten'
-                                : 'Jetzt bewerben'
+                                ? t('candidate.jobs.startApplication')
+                                : t('candidate.jobs.applyNow')
                         }}
                     </button>
-                    <StatusBadge v-else label="Bereits beworben" tone="green" />
+                    <StatusBadge
+                        v-else
+                        :label="t('candidate.jobs.alreadyApplied')"
+                        tone="green"
+                    />
                 </div>
                 <form
                     v-if="applyingJobId === job.id"
@@ -315,14 +332,16 @@ const money = (job: Job) => {
                             :for="`cover-letter-${job.id}`"
                             class="text-xs font-bold text-slate-700"
                         >
-                            Anschreiben (optional)
+                            {{ t('candidate.jobs.coverLetter') }}
                         </label>
                         <textarea
                             :id="`cover-letter-${job.id}`"
                             v-model="applicationForm.cover_letter"
                             rows="4"
                             class="erin-focus mt-1.5 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm"
-                            placeholder="Warum passt diese Stelle zu dir?"
+                            :placeholder="
+                                t('candidate.jobs.coverLetterPlaceholder')
+                            "
                         />
                     </div>
                     <div
@@ -362,14 +381,14 @@ const money = (job: Job) => {
                             class="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-600"
                             @click="applyingJobId = null"
                         >
-                            Abbrechen
+                            {{ t('candidate.jobs.cancel') }}
                         </button>
                         <button
                             type="submit"
                             :disabled="applicationForm.processing"
                             class="h-9 rounded-xl bg-[var(--erin-primary)] px-4 text-xs font-bold text-white disabled:opacity-50"
                         >
-                            Bewerbung absenden
+                            {{ t('candidate.jobs.submit') }}
                         </button>
                     </div>
                 </form>
@@ -381,10 +400,11 @@ const money = (job: Job) => {
         >
             <div>
                 <BriefcaseBusiness class="mx-auto size-9 text-slate-300" />
-                <h2 class="mt-4 font-bold">Keine passenden Jobs gefunden</h2>
+                <h2 class="mt-4 font-bold">
+                    {{ t('candidate.jobs.emptyTitle') }}
+                </h2>
                 <p class="mt-2 max-w-md text-sm text-slate-500">
-                    Passe deine Suche an oder ergänze dein Profil, um genauere
-                    Matches zu erhalten.
+                    {{ t('candidate.jobs.emptyDescription') }}
                 </p>
             </div>
         </div>

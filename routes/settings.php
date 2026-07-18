@@ -41,6 +41,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('settings/push-subscriptions', [PushSubscriptionController::class, 'destroy'])
         ->middleware('throttle:10,1')
         ->name('push-subscriptions.destroy');
+    Route::post('settings/push-subscriptions/test', [PushSubscriptionController::class, 'test'])
+        ->middleware('throttle:3,1')
+        ->name('push-subscriptions.test');
 });
 
 /* @chisel-passkeys */

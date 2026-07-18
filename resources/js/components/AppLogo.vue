@@ -9,7 +9,7 @@ import AppLogoIcon from '@/components/AppLogoIcon.vue';
             erin<span class="text-blue-600">.</span>
         </span>
         <span
-            class="truncate text-[10px] font-semibold tracking-[0.12em] text-slate-400 uppercase"
+            class="truncate text-[10px] font-semibold tracking-[0.12em] text-slate-600 uppercase"
         >
             Recruiting OS
         </span>

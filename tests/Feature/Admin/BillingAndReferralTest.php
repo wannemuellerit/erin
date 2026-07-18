@@ -8,8 +8,55 @@ use App\Models\Referral;
 use App\Models\ReferralCode;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 
 uses(RefreshDatabase::class);
+
+it('shows only a secret-free Stripe configuration status', function () {
+    config()->set('cashier.key', 'pk_live_never_render');
+    config()->set('cashier.secret', 'sk_live_never_render');
+    config()->set('cashier.webhook.secret', 'whsec_never_render');
+    config()->set('services.stripe.seat_price_id', 'price_seat_never_render');
+    config()->set('services.stripe.visa_price_id');
+    $admin = User::factory()->create(['role' => UserRole::SuperAdmin]);
+    Plan::factory()->create([
+        'slug' => 'configured',
+        'name' => 'Konfiguriert',
+        'stripe_product_id' => 'prod_never_render',
+        'stripe_price_id' => 'price_never_render',
+    ]);
+    Plan::factory()->create([
+        'slug' => 'missing',
+        'name' => 'Unvollständig',
+        'stripe_product_id' => null,
+        'stripe_price_id' => null,
+    ]);
+    Plan::factory()->create([
+        'slug' => 'enterprise-status',
+        'is_enterprise' => true,
+        'stripe_product_id' => null,
+        'stripe_price_id' => null,
+    ]);
+
+    $response = $this->actingAs($admin)->get(route('admin.billing.index'));
+
+    $response
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('admin/Billing')
+            ->where('stripe_configuration.mode', 'live')
+            ->where('stripe_configuration.publishable_key', true)
+            ->where('stripe_configuration.secret_key', true)
+            ->where('stripe_configuration.webhook_secret', true)
+            ->where('stripe_configuration.seat_price', true)
+            ->where('stripe_configuration.visa_price', false)
+            ->where('stripe_configuration.launch_prices_configured', 1)
+            ->where('stripe_configuration.launch_prices_total', 2)
+            ->where('stripe_configuration.ready', false)
+            ->has('stripe_configuration.plans', 2))
+        ->assertDontSee('sk_live_never_render')
+        ->assertDontSee('whsec_never_render');
+});
 
 it('requires a new Stripe Price ID when a configured package price changes', function () {
     $admin = User::factory()->create(['role' => UserRole::SuperAdmin]);

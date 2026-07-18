@@ -151,7 +151,7 @@ const copyrightYear = computed(() => new Date().getFullYear());
                 </div>
             </div>
 
-            <div class="px-8 py-5 text-center text-[11px] text-slate-400">
+            <div class="px-8 py-5 text-center text-[11px] text-slate-600">
                 © {{ copyrightYear }} Erin · {{ t('auth.privacy') }} ·
                 {{ t('auth.imprint') }}
             </div>

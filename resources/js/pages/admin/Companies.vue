@@ -2,19 +2,14 @@
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { Building2, Search, ShieldAlert, X } from '@lucide/vue';
 import { reactive } from 'vue';
+import EmptyState from '@/components/product/EmptyState.vue';
 import PageHeader from '@/components/product/PageHeader.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
 import adminCompanies from '@/routes/admin/companies';
-import AdminEmptyState from './_components/AdminEmptyState.vue';
 import AdminPagination from './_components/AdminPagination.vue';
-import {
-    cleanFilters,
-    formatCurrency,
-    formatDate,
-    humanize,
-    statusTone,
-} from './_shared';
+import { useAdminI18n } from './_i18n';
+import { cleanFilters, statusTone } from './_shared';
 import type { AdminPaginator } from './_shared';
 
 type CompanyRow = {
@@ -71,6 +66,8 @@ const statusForm = useForm({
     reason: '',
 });
 
+const { t, formatCurrency, formatDate, humanize } = useAdminI18n();
+
 function applyFilters(): void {
     router.get(adminCompanies.index.url(), cleanFilters(filters), {
         preserveState: true,
@@ -93,9 +90,7 @@ function updateStatus(company: CompanyRow, event: Event): void {
     let reason = '';
 
     if (['suspended', 'blocked'].includes(nextStatus)) {
-        const input = window.prompt(
-            'Bitte gib einen nachvollziehbaren Grund an (mindestens 5 Zeichen):',
-        );
+        const input = window.prompt(t('common.reasonPrompt'));
 
         if (input === null || input.trim().length < 5) {
             select.value = company.status;
@@ -119,13 +114,15 @@ function updateStatus(company: CompanyRow, event: Event): void {
 </script>
 
 <template>
-    <Head title="Unternehmen" />
+    <Head :title="t('companies.metaTitle')" />
 
     <div class="erin-page">
         <PageHeader
-            eyebrow="Mandanten"
-            title="Unternehmen"
-            :description="`${companies.total} Firmenkunden mit echten Paket-, Team- und Aktivitätsdaten.`"
+            :eyebrow="t('companies.eyebrow')"
+            :title="t('companies.title')"
+            :description="
+                t('companies.description', { count: companies.total })
+            "
             :icon="Building2"
         />
 
@@ -135,23 +132,25 @@ function updateStatus(company: CompanyRow, event: Event): void {
                 @submit.prevent="applyFilters"
             >
                 <label class="relative">
-                    <span class="sr-only">Unternehmen suchen</span>
+                    <span class="sr-only">{{
+                        t('companies.searchLabel')
+                    }}</span>
                     <Search
                         class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-slate-400"
                     />
                     <input
                         v-model="filters.search"
                         type="search"
-                        placeholder="Name, Rechtsname oder E-Mail …"
+                        :placeholder="t('companies.searchPlaceholder')"
                         class="erin-focus h-11 w-full rounded-xl border border-slate-200 bg-white pr-3 pl-10 text-sm"
                     />
                 </label>
                 <select
                     v-model="filters.status"
-                    aria-label="Firmenstatus"
+                    :aria-label="t('companies.companyStatus')"
                     class="erin-focus h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
                 >
-                    <option value="">Alle Status</option>
+                    <option value="">{{ t('common.allStatuses') }}</option>
                     <option
                         v-for="status in statuses"
                         :key="status"
@@ -163,36 +162,38 @@ function updateStatus(company: CompanyRow, event: Event): void {
                 <input
                     v-model="filters.subscription_status"
                     type="text"
-                    placeholder="Abo-Status"
-                    aria-label="Abonnementstatus"
+                    :placeholder="t('companies.subscriptionPlaceholder')"
+                    :aria-label="t('companies.subscriptionStatus')"
                     class="erin-focus h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
                 />
                 <input
                     v-model="filters.plan"
                     type="text"
-                    placeholder="Paket-Slug"
-                    aria-label="Paket"
+                    :placeholder="t('companies.planPlaceholder')"
+                    :aria-label="t('companies.plan')"
                     class="erin-focus h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
                 />
                 <select
                     v-model="filters.sort"
-                    aria-label="Sortierung"
+                    :aria-label="t('companies.sorting')"
                     class="erin-focus h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
                 >
-                    <option value="newest">Neueste zuerst</option>
-                    <option value="last_active">Zuletzt aktiv</option>
-                    <option value="name">Name</option>
+                    <option value="newest">{{ t('companies.newest') }}</option>
+                    <option value="last_active">
+                        {{ t('companies.lastActive') }}
+                    </option>
+                    <option value="name">{{ t('companies.name') }}</option>
                 </select>
                 <div class="flex gap-2">
                     <button
                         type="submit"
                         class="erin-focus h-11 rounded-xl bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700"
                     >
-                        Filtern
+                        {{ t('common.filter') }}
                     </button>
                     <button
                         type="button"
-                        aria-label="Filter zurücksetzen"
+                        :aria-label="t('common.resetFilters')"
                         class="erin-focus grid size-11 place-items-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50"
                         @click="resetFilters"
                     >
@@ -207,11 +208,21 @@ function updateStatus(company: CompanyRow, event: Event): void {
                         <tr
                             class="text-[11px] font-bold tracking-wide text-slate-500 uppercase"
                         >
-                            <th class="px-5 py-3">Unternehmen</th>
-                            <th class="px-5 py-3">Paket</th>
-                            <th class="px-5 py-3">Nutzung</th>
-                            <th class="px-5 py-3">Aktivität</th>
-                            <th class="px-5 py-3">Zugang</th>
+                            <th class="px-5 py-3">
+                                {{ t('companies.columns.company') }}
+                            </th>
+                            <th class="px-5 py-3">
+                                {{ t('companies.columns.plan') }}
+                            </th>
+                            <th class="px-5 py-3">
+                                {{ t('companies.columns.usage') }}
+                            </th>
+                            <th class="px-5 py-3">
+                                {{ t('companies.columns.activity') }}
+                            </th>
+                            <th class="px-5 py-3">
+                                {{ t('companies.columns.access') }}
+                            </th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
@@ -231,7 +242,7 @@ function updateStatus(company: CompanyRow, event: Event): void {
                                         '—'
                                     }}
                                 </p>
-                                <p class="mt-2 text-xs text-slate-400">
+                                <p class="mt-2 text-xs text-slate-600">
                                     {{
                                         [
                                             company.city,
@@ -240,13 +251,16 @@ function updateStatus(company: CompanyRow, event: Event): void {
                                         ]
                                             .filter(Boolean)
                                             .join(' · ') ||
-                                        'Keine Profildetails'
+                                        t('companies.noProfileDetails')
                                     }}
                                 </p>
                             </td>
                             <td class="px-5 py-4">
                                 <p class="text-sm font-semibold text-slate-800">
-                                    {{ company.plan?.name ?? 'Kein Paket' }}
+                                    {{
+                                        company.plan?.name ??
+                                        t('companies.noPlan')
+                                    }}
                                 </p>
                                 <p
                                     v-if="company.plan"
@@ -254,7 +268,7 @@ function updateStatus(company: CompanyRow, event: Event): void {
                                 >
                                     {{
                                         company.plan.price_cents === null
-                                            ? 'Auf Anfrage'
+                                            ? t('common.onRequest')
                                             : formatCurrency(
                                                   company.plan.price_cents,
                                                   company.plan.currency,
@@ -270,39 +284,54 @@ function updateStatus(company: CompanyRow, event: Event): void {
                                         statusTone(company.subscription_status)
                                     "
                                 />
-                                <p class="mt-1 text-[11px] text-slate-400">
-                                    Verlängerung
+                                <p class="mt-1 text-[11px] text-slate-600">
                                     {{
-                                        formatDate(
-                                            company.subscription_renews_at,
-                                        )
+                                        t('companies.renewal', {
+                                            date: formatDate(
+                                                company.subscription_renews_at,
+                                            ),
+                                        })
                                     }}
                                 </p>
                             </td>
                             <td class="px-5 py-4 text-xs text-slate-600">
                                 <p>
-                                    <strong class="text-slate-800">{{
-                                        company.memberships_count
-                                    }}</strong>
-                                    Teammitglieder
+                                    {{
+                                        t(
+                                            'companies.teamMembers',
+                                            company.memberships_count,
+                                        )
+                                    }}
                                 </p>
                                 <p class="mt-1">
-                                    <strong class="text-slate-800">{{
-                                        company.job_postings_count
-                                    }}</strong>
-                                    Stellenanzeigen
+                                    {{
+                                        t(
+                                            'companies.jobPostings',
+                                            company.job_postings_count,
+                                        )
+                                    }}
                                 </p>
                                 <p v-if="company.employee_count" class="mt-1">
-                                    {{ company.employee_count }} Beschäftigte
+                                    {{
+                                        t(
+                                            'companies.employees',
+                                            company.employee_count,
+                                        )
+                                    }}
                                 </p>
                             </td>
                             <td
                                 class="px-5 py-4 text-xs whitespace-nowrap text-slate-500"
                             >
                                 <p>{{ formatDate(company.last_active_at) }}</p>
-                                <p class="mt-1 text-slate-400">
-                                    Erstellt
-                                    {{ formatDate(company.created_at) }}
+                                <p class="mt-1 text-slate-600">
+                                    {{
+                                        t('users.createdAt', {
+                                            date: formatDate(
+                                                company.created_at,
+                                            ),
+                                        })
+                                    }}
                                 </p>
                             </td>
                             <td class="px-5 py-4">
@@ -313,7 +342,11 @@ function updateStatus(company: CompanyRow, event: Event): void {
                                 <select
                                     :value="company.status"
                                     :disabled="statusForm.processing"
-                                    :aria-label="`Status von ${company.name}`"
+                                    :aria-label="
+                                        t('common.statusFor', {
+                                            name: company.name,
+                                        })
+                                    "
                                     class="erin-focus mt-2 block h-9 min-w-36 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold disabled:opacity-60"
                                     @change="updateStatus(company, $event)"
                                 >
@@ -343,7 +376,11 @@ function updateStatus(company: CompanyRow, event: Event): void {
                     </tbody>
                 </table>
             </div>
-            <AdminEmptyState v-else />
+            <EmptyState
+                v-else
+                :title="t('common.emptyTitle')"
+                :description="t('common.emptyDescription')"
+            />
             <AdminPagination :paginator="companies" />
         </SectionCard>
     </div>

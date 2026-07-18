@@ -161,7 +161,7 @@ const { t } = useI18n();
                                         )
                                     }}
                                 </p>
-                                <p class="truncate text-xs text-slate-400">
+                                <p class="truncate text-xs text-slate-600">
                                     {{
                                         application.job_posting?.title ||
                                         t('dashboard.employer.jobFallback')
@@ -190,7 +190,7 @@ const { t } = useI18n();
                             />
                         </div>
                     </div>
-                    <p v-else class="py-10 text-center text-sm text-slate-400">
+                    <p v-else class="py-10 text-center text-sm text-slate-600">
                         {{ t('dashboard.employer.noApplications') }}
                     </p>
                 </SectionCard>

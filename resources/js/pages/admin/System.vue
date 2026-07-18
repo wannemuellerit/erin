@@ -3,33 +3,31 @@ import type { FormDataConvertible } from '@inertiajs/core';
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import {
     Activity,
-    Database,
     FileLock2,
     Flag,
-    KeyRound,
     ListChecks,
-    Mail,
     PencilLine,
     Plus,
     Save,
-    Server,
     ShieldCheck,
     Trash2,
-    Webhook,
 } from '@lucide/vue';
 import { computed, ref, watch } from 'vue';
-import MetricCard from '@/components/product/MetricCard.vue';
+import EmptyState from '@/components/product/EmptyState.vue';
 import PageHeader from '@/components/product/PageHeader.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
+import Textarea from '@/components/product/Textarea.vue';
 import adminAccessList from '@/routes/admin/access-list';
 import adminEmailTemplates from '@/routes/admin/email-templates';
 import adminFeatureFlags from '@/routes/admin/feature-flags';
 import adminGdprRequests from '@/routes/admin/gdpr-requests';
-import AdminEmptyState from './_components/AdminEmptyState.vue';
 import AdminPagination from './_components/AdminPagination.vue';
+import SystemLoginHistory from './_components/SystemLoginHistory.vue';
+import SystemOverview from './_components/SystemOverview.vue';
+import { useAdminI18n } from './_i18n';
 import type { AdminPaginator } from './_shared';
-import { formatDate, humanize, statusTone } from './_shared';
+import { statusTone } from './_shared';
 
 type JsonConditions =
     Record<string, FormDataConvertible> | FormDataConvertible[] | null;
@@ -175,6 +173,7 @@ const page = usePage();
 const isSuperAdmin = computed(
     () => String(page.props.auth.user.role) === 'super_admin',
 );
+const { t, formatDate, humanize } = useAdminI18n();
 
 const selectedGdprId = ref<number | null>(
     props.gdpr_requests.data[0]?.id ?? null,
@@ -324,7 +323,11 @@ function saveAccessEntry(): void {
 }
 
 function deleteAccessEntry(entry: AccessListEntryRow): void {
-    if (!window.confirm(`Eintrag „${entry.value}“ wirklich löschen?`)) {
+    if (
+        !window.confirm(
+            t('system.access.deleteConfirm', { value: entry.value }),
+        )
+    ) {
         return;
     }
 
@@ -438,7 +441,9 @@ function saveTemplate(): void {
 function deleteTemplate(template: EmailTemplateGroup): void {
     if (
         !window.confirm(
-            `E-Mail-Template „${template.key}“ in DE und EN wirklich löschen?`,
+            t('system.templates.deleteConfirm', {
+                key: template.key,
+            }),
         )
     ) {
         return;
@@ -549,8 +554,7 @@ function createFlag(): void {
     const conditions = parseConditions(createConditionsText.value);
 
     if (conditions === undefined) {
-        createJsonError.value =
-            'Bedingungen müssen ein gültiges JSON-Objekt oder -Array sein.';
+        createJsonError.value = t('system.flags.invalidJson');
 
         return;
     }
@@ -578,8 +582,7 @@ function updateFlag(): void {
     const conditions = parseConditions(updateConditionsText.value);
 
     if (conditions === undefined) {
-        updateJsonError.value =
-            'Bedingungen müssen ein gültiges JSON-Objekt oder -Array sein.';
+        updateJsonError.value = t('system.flags.invalidJson');
 
         return;
     }
@@ -616,7 +619,7 @@ function toggleFlag(flag: FeatureFlagRow): void {
 }
 
 function deleteFlag(flag: FeatureFlagRow): void {
-    if (!window.confirm(`Feature Flag „${flag.key}“ wirklich löschen?`)) {
+    if (!window.confirm(t('system.flags.deleteConfirm', { key: flag.key }))) {
         return;
     }
 
@@ -631,13 +634,13 @@ function deleteFlag(flag: FeatureFlagRow): void {
 </script>
 
 <template>
-    <Head title="System" />
+    <Head :title="t('system.metaTitle')" />
 
     <div class="erin-page">
         <PageHeader
-            eyebrow="Platform Operations"
-            title="System & Governance"
-            description="Reale Laufzeitkonfiguration, Governance-Daten, Feature Flags und Login-Historie."
+            :eyebrow="t('system.eyebrow')"
+            :title="t('system.title')"
+            :description="t('system.description')"
             :icon="Activity"
         />
 
@@ -647,162 +650,20 @@ function deleteFlag(flag: FeatureFlagRow): void {
         >
             <ShieldCheck class="mt-0.5 size-4 shrink-0" />
             <p>
-                Support-Leseansicht: Governance-Daten sind sichtbar, Änderungen
-                bleiben ausschließlich Superadmins vorbehalten.
+                {{ t('system.supportNotice') }}
             </p>
         </div>
 
-        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <MetricCard
-                label="Fehlgeschlagene Jobs"
-                :value="runtime.failed_jobs"
-                :hint="`Queue: ${runtime.queue_connection}`"
-                :icon="Database"
-                tone="orange"
-            />
-            <MetricCard
-                label="Offene DSGVO-Anfragen"
-                :value="gdpr.open"
-                :hint="`${gdpr.overdue} überfällig`"
-                :icon="ShieldCheck"
-                tone="teal"
-            />
-            <MetricCard
-                label="Zugriffslisteneinträge"
-                :value="governance.access_list_entries"
-                :icon="KeyRound"
-            />
-            <MetricCard
-                label="E-Mail-Templates"
-                :value="governance.email_templates"
-                :icon="Mail"
-                tone="violet"
-            />
-        </div>
-
-        <div class="grid gap-6 xl:grid-cols-2">
-            <SectionCard
-                title="Laufzeit"
-                description="Direkt aus der aktiven Laravel-Instanz."
-            >
-                <dl class="grid gap-3 sm:grid-cols-2">
-                    <div class="rounded-xl bg-slate-50 p-4">
-                        <dt
-                            class="text-[10px] font-bold text-slate-400 uppercase"
-                        >
-                            Laravel
-                        </dt>
-                        <dd
-                            class="mt-1 font-mono text-sm font-bold text-slate-800"
-                        >
-                            {{ runtime.laravel }}
-                        </dd>
-                    </div>
-                    <div class="rounded-xl bg-slate-50 p-4">
-                        <dt
-                            class="text-[10px] font-bold text-slate-400 uppercase"
-                        >
-                            PHP
-                        </dt>
-                        <dd
-                            class="mt-1 font-mono text-sm font-bold text-slate-800"
-                        >
-                            {{ runtime.php }}
-                        </dd>
-                    </div>
-                    <div class="rounded-xl bg-slate-50 p-4">
-                        <dt
-                            class="text-[10px] font-bold text-slate-400 uppercase"
-                        >
-                            Umgebung
-                        </dt>
-                        <dd class="mt-1 text-sm font-bold text-slate-800">
-                            {{ runtime.environment }}
-                        </dd>
-                    </div>
-                    <div class="rounded-xl bg-slate-50 p-4">
-                        <dt
-                            class="text-[10px] font-bold text-slate-400 uppercase"
-                        >
-                            Debug
-                        </dt>
-                        <dd class="mt-2">
-                            <StatusBadge
-                                :label="runtime.debug ? 'Aktiv' : 'Inaktiv'"
-                                :tone="runtime.debug ? 'yellow' : 'green'"
-                            />
-                        </dd>
-                    </div>
-                </dl>
-            </SectionCard>
-
-            <SectionCard
-                title="Integrationen"
-                description="Konfigurationsstatus; keine erfundene Verfügbarkeitsmessung."
-            >
-                <div class="grid gap-3 sm:grid-cols-2">
-                    <div
-                        v-for="integration in [
-                            { name: 'Stripe', configured: integrations.stripe },
-                            { name: 'OpenAI', configured: integrations.openai },
-                            {
-                                name: 'LiveKit',
-                                configured: integrations.livekit,
-                            },
-                        ]"
-                        :key="integration.name"
-                        class="flex items-center justify-between rounded-xl border border-slate-200 p-4"
-                    >
-                        <div class="flex items-center gap-3">
-                            <span
-                                class="grid size-9 place-items-center rounded-xl bg-blue-50 text-blue-600"
-                            >
-                                <Server class="size-4" />
-                            </span>
-                            <span class="text-sm font-bold text-slate-800">
-                                {{ integration.name }}
-                            </span>
-                        </div>
-                        <StatusBadge
-                            :label="
-                                integration.configured
-                                    ? 'Konfiguriert'
-                                    : 'Nicht konfiguriert'
-                            "
-                            :tone="integration.configured ? 'green' : 'slate'"
-                        />
-                    </div>
-                    <div
-                        class="flex items-center justify-between rounded-xl border border-slate-200 p-4"
-                    >
-                        <div class="flex items-center gap-3">
-                            <span
-                                class="grid size-9 place-items-center rounded-xl bg-orange-50 text-orange-600"
-                            >
-                                <Webhook class="size-4" />
-                            </span>
-                            <span class="text-sm font-bold text-slate-800">
-                                Webhook-Fehler / 24 h
-                            </span>
-                        </div>
-                        <StatusBadge
-                            :label="
-                                integrations.recent_failed_webhooks.toString()
-                            "
-                            :tone="
-                                integrations.recent_failed_webhooks > 0
-                                    ? 'red'
-                                    : 'green'
-                            "
-                        />
-                    </div>
-                </div>
-            </SectionCard>
-        </div>
+        <SystemOverview
+            :runtime="runtime"
+            :integrations="integrations"
+            :gdpr="gdpr"
+            :governance="governance"
+        />
 
         <SectionCard
-            title="DSGVO-Anfragen"
-            description="Export- und Löschanfragen mit Verantwortlichkeit, Frist und nachvollziehbarem Bearbeitungsstatus."
+            :title="t('system.gdpr.title')"
+            :description="t('system.gdpr.description')"
             flush
         >
             <div class="grid xl:grid-cols-[22rem_minmax(0,1fr)]">
@@ -847,17 +708,19 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                 class="mt-3 flex items-center justify-between gap-3 text-xs text-slate-500"
                             >
                                 <span>{{ humanize(request.type) }}</span>
-                                <span
-                                    >Frist
-                                    {{ formatDate(request.due_at) }}</span
-                                >
+                                <span>{{
+                                    t('system.gdpr.deadline', {
+                                        date: formatDate(request.due_at),
+                                    })
+                                }}</span>
                             </div>
                         </button>
                     </div>
-                    <AdminEmptyState
+                    <EmptyState
                         v-else
-                        title="Keine DSGVO-Anfragen"
-                        description="Derzeit liegen keine Export- oder Löschanfragen vor."
+                        :title="t('system.gdpr.emptyTitle')"
+                        :description="t('system.gdpr.emptyDescription')"
+                        compact
                     />
                     <AdminPagination :paginator="gdpr_requests" />
                 </aside>
@@ -874,7 +737,11 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                 <p
                                     class="text-xs font-bold tracking-wide text-blue-600 uppercase"
                                 >
-                                    Anfrage #{{ selectedGdpr.id }}
+                                    {{
+                                        t('system.gdpr.requestReference', {
+                                            id: selectedGdpr.id,
+                                        })
+                                    }}
                                 </p>
                                 <h3 class="mt-1 font-bold text-slate-950">
                                     {{ selectedGdpr.user.name }}
@@ -894,31 +761,35 @@ function deleteFlag(flag: FeatureFlagRow): void {
                             class="mt-4 grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4"
                         >
                             <div class="rounded-xl bg-slate-50 p-3">
-                                <dt class="font-bold text-slate-400">Typ</dt>
+                                <dt class="font-bold text-slate-600">
+                                    {{ t('system.gdpr.type') }}
+                                </dt>
                                 <dd class="mt-1 text-slate-700">
                                     {{ humanize(selectedGdpr.type) }}
                                 </dd>
                             </div>
                             <div class="rounded-xl bg-slate-50 p-3">
-                                <dt class="font-bold text-slate-400">Frist</dt>
+                                <dt class="font-bold text-slate-600">
+                                    {{ t('system.gdpr.dueAt') }}
+                                </dt>
                                 <dd class="mt-1 text-slate-700">
                                     {{ formatDate(selectedGdpr.due_at) }}
                                 </dd>
                             </div>
                             <div class="rounded-xl bg-slate-50 p-3">
-                                <dt class="font-bold text-slate-400">
-                                    Bearbeitung
+                                <dt class="font-bold text-slate-600">
+                                    {{ t('system.gdpr.handler') }}
                                 </dt>
                                 <dd class="mt-1 text-slate-700">
                                     {{
                                         selectedGdpr.handler?.name ??
-                                        'Nicht zugewiesen'
+                                        t('common.notAssigned')
                                     }}
                                 </dd>
                             </div>
                             <div class="rounded-xl bg-slate-50 p-3">
-                                <dt class="font-bold text-slate-400">
-                                    Angefragt
+                                <dt class="font-bold text-slate-600">
+                                    {{ t('common.created') }}
                                 </dt>
                                 <dd class="mt-1 text-slate-700">
                                     {{ formatDate(selectedGdpr.created_at) }}
@@ -942,7 +813,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
                             <div class="flex items-center gap-2">
                                 <PencilLine class="size-4 text-blue-600" />
                                 <h3 class="font-bold text-slate-950">
-                                    Anfrage bearbeiten
+                                    {{ t('system.gdpr.editTitle') }}
                                 </h3>
                             </div>
                             <div class="mt-4 grid gap-3 sm:grid-cols-2">
@@ -950,7 +821,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                     <span
                                         class="text-xs font-bold text-slate-600"
                                     >
-                                        Typ
+                                        {{ t('system.gdpr.type') }}
                                     </span>
                                     <select
                                         v-model="gdprUpdateForm.type"
@@ -969,7 +840,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                     <span
                                         class="text-xs font-bold text-slate-600"
                                     >
-                                        Status
+                                        {{ t('system.gdpr.status') }}
                                     </span>
                                     <select
                                         v-model="gdprUpdateForm.status"
@@ -987,7 +858,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
                             </div>
                             <label class="mt-3 block">
                                 <span class="text-xs font-bold text-slate-600">
-                                    Frist
+                                    {{ t('system.gdpr.dueAt') }}
                                 </span>
                                 <input
                                     v-model="gdprUpdateForm.due_at"
@@ -997,12 +868,12 @@ function deleteFlag(flag: FeatureFlagRow): void {
                             </label>
                             <label class="mt-3 block">
                                 <span class="text-xs font-bold text-slate-600">
-                                    Grund / Bearbeitungsnotiz
+                                    {{ t('system.gdpr.reason') }}
                                 </span>
-                                <textarea
+                                <Textarea
                                     v-model="gdprUpdateForm.reason"
                                     rows="4"
-                                    class="erin-focus mt-1.5 w-full rounded-xl border border-slate-200 p-3 text-sm"
+                                    class="mt-1.5"
                                 />
                             </label>
                             <p
@@ -1017,7 +888,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                 class="erin-focus mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-xs font-bold text-white disabled:opacity-50"
                             >
                                 <Save class="size-4" />
-                                Status speichern
+                                {{ t('system.gdpr.saveStatus') }}
                             </button>
                         </form>
 
@@ -1028,7 +899,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
                             <div class="flex items-center gap-2">
                                 <Plus class="size-4 text-teal-600" />
                                 <h3 class="font-bold text-slate-950">
-                                    Anfrage anlegen
+                                    {{ t('system.gdpr.createTitle') }}
                                 </h3>
                             </div>
                             <div class="mt-4 grid gap-3 sm:grid-cols-2">
@@ -1036,7 +907,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                     <span
                                         class="text-xs font-bold text-slate-600"
                                     >
-                                        Nutzer-ID
+                                        {{ t('system.gdpr.userId') }}
                                     </span>
                                     <input
                                         v-model="gdprCreateForm.user_id"
@@ -1050,7 +921,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                     <span
                                         class="text-xs font-bold text-slate-600"
                                     >
-                                        Typ
+                                        {{ t('system.gdpr.type') }}
                                     </span>
                                     <select
                                         v-model="gdprCreateForm.type"
@@ -1068,7 +939,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
                             </div>
                             <label class="mt-3 block">
                                 <span class="text-xs font-bold text-slate-600">
-                                    Frist
+                                    {{ t('system.gdpr.dueAt') }}
                                 </span>
                                 <input
                                     v-model="gdprCreateForm.due_at"
@@ -1078,12 +949,12 @@ function deleteFlag(flag: FeatureFlagRow): void {
                             </label>
                             <label class="mt-3 block">
                                 <span class="text-xs font-bold text-slate-600">
-                                    Grund
+                                    {{ t('system.gdpr.reason') }}
                                 </span>
-                                <textarea
+                                <Textarea
                                     v-model="gdprCreateForm.reason"
                                     rows="4"
-                                    class="erin-focus mt-1.5 w-full rounded-xl border border-slate-200 p-3 text-sm"
+                                    class="mt-1.5"
                                 />
                             </label>
                             <p
@@ -1098,7 +969,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                 class="erin-focus mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-teal-600 px-4 text-xs font-bold text-white disabled:opacity-50"
                             >
                                 <FileLock2 class="size-4" />
-                                Anfrage speichern
+                                {{ t('system.gdpr.saveRequest') }}
                             </button>
                         </form>
                     </div>
@@ -1107,8 +978,8 @@ function deleteFlag(flag: FeatureFlagRow): void {
         </SectionCard>
 
         <SectionCard
-            title="Blacklist & Whitelist"
-            description="Zeitlich begrenzbare Regeln für konkrete E-Mail-Adressen, Domains und IP-Adressen."
+            :title="t('system.access.title')"
+            :description="t('system.access.description')"
             flush
         >
             <div class="grid xl:grid-cols-[22rem_minmax(0,1fr)]">
@@ -1122,7 +993,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
                         @click="newAccessEntry"
                     >
                         <Plus class="size-4" />
-                        Neuer Listeneintrag
+                        {{ t('system.access.new') }}
                     </button>
                     <div
                         v-if="access_list_entries.length > 0"
@@ -1166,10 +1037,11 @@ function deleteFlag(flag: FeatureFlagRow): void {
                             </p>
                         </button>
                     </div>
-                    <AdminEmptyState
+                    <EmptyState
                         v-else
-                        title="Keine Zugriffsregeln"
-                        description="Blacklist und Whitelist sind leer."
+                        :title="t('system.access.emptyTitle')"
+                        :description="t('system.access.emptyDescription')"
+                        compact
                     />
                 </aside>
 
@@ -1188,24 +1060,24 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                     <h3 class="font-bold text-slate-950">
                                         {{
                                             accessMode === 'edit'
-                                                ? 'Listeneintrag bearbeiten'
-                                                : 'Listeneintrag anlegen'
+                                                ? t('system.access.editTitle')
+                                                : t('system.access.createTitle')
                                         }}
                                     </h3>
                                     <p
                                         v-if="selectedAccessEntry"
-                                        class="mt-0.5 text-xs text-slate-400"
+                                        class="mt-0.5 text-xs text-slate-600"
                                     >
-                                        Erstellt von
                                         {{
-                                            selectedAccessEntry.creator?.name ??
-                                            'System'
-                                        }}
-                                        am
-                                        {{
-                                            formatDate(
-                                                selectedAccessEntry.created_at,
-                                            )
+                                            t('system.access.createdByAt', {
+                                                name:
+                                                    selectedAccessEntry.creator
+                                                        ?.name ??
+                                                    t('common.system'),
+                                                date: formatDate(
+                                                    selectedAccessEntry.created_at,
+                                                ),
+                                            })
                                         }}
                                     </p>
                                 </div>
@@ -1219,7 +1091,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                 @click="deleteAccessEntry(selectedAccessEntry)"
                             >
                                 <Trash2 class="size-4" />
-                                Löschen
+                                {{ t('common.delete') }}
                             </button>
                         </div>
                         <div
@@ -1227,32 +1099,42 @@ function deleteFlag(flag: FeatureFlagRow): void {
                         >
                             <label>
                                 <span class="text-xs font-bold text-slate-600">
-                                    Liste
+                                    {{ t('system.access.listType') }}
                                 </span>
                                 <select
                                     v-model="accessForm.list_type"
                                     class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
                                 >
-                                    <option value="blacklist">Blacklist</option>
-                                    <option value="whitelist">Whitelist</option>
+                                    <option value="blacklist">
+                                        {{ humanize('blacklist') }}
+                                    </option>
+                                    <option value="whitelist">
+                                        {{ humanize('whitelist') }}
+                                    </option>
                                 </select>
                             </label>
                             <label>
                                 <span class="text-xs font-bold text-slate-600">
-                                    Zieltyp
+                                    {{ t('system.access.subjectType') }}
                                 </span>
                                 <select
                                     v-model="accessForm.subject_type"
                                     class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
                                 >
-                                    <option value="email">E-Mail</option>
-                                    <option value="domain">Domain</option>
-                                    <option value="ip">IP-Adresse</option>
+                                    <option value="email">
+                                        {{ humanize('email') }}
+                                    </option>
+                                    <option value="domain">
+                                        {{ humanize('domain') }}
+                                    </option>
+                                    <option value="ip">
+                                        {{ humanize('ip') }}
+                                    </option>
                                 </select>
                             </label>
                             <label>
                                 <span class="text-xs font-bold text-slate-600">
-                                    Wert
+                                    {{ t('system.access.value') }}
                                 </span>
                                 <input
                                     v-model="accessForm.value"
@@ -1269,7 +1151,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
                             </label>
                             <label>
                                 <span class="text-xs font-bold text-slate-600">
-                                    Ablauf
+                                    {{ t('system.access.expiresAt') }}
                                 </span>
                                 <input
                                     v-model="accessForm.expires_at"
@@ -1280,12 +1162,12 @@ function deleteFlag(flag: FeatureFlagRow): void {
                         </div>
                         <label class="mt-3 block">
                             <span class="text-xs font-bold text-slate-600">
-                                Begründung
+                                {{ t('system.access.reason') }}
                             </span>
-                            <textarea
+                            <Textarea
                                 v-model="accessForm.reason"
                                 rows="3"
-                                class="erin-focus mt-1.5 w-full rounded-xl border border-slate-200 p-3 text-sm"
+                                class="mt-1.5"
                             />
                         </label>
                         <p
@@ -1302,8 +1184,8 @@ function deleteFlag(flag: FeatureFlagRow): void {
                             <Save class="size-4" />
                             {{
                                 accessMode === 'edit'
-                                    ? 'Änderungen speichern'
-                                    : 'Eintrag anlegen'
+                                    ? t('system.access.saveChanges')
+                                    : t('system.access.create')
                             }}
                         </button>
                     </form>
@@ -1342,11 +1224,17 @@ function deleteFlag(flag: FeatureFlagRow): void {
                         >
                             {{ selectedAccessEntry.reason }}
                         </p>
-                        <p class="mt-4 text-xs text-slate-400">
-                            Ablauf:
-                            {{ formatDate(selectedAccessEntry.expires_at) }} ·
-                            Erstellt von
-                            {{ selectedAccessEntry.creator?.name ?? 'System' }}
+                        <p class="mt-4 text-xs text-slate-600">
+                            {{
+                                t('system.access.expiresAtValue', {
+                                    date: formatDate(
+                                        selectedAccessEntry.expires_at,
+                                    ),
+                                    name:
+                                        selectedAccessEntry.creator?.name ??
+                                        t('common.system'),
+                                })
+                            }}
                         </p>
                     </div>
                 </div>
@@ -1354,8 +1242,8 @@ function deleteFlag(flag: FeatureFlagRow): void {
         </SectionCard>
 
         <SectionCard
-            title="E-Mail-Templates"
-            description="Zweisprachige Systemvorlagen; Speichern aktualisiert Deutsch und Englisch atomar."
+            :title="t('system.templates.title')"
+            :description="t('system.templates.description')"
             flush
         >
             <div class="grid xl:grid-cols-[22rem_minmax(0,1fr)]">
@@ -1369,7 +1257,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
                         @click="newTemplate"
                     >
                         <Plus class="size-4" />
-                        Neues E-Mail-Template
+                        {{ t('system.templates.new') }}
                     </button>
                     <div
                         v-if="emailTemplateGroups.length > 0"
@@ -1402,7 +1290,9 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                 </div>
                                 <StatusBadge
                                     :label="
-                                        template.is_active ? 'Aktiv' : 'Inaktiv'
+                                        template.is_active
+                                            ? t('common.active')
+                                            : t('common.inactive')
                                     "
                                     :tone="
                                         template.is_active ? 'green' : 'slate'
@@ -1413,15 +1303,16 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                 {{
                                     template.de?.subject ??
                                     template.en?.subject ??
-                                    'Kein Betreff'
+                                    t('system.templates.noSubject')
                                 }}
                             </p>
                         </button>
                     </div>
-                    <AdminEmptyState
+                    <EmptyState
                         v-else
-                        title="Keine E-Mail-Templates"
-                        description="Es wurden noch keine Vorlagen angelegt."
+                        :title="t('system.templates.emptyTitle')"
+                        :description="t('system.templates.emptyDescription')"
+                        compact
                     />
                 </aside>
 
@@ -1440,26 +1331,39 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                     <h3 class="font-bold text-slate-950">
                                         {{
                                             templateMode === 'edit'
-                                                ? 'Template bearbeiten'
-                                                : 'Template anlegen'
+                                                ? t(
+                                                      'system.templates.editTitle',
+                                                  )
+                                                : t(
+                                                      'system.templates.createTitle',
+                                                  )
                                         }}
                                     </h3>
                                     <p
                                         v-if="selectedTemplate"
-                                        class="mt-0.5 text-xs text-slate-400"
+                                        class="mt-0.5 text-xs text-slate-600"
                                     >
-                                        Geändert
                                         {{
-                                            formatDate(
-                                                selectedTemplate.updated_at,
-                                            )
+                                            selectedTemplate.updater
+                                                ? t(
+                                                      'system.templates.changedByAt',
+                                                      {
+                                                          date: formatDate(
+                                                              selectedTemplate.updated_at,
+                                                          ),
+                                                          name: selectedTemplate
+                                                              .updater.name,
+                                                      },
+                                                  )
+                                                : t(
+                                                      'system.templates.changedAt',
+                                                      {
+                                                          date: formatDate(
+                                                              selectedTemplate.updated_at,
+                                                          ),
+                                                      },
+                                                  )
                                         }}
-                                        <template
-                                            v-if="selectedTemplate.updater"
-                                        >
-                                            von
-                                            {{ selectedTemplate.updater.name }}
-                                        </template>
                                     </p>
                                 </div>
                             </div>
@@ -1472,14 +1376,14 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                 @click="deleteTemplate(selectedTemplate)"
                             >
                                 <Trash2 class="size-4" />
-                                DE & EN löschen
+                                {{ t('system.templates.deleteBoth') }}
                             </button>
                         </div>
 
                         <div class="mt-4 grid gap-3 sm:grid-cols-2">
                             <label>
                                 <span class="text-xs font-bold text-slate-600">
-                                    Technischer Schlüssel
+                                    {{ t('system.templates.technicalKey') }}
                                 </span>
                                 <input
                                     v-model="templateForm.key"
@@ -1496,7 +1400,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                     type="checkbox"
                                     class="size-4 rounded border-slate-300 text-blue-600"
                                 />
-                                Template aktiv
+                                {{ t('system.templates.enabled') }}
                             </label>
                         </div>
 
@@ -1510,14 +1414,16 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                     class="px-2 text-xs font-black tracking-wide text-slate-500 uppercase"
                                 >
                                     {{
-                                        locale === 'de' ? 'Deutsch' : 'Englisch'
+                                        locale === 'de'
+                                            ? t('system.templates.german')
+                                            : t('system.templates.english')
                                     }}
                                 </legend>
                                 <label class="block">
                                     <span
                                         class="text-xs font-bold text-slate-600"
                                     >
-                                        Betreff
+                                        {{ t('system.templates.subject') }}
                                     </span>
                                     <input
                                         v-model="
@@ -1531,30 +1437,30 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                     <span
                                         class="text-xs font-bold text-slate-600"
                                     >
-                                        HTML-Inhalt
+                                        {{ t('system.templates.htmlBody') }}
                                     </span>
-                                    <textarea
+                                    <Textarea
                                         v-model="
                                             templateForm.translations[locale]
                                                 .body_html
                                         "
                                         rows="8"
-                                        class="erin-focus mt-1.5 w-full rounded-xl border border-slate-200 p-3 font-mono text-xs"
+                                        class="mt-1.5 font-mono text-xs"
                                     />
                                 </label>
                                 <label class="mt-3 block">
                                     <span
                                         class="text-xs font-bold text-slate-600"
                                     >
-                                        Text-Alternative
+                                        {{ t('system.templates.textBody') }}
                                     </span>
-                                    <textarea
+                                    <Textarea
                                         v-model="
                                             templateForm.translations[locale]
                                                 .body_text
                                         "
                                         rows="5"
-                                        class="erin-focus mt-1.5 w-full rounded-xl border border-slate-200 p-3 text-sm"
+                                        class="mt-1.5"
                                     />
                                 </label>
                             </fieldset>
@@ -1571,7 +1477,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
                             class="erin-focus mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 text-xs font-bold text-white disabled:opacity-50"
                         >
                             <Save class="size-4" />
-                            DE & EN speichern
+                            {{ t('system.templates.saveBoth') }}
                         </button>
                     </form>
 
@@ -1592,7 +1498,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
                             <h3 class="mt-2 font-bold text-slate-950">
                                 {{
                                     selectedTemplate[locale]?.subject ??
-                                    'Keine Übersetzung'
+                                    t('system.templates.noTranslation')
                                 }}
                             </h3>
                             <pre
@@ -1609,8 +1515,8 @@ function deleteFlag(flag: FeatureFlagRow): void {
         </SectionCard>
 
         <SectionCard
-            title="Feature Flags"
-            description="Anlegen, schalten, staffeln und löschen über die vorhandenen Admin-Actions."
+            :title="t('system.flags.title')"
+            :description="t('system.flags.description')"
             flush
         >
             <div class="grid xl:grid-cols-[20rem_minmax(0,1fr)]">
@@ -1638,25 +1544,34 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                         {{ flag.name }}
                                     </p>
                                     <p
-                                        class="mt-1 truncate font-mono text-[11px] text-slate-400"
+                                        class="mt-1 truncate font-mono text-[11px] text-slate-600"
                                     >
                                         {{ flag.key }}
                                     </p>
                                 </div>
                                 <StatusBadge
-                                    :label="flag.enabled ? 'Aktiv' : 'Inaktiv'"
+                                    :label="
+                                        flag.enabled
+                                            ? t('common.active')
+                                            : t('common.inactive')
+                                    "
                                     :tone="flag.enabled ? 'green' : 'slate'"
                                 />
                             </div>
                             <p class="mt-3 text-xs text-slate-500">
-                                Rollout {{ flag.rollout_percentage }} %
+                                {{
+                                    t('system.flags.rollout', {
+                                        value: flag.rollout_percentage,
+                                    })
+                                }}
                             </p>
                         </button>
                     </div>
-                    <AdminEmptyState
+                    <EmptyState
                         v-else
-                        title="Keine Feature Flags"
-                        description="Lege rechts das erste Flag an."
+                        :title="t('system.flags.emptyTitle')"
+                        :description="t('system.flags.emptyDescription')"
+                        compact
                     />
                 </aside>
 
@@ -1675,7 +1590,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                     {{ selectedFlag.key }}
                                 </p>
                                 <h3 class="mt-1 font-bold text-slate-950">
-                                    Flag bearbeiten
+                                    {{ t('system.flags.editTitle') }}
                                 </h3>
                             </div>
                             <button
@@ -1691,16 +1606,16 @@ function deleteFlag(flag: FeatureFlagRow): void {
                             >
                                 {{
                                     selectedFlag.enabled
-                                        ? 'Deaktivieren'
-                                        : 'Aktivieren'
+                                        ? t('system.flags.deactivate')
+                                        : t('system.flags.activate')
                                 }}
                             </button>
                         </div>
 
                         <label class="mt-4 block">
-                            <span class="text-xs font-bold text-slate-600"
-                                >Name</span
-                            >
+                            <span class="text-xs font-bold text-slate-600">
+                                {{ t('system.flags.name') }}
+                            </span>
                             <input
                                 v-model="updateForm.name"
                                 class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
@@ -1708,17 +1623,17 @@ function deleteFlag(flag: FeatureFlagRow): void {
                         </label>
                         <label class="mt-3 block">
                             <span class="text-xs font-bold text-slate-600">
-                                Beschreibung
+                                {{ t('system.flags.descriptionLabel') }}
                             </span>
-                            <textarea
+                            <Textarea
                                 v-model="updateForm.description"
                                 rows="3"
-                                class="erin-focus mt-1.5 w-full rounded-xl border border-slate-200 p-3 text-sm"
+                                class="mt-1.5"
                             />
                         </label>
                         <label class="mt-3 block">
                             <span class="text-xs font-bold text-slate-600">
-                                Rollout in Prozent
+                                {{ t('system.flags.rolloutPercentage') }}
                             </span>
                             <input
                                 v-model="updateForm.rollout_percentage"
@@ -1730,12 +1645,12 @@ function deleteFlag(flag: FeatureFlagRow): void {
                         </label>
                         <label class="mt-3 block">
                             <span class="text-xs font-bold text-slate-600">
-                                Bedingungen als JSON
+                                {{ t('system.flags.conditions') }}
                             </span>
-                            <textarea
+                            <Textarea
                                 v-model="updateConditionsText"
                                 rows="6"
-                                class="erin-focus mt-1.5 w-full rounded-xl border border-slate-200 p-3 font-mono text-xs"
+                                class="mt-1.5 font-mono text-xs"
                             />
                         </label>
                         <p
@@ -1751,22 +1666,31 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                 @click="deleteFlag(selectedFlag)"
                             >
                                 <Trash2 class="size-4" />
-                                Löschen
+                                {{ t('common.delete') }}
                             </button>
                             <button
                                 type="submit"
                                 :disabled="updateForm.processing"
                                 class="erin-focus h-10 rounded-xl bg-blue-600 px-4 text-xs font-bold text-white disabled:opacity-50"
                             >
-                                Änderungen speichern
+                                {{ t('system.flags.saveChanges') }}
                             </button>
                         </div>
-                        <p class="mt-4 text-[11px] text-slate-400">
-                            Zuletzt geändert
-                            {{ formatDate(selectedFlag.updated_at) }}
-                            <template v-if="selectedFlag.updater">
-                                von {{ selectedFlag.updater.name }}
-                            </template>
+                        <p class="mt-4 text-[11px] text-slate-600">
+                            {{
+                                selectedFlag.updater
+                                    ? t('system.flags.lastChangedBy', {
+                                          date: formatDate(
+                                              selectedFlag.updated_at,
+                                          ),
+                                          name: selectedFlag.updater.name,
+                                      })
+                                    : t('system.flags.lastChanged', {
+                                          date: formatDate(
+                                              selectedFlag.updated_at,
+                                          ),
+                                      })
+                            }}
                         </p>
                     </form>
 
@@ -1777,12 +1701,12 @@ function deleteFlag(flag: FeatureFlagRow): void {
                         <div class="flex items-center gap-2">
                             <Plus class="size-4 text-teal-600" />
                             <h3 class="font-bold text-slate-950">
-                                Neues Feature Flag
+                                {{ t('system.flags.createTitle') }}
                             </h3>
                         </div>
                         <label class="mt-4 block">
                             <span class="text-xs font-bold text-slate-600">
-                                Technischer Schlüssel
+                                {{ t('system.flags.technicalKey') }}
                             </span>
                             <input
                                 v-model="createForm.key"
@@ -1791,9 +1715,9 @@ function deleteFlag(flag: FeatureFlagRow): void {
                             />
                         </label>
                         <label class="mt-3 block">
-                            <span class="text-xs font-bold text-slate-600"
-                                >Name</span
-                            >
+                            <span class="text-xs font-bold text-slate-600">
+                                {{ t('system.flags.name') }}
+                            </span>
                             <input
                                 v-model="createForm.name"
                                 class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
@@ -1801,18 +1725,18 @@ function deleteFlag(flag: FeatureFlagRow): void {
                         </label>
                         <label class="mt-3 block">
                             <span class="text-xs font-bold text-slate-600">
-                                Beschreibung
+                                {{ t('system.flags.descriptionLabel') }}
                             </span>
-                            <textarea
+                            <Textarea
                                 v-model="createForm.description"
                                 rows="3"
-                                class="erin-focus mt-1.5 w-full rounded-xl border border-slate-200 p-3 text-sm"
+                                class="mt-1.5"
                             />
                         </label>
                         <div class="mt-3 grid gap-3 sm:grid-cols-2">
                             <label>
                                 <span class="text-xs font-bold text-slate-600">
-                                    Rollout %
+                                    {{ t('system.flags.rolloutPercentage') }}
                                 </span>
                                 <input
                                     v-model="createForm.rollout_percentage"
@@ -1830,17 +1754,17 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                     type="checkbox"
                                     class="size-4 rounded border-slate-300 text-blue-600"
                                 />
-                                Sofort aktiv
+                                {{ t('system.flags.activeImmediately') }}
                             </label>
                         </div>
                         <label class="mt-3 block">
                             <span class="text-xs font-bold text-slate-600">
-                                Bedingungen als JSON
+                                {{ t('system.flags.conditions') }}
                             </span>
-                            <textarea
+                            <Textarea
                                 v-model="createConditionsText"
                                 rows="5"
-                                class="erin-focus mt-1.5 w-full rounded-xl border border-slate-200 p-3 font-mono text-xs"
+                                class="mt-1.5 font-mono text-xs"
                             />
                         </label>
                         <p
@@ -1855,7 +1779,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
                             class="erin-focus mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-teal-600 text-xs font-bold text-white disabled:opacity-50"
                         >
                             <Flag class="size-4" />
-                            Feature Flag anlegen
+                            {{ t('system.flags.create') }}
                         </button>
                     </form>
                 </div>
@@ -1875,7 +1799,9 @@ function deleteFlag(flag: FeatureFlagRow): void {
                             </div>
                             <StatusBadge
                                 :label="
-                                    selectedFlag.enabled ? 'Aktiv' : 'Inaktiv'
+                                    selectedFlag.enabled
+                                        ? t('common.active')
+                                        : t('common.inactive')
                                 "
                                 :tone="selectedFlag.enabled ? 'green' : 'slate'"
                             />
@@ -1883,21 +1809,21 @@ function deleteFlag(flag: FeatureFlagRow): void {
                         <p class="mt-4 text-sm text-slate-600">
                             {{
                                 selectedFlag.description ??
-                                'Keine Beschreibung hinterlegt.'
+                                t('system.flags.noDescription')
                             }}
                         </p>
                         <dl class="mt-4 grid gap-3 text-xs sm:grid-cols-2">
                             <div class="rounded-xl bg-slate-50 p-3">
-                                <dt class="font-bold text-slate-400">
-                                    Rollout
+                                <dt class="font-bold text-slate-600">
+                                    {{ t('system.flags.rolloutPercentage') }}
                                 </dt>
                                 <dd class="mt-1 text-slate-700">
                                     {{ selectedFlag.rollout_percentage }} %
                                 </dd>
                             </div>
                             <div class="rounded-xl bg-slate-50 p-3">
-                                <dt class="font-bold text-slate-400">
-                                    Zuletzt geändert
+                                <dt class="font-bold text-slate-600">
+                                    {{ t('common.updated') }}
                                 </dt>
                                 <dd class="mt-1 text-slate-700">
                                     {{ formatDate(selectedFlag.updated_at) }}
@@ -1909,79 +1835,6 @@ function deleteFlag(flag: FeatureFlagRow): void {
             </div>
         </SectionCard>
 
-        <SectionCard
-            title="Login-Historie"
-            description="Die letzten vom Backend gelieferten Anmeldeereignisse."
-            flush
-        >
-            <div v-if="login_history.length > 0" class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-slate-100 text-left">
-                    <thead class="bg-slate-50/80">
-                        <tr
-                            class="text-[11px] font-bold tracking-wide text-slate-500 uppercase"
-                        >
-                            <th class="px-5 py-3">Konto</th>
-                            <th class="px-5 py-3">Ereignis</th>
-                            <th class="px-5 py-3">Ergebnis</th>
-                            <th class="px-5 py-3">Netzwerk</th>
-                            <th class="px-5 py-3 text-right">Zeitpunkt</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        <tr
-                            v-for="entry in login_history"
-                            :key="entry.id"
-                            class="align-top"
-                        >
-                            <td class="px-5 py-4">
-                                <p class="text-sm font-semibold text-slate-800">
-                                    {{ entry.user?.name ?? entry.email }}
-                                </p>
-                                <p
-                                    v-if="entry.user"
-                                    class="mt-0.5 text-xs text-slate-500"
-                                >
-                                    {{ entry.email }}
-                                </p>
-                            </td>
-                            <td class="px-5 py-4 text-xs text-slate-600">
-                                {{ humanize(entry.event) }}
-                            </td>
-                            <td class="px-5 py-4">
-                                <StatusBadge
-                                    :label="
-                                        entry.successful
-                                            ? 'Erfolgreich'
-                                            : (entry.failure_reason ??
-                                              'Fehlgeschlagen')
-                                    "
-                                    :tone="entry.successful ? 'green' : 'red'"
-                                />
-                            </td>
-                            <td class="px-5 py-4 text-xs text-slate-600">
-                                <p>{{ entry.ip_address ?? '—' }}</p>
-                                <p
-                                    v-if="entry.user_agent"
-                                    class="mt-1 max-w-64 truncate text-slate-400"
-                                    :title="entry.user_agent"
-                                >
-                                    {{ entry.user_agent }}
-                                </p>
-                            </td>
-                            <td
-                                class="px-5 py-4 text-right text-xs whitespace-nowrap text-slate-500"
-                            >
-                                {{ formatDate(entry.created_at) }}
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-            <AdminEmptyState
-                v-else
-                title="Keine Login-Ereignisse"
-                description="Die Login-Historie enthält derzeit keine Einträge."
-            />
-        </SectionCard>
+        <SystemLoginHistory :login-history="login_history" />
     </div>
 </template>

@@ -53,7 +53,7 @@ it('requires authentication and presents safe defaults for every event category'
 it('registers updates and removes a browser push subscription for the authenticated user', function () {
     $user = User::factory()->create();
     $payload = [
-        'endpoint' => 'https://push.example.test/subscriptions/device-1',
+        'endpoint' => 'https://fcm.googleapis.com/subscriptions/device-1',
         'keys' => [
             'p256dh' => str_repeat('p', 87),
             'auth' => str_repeat('a', 22),
@@ -102,7 +102,7 @@ it('registers updates and removes a browser push subscription for the authentica
 it('does not allow users to take over or remove another users push endpoint', function () {
     $owner = User::factory()->create();
     $attacker = User::factory()->create();
-    $endpoint = 'https://push.example.test/subscriptions/private-device';
+    $endpoint = 'https://fcm.googleapis.com/subscriptions/private-device';
     $owner->updatePushSubscription(
         $endpoint,
         str_repeat('p', 87),
@@ -154,6 +154,32 @@ it('validates browser push subscription input', function () {
     expect(PushSubscription::query()->count())->toBe(0);
 });
 
+it('rejects untrusted browser push endpoints before they can be stored', function (string $endpoint) {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->from(route('notification-preferences.edit'))
+        ->post(route('push-subscriptions.store'), [
+            'endpoint' => $endpoint,
+            'keys' => [
+                'p256dh' => str_repeat('p', 87),
+                'auth' => str_repeat('a', 22),
+            ],
+            'content_encoding' => 'aes128gcm',
+        ])
+        ->assertRedirect(route('notification-preferences.edit'))
+        ->assertSessionHasErrors('endpoint');
+
+    expect(PushSubscription::query()->count())->toBe(0);
+})->with([
+    'plain HTTP' => 'http://fcm.googleapis.com/subscriptions/device',
+    'loopback IPv4' => 'https://127.0.0.1/internal',
+    'cloud metadata address' => 'https://169.254.169.254/latest/meta-data',
+    'unapproved public host' => 'https://push.attacker.example/subscriptions/device',
+    'credentials in URL' => 'https://user:secret@fcm.googleapis.com/subscriptions/device',
+    'non-standard port' => 'https://fcm.googleapis.com:8443/subscriptions/device',
+]);
+
 it('updates only the authenticated users preferences', function () {
     $user = User::factory()->create();
     $other = User::factory()->create();
@@ -185,7 +211,7 @@ it('updates only the authenticated users preferences', function () {
         ->assertRedirect(route('notification-preferences.edit'))
         ->assertSessionHas('success');
 
-    expect($user->notificationPreferences()->count())->toBe(5)
+    expect($user->notificationPreferences()->count())->toBe(count(NotificationPreference::EVENTS))
         ->and($user->notificationPreferences()->where('event', 'application')->firstOrFail())
         ->database_enabled->toBeFalse()
         ->email_enabled->toBeTrue()

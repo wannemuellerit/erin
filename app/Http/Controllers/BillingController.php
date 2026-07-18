@@ -3,12 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Enums\CompanyMemberRole;
+use App\Models\Company;
 use App\Models\Plan;
 use App\Services\Billing\EntitlementService;
 use App\Services\Companies\CurrentCompany;
 use App\Services\Platform\PlatformSettings;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 use Laravel\Cashier\Checkout;
@@ -47,15 +49,19 @@ class BillingController extends Controller
             ]),
             'plans' => $this->plans(),
             'entitlements' => $entitlements->summary($company),
-            'subscription' => $company->subscriptions()
-                ->select(['id', 'type', 'stripe_status', 'stripe_price', 'ends_at'])
-                ->first(),
+            'subscription' => $company->billingSubscription()?->only([
+                'id',
+                'type',
+                'stripe_status',
+                'stripe_price',
+                'ends_at',
+            ]),
             'add_ons' => [
                 'visa_enabled' => (bool) app(PlatformSettings::class)->get('billing.visa_credit_enabled', false)
                     && filled(config('services.stripe.visa_price_id')),
                 'seat_enabled' => (bool) app(PlatformSettings::class)->get('billing.seat_addon_enabled', false)
                     && filled(config('services.stripe.seat_price_id')),
-                'seat_quantity' => (int) ($company->subscription('default')
+                'seat_quantity' => (int) ($company->billingSubscription()
                     ?->items()
                     ->where('stripe_price', config('services.stripe.seat_price_id'))
                     ->sum('quantity') ?? 0),
@@ -115,11 +121,32 @@ class BillingController extends Controller
             return back()->with('warning', __('Bitte nutze für bestehende Abonnements den Tarifwechsel.'));
         }
 
+        $subscriptionGeneration = DB::transaction(function () use ($company): int {
+            /** @var Company $lockedCompany */
+            $lockedCompany = Company::query()
+                ->lockForUpdate()
+                ->findOrFail($company->getKey());
+            $generation = max(
+                $lockedCompany->stripe_subscription_generation,
+                $lockedCompany->stripe_next_subscription_generation,
+            ) + 1;
+            $lockedCompany->forceFill([
+                'stripe_next_subscription_generation' => $generation,
+            ])->save();
+            $company->setAttribute(
+                'stripe_next_subscription_generation',
+                $generation,
+            );
+
+            return $generation;
+        }, 3);
+
         return $company
             ->newSubscription('default', $plan->stripe_price_id)
             ->withMetadata([
                 'company_id' => (string) $company->getKey(),
                 'plan_id' => (string) $plan->getKey(),
+                'erin_subscription_generation' => (string) $subscriptionGeneration,
             ])
             ->collectTaxIds()
             ->checkout([
@@ -171,7 +198,7 @@ class BillingController extends Controller
         $this->assertCanManage($request, $currentCompany);
         abort_if($plan->is_enterprise || ! $plan->stripe_price_id, 422);
 
-        $subscription = $company->subscription('default');
+        $subscription = $company->billingSubscription();
         abort_if($subscription === null, 422, __('Es besteht noch kein aktives Abonnement.'));
 
         $company->loadMissing('plan');
@@ -227,7 +254,7 @@ class BillingController extends Controller
         $this->assertCanManage($request, $currentCompany);
         $company->loadMissing('plan');
 
-        $subscription = $company->subscription('default');
+        $subscription = $company->billingSubscription();
         abort_if($subscription === null, 422, __('Es besteht kein Abonnement.'));
 
         $renewsAt = $company->subscription_renews_at ?? $subscription->currentPeriodEnd();
@@ -292,7 +319,7 @@ class BillingController extends Controller
             __('Zusätzliche Recruiter-Sitze sind noch nicht konfiguriert.'),
         );
 
-        $subscription = $company->subscription('default');
+        $subscription = $company->billingSubscription();
         abort_if($subscription === null, 422, __('Es besteht noch kein aktives Abonnement.'));
 
         $quantity = (int) $validated['quantity'];

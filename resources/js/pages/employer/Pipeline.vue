@@ -1,14 +1,12 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
-import {
-    CalendarDays,
-    GripVertical,
-    Kanban,
-    Search,
-    UsersRound,
-} from '@lucide/vue';
+import { CalendarDays, GripVertical, Kanban, UsersRound } from '@lucide/vue';
 import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
+import FilterToolbar from '@/components/product/FilterToolbar.vue';
 import PageHeader from '@/components/product/PageHeader.vue';
+import SearchField from '@/components/product/SearchField.vue';
+import { useFormatters } from '@/composables/useFormatters';
 import { useStatusLabels } from '@/composables/useStatusLabels';
 import { status as updateApplicationStatus } from '@/routes/employer/applications';
 import { pipeline as pipelineRoute } from '@/routes/employer';
@@ -49,21 +47,43 @@ const props = withDefaults(
 
 const search = ref('');
 const selectedJob = ref<number | null>(props.selected_job);
+const { t } = useI18n();
+const { formatDate } = useFormatters();
 const { statusLabel } = useStatusLabels();
-const stageDefinitions = [
-    { key: 'new', title: 'Neue Bewerbungen', color: 'bg-blue-500' },
-    { key: 'interesting', title: 'Interessant', color: 'bg-teal-500' },
-    { key: 'interview', title: 'Interview', color: 'bg-violet-500' },
+const stageDefinitions = computed(() => [
+    {
+        key: 'new',
+        title: t('employer.pipeline.stages.new'),
+        color: 'bg-blue-500',
+    },
+    {
+        key: 'interesting',
+        title: t('employer.pipeline.stages.interesting'),
+        color: 'bg-teal-500',
+    },
+    {
+        key: 'interview',
+        title: t('employer.pipeline.stages.interview'),
+        color: 'bg-violet-500',
+    },
     {
         key: 'final_selection',
-        title: 'Finale Auswahl',
+        title: t('employer.pipeline.stages.finalSelection'),
         color: 'bg-orange-500',
     },
-    { key: 'accepted', title: 'Angenommen', color: 'bg-emerald-500' },
-    { key: 'hired', title: 'Eingestellt', color: 'bg-green-700' },
-];
+    {
+        key: 'accepted',
+        title: t('employer.pipeline.stages.accepted'),
+        color: 'bg-emerald-500',
+    },
+    {
+        key: 'hired',
+        title: t('employer.pipeline.stages.hired'),
+        color: 'bg-green-700',
+    },
+]);
 const columns = computed(() =>
-    stageDefinitions
+    stageDefinitions.value
         .map((stage) => ({
             ...stage,
             cards: (props.pipeline[stage.key] ?? []).filter((application) => {
@@ -89,6 +109,14 @@ const columns = computed(() =>
 const total = computed(() =>
     Object.values(props.pipeline).reduce((sum, items) => sum + items.length, 0),
 );
+const activeApplicationsLabel = computed(() =>
+    t(
+        total.value === 1
+            ? 'employer.pipeline.activeApplications.one'
+            : 'employer.pipeline.activeApplications.other',
+        { count: total.value },
+    ),
+);
 
 const filterJob = () => {
     router.get(
@@ -113,44 +141,42 @@ const transition = (application: Application, nextStatus: string) => {
 </script>
 
 <template>
-    <Head title="Bewerbungs-Pipeline" />
+    <Head :title="t('employer.pipeline.metaTitle')" />
     <div class="erin-page max-w-none">
         <PageHeader
-            eyebrow="Bewerbermanagement"
-            title="Recruiting-Pipeline"
-            description="Verschieben Sie Kandidaten durch Ihren Auswahlprozess – wie in einem kompakten ATS."
+            :eyebrow="t('employer.pipeline.eyebrow')"
+            :title="t('employer.pipeline.title')"
+            :description="t('employer.pipeline.description')"
             :icon="Kanban"
         >
             <template #actions>
                 <span
                     class="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700"
-                    >{{ total }} aktive Bewerbungen</span
+                    >{{ activeApplicationsLabel }}</span
                 >
             </template>
         </PageHeader>
-        <section class="erin-panel flex flex-col gap-3 p-4 sm:flex-row">
-            <div class="relative min-w-0 flex-1">
-                <Search
-                    class="absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-slate-400"
-                />
-                <input
-                    v-model="search"
-                    type="search"
-                    placeholder="Kandidat oder Stelle durchsuchen …"
-                    class="h-10 w-full rounded-xl border border-slate-200 pl-10 text-sm"
-                />
-            </div>
-            <select
-                v-model="selectedJob"
-                class="h-10 rounded-xl border border-slate-200 px-3 text-xs font-bold text-slate-600"
-                @change="filterJob"
-            >
-                <option :value="null">Alle Stellenanzeigen</option>
-                <option v-for="job in jobs" :key="job.id" :value="job.id">
-                    {{ job.title }}
-                </option>
-            </select>
-        </section>
+        <FilterToolbar>
+            <SearchField
+                v-model="search"
+                size="sm"
+                :placeholder="t('employer.pipeline.searchPlaceholder')"
+            />
+            <template #actions>
+                <select
+                    v-model="selectedJob"
+                    class="erin-focus h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-600"
+                    @change="filterJob"
+                >
+                    <option :value="null">
+                        {{ t('employer.pipeline.allJobs') }}
+                    </option>
+                    <option v-for="job in jobs" :key="job.id" :value="job.id">
+                        {{ job.title }}
+                    </option>
+                </select>
+            </template>
+        </FilterToolbar>
 
         <div v-if="total" class="overflow-x-auto pb-3">
             <div
@@ -217,7 +243,9 @@ const transition = (application: Application, nextStatus: string) => {
                                     >
                                         {{
                                             application.candidate.position ||
-                                            'Position nicht angegeben'
+                                            t(
+                                                'employer.pipeline.positionMissing',
+                                            )
                                         }}
                                     </p>
                                     <p
@@ -225,7 +253,9 @@ const transition = (application: Application, nextStatus: string) => {
                                     >
                                         {{
                                             application.candidate.country ||
-                                            'Land nicht angegeben'
+                                            t(
+                                                'employer.pipeline.countryMissing',
+                                            )
                                         }}
                                     </p>
                                     <p
@@ -240,7 +270,11 @@ const transition = (application: Application, nextStatus: string) => {
                                 <select
                                     :value="application.status"
                                     class="h-8 w-full rounded-lg border border-slate-200 px-2 text-[10px] font-bold text-slate-600"
-                                    aria-label="Bewerbungsstatus ändern"
+                                    :aria-label="
+                                        t(
+                                            'employer.pipeline.changeApplicationStatus',
+                                        )
+                                    "
                                     @change="
                                         transition(
                                             application,
@@ -267,13 +301,7 @@ const transition = (application: Application, nextStatus: string) => {
                                     class="mt-2 flex items-center gap-1.5 text-[9px] text-slate-400"
                                 >
                                     <CalendarDays class="size-3" />
-                                    {{
-                                        new Intl.DateTimeFormat('de-DE', {
-                                            dateStyle: 'medium',
-                                        }).format(
-                                            new Date(application.applied_at),
-                                        )
-                                    }}
+                                    {{ formatDate(application.applied_at) }}
                                 </p>
                             </div>
                         </article>
@@ -281,7 +309,7 @@ const transition = (application: Application, nextStatus: string) => {
                             v-if="column.cards.length === 0"
                             class="rounded-xl border border-dashed border-slate-300 p-5 text-center text-xs text-slate-400"
                         >
-                            Keine Bewerbungen
+                            {{ t('employer.pipeline.noApplicationsInStage') }}
                         </p>
                     </div>
                 </section>
@@ -294,11 +322,10 @@ const transition = (application: Application, nextStatus: string) => {
             <div>
                 <UsersRound class="mx-auto size-9 text-slate-300" />
                 <h2 class="mt-4 font-bold text-slate-900">
-                    Noch keine Bewerbungen
+                    {{ t('employer.pipeline.emptyTitle') }}
                 </h2>
                 <p class="mt-2 max-w-md text-sm text-slate-500">
-                    Sobald Fachkräfte sich bewerben oder Einladungen annehmen,
-                    erscheinen sie hier in der Pipeline.
+                    {{ t('employer.pipeline.emptyDescription') }}
                 </p>
             </div>
         </div>

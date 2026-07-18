@@ -1,4 +1,5 @@
 export default {
+    metaTitle: 'Dashboard',
     employer: {
         eyebrow: 'Unternehmensbereich',
         welcome: 'Willkommen, {company}',

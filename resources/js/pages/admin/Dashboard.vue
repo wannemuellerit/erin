@@ -13,8 +13,8 @@ import {
 import MetricCard from '@/components/product/MetricCard.vue';
 import PageHeader from '@/components/product/PageHeader.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
-import AdminEmptyState from './_components/AdminEmptyState.vue';
-import { formatCurrency, formatDate, humanize } from './_shared';
+import EmptyState from '@/components/product/EmptyState.vue';
+import { useAdminI18n } from './_i18n';
 
 type AuditEntry = {
     id: number;
@@ -60,9 +60,11 @@ defineProps<{
     recent_audit: AuditEntry[];
 }>();
 
+const { t, formatCurrency, formatDate, humanize } = useAdminI18n();
+
 function targetLabel(entry: AuditEntry): string {
     if (!entry.auditable_type) {
-        return 'System';
+        return t('common.system');
     }
 
     const type =
@@ -73,47 +75,61 @@ function targetLabel(entry: AuditEntry): string {
 </script>
 
 <template>
-    <Head title="Admin Cockpit" />
+    <Head :title="t('dashboard.metaTitle')" />
 
     <div class="erin-page">
         <PageHeader
-            eyebrow="Platform Operations"
-            title="Admin Cockpit"
-            description="Live-Kennzahlen aus Nutzern, Firmen, Marketplace und operativen Workflows."
+            :eyebrow="t('dashboard.eyebrow')"
+            :title="t('dashboard.title')"
+            :description="t('dashboard.description')"
             :icon="ScrollText"
         />
 
         <section>
             <h2
-                class="mb-3 text-xs font-bold tracking-wider text-slate-400 uppercase"
+                class="mb-3 text-xs font-bold tracking-wider text-slate-600 uppercase"
             >
-                Plattform
+                {{ t('dashboard.platform') }}
             </h2>
             <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <MetricCard
-                    label="Nutzer gesamt"
+                    :label="t('dashboard.metrics.users')"
                     :value="metrics.users.total"
-                    :hint="`${metrics.users.candidates} Fachkräfte · ${metrics.users.companies} Firmenkonten`"
+                    :hint="
+                        t('dashboard.metrics.usersHint', {
+                            candidates: metrics.users.candidates,
+                            companies: metrics.users.companies,
+                        })
+                    "
                     :icon="Users"
                 />
                 <MetricCard
-                    label="Unternehmen"
+                    :label="t('dashboard.metrics.companies')"
                     :value="metrics.companies.total"
-                    :hint="`${metrics.companies.active} aktiv · ${metrics.companies.blocked} gesperrt`"
+                    :hint="
+                        t('dashboard.metrics.companiesHint', {
+                            active: metrics.companies.active,
+                            blocked: metrics.companies.blocked,
+                        })
+                    "
                     :icon="Building2"
                     tone="teal"
                 />
                 <MetricCard
-                    label="Veröffentlichte Jobs"
+                    :label="t('dashboard.metrics.publishedJobs')"
                     :value="metrics.marketplace.published_jobs"
-                    :hint="`${metrics.marketplace.applications} Bewerbungen insgesamt`"
+                    :hint="
+                        t('dashboard.metrics.applicationsHint', {
+                            count: metrics.marketplace.applications,
+                        })
+                    "
                     :icon="BriefcaseBusiness"
                     tone="violet"
                 />
                 <MetricCard
-                    label="Zahlung überfällig"
+                    :label="t('dashboard.metrics.pastDue')"
                     :value="metrics.companies.past_due"
-                    hint="betroffene Unternehmen"
+                    :hint="t('dashboard.metrics.pastDueHint')"
                     :icon="CircleDollarSign"
                     tone="orange"
                 />
@@ -122,33 +138,33 @@ function targetLabel(entry: AuditEntry): string {
 
         <section>
             <h2
-                class="mb-3 text-xs font-bold tracking-wider text-slate-400 uppercase"
+                class="mb-3 text-xs font-bold tracking-wider text-slate-600 uppercase"
             >
-                Offene Vorgänge
+                {{ t('dashboard.openProcesses') }}
             </h2>
             <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <MetricCard
-                    label="Dokumentprüfung"
+                    :label="t('dashboard.metrics.documentReview')"
                     :value="metrics.operations.documents_waiting"
-                    hint="hochgeladen oder in Prüfung"
+                    :hint="t('dashboard.metrics.documentReviewHint')"
                     :icon="FileText"
                     tone="teal"
                 />
                 <MetricCard
-                    label="Aktive Visa-Fälle"
+                    :label="t('dashboard.metrics.visaCases')"
                     :value="metrics.operations.visa_active"
-                    hint="aktiv oder blockiert"
+                    :hint="t('dashboard.metrics.visaCasesHint')"
                     :icon="FileClock"
                 />
                 <MetricCard
-                    label="Offene Tickets"
+                    :label="t('dashboard.metrics.openTickets')"
                     :value="metrics.operations.tickets_open"
-                    hint="noch nicht gelöst"
+                    :hint="t('dashboard.metrics.openTicketsHint')"
                     :icon="Tickets"
                     tone="orange"
                 />
                 <MetricCard
-                    label="Referral-Auszahlungen"
+                    :label="t('dashboard.metrics.referralPayouts')"
                     :value="metrics.operations.referrals_payable"
                     :hint="
                         formatCurrency(
@@ -162,8 +178,8 @@ function targetLabel(entry: AuditEntry): string {
         </section>
 
         <SectionCard
-            title="Letzte Audit-Ereignisse"
-            description="Die jüngsten protokollierten Plattformaktionen."
+            :title="t('dashboard.auditTitle')"
+            :description="t('dashboard.auditDescription')"
             flush
         >
             <div v-if="recent_audit.length > 0" class="overflow-x-auto">
@@ -172,10 +188,18 @@ function targetLabel(entry: AuditEntry): string {
                         <tr
                             class="text-[11px] font-bold tracking-wide text-slate-500 uppercase"
                         >
-                            <th class="px-5 py-3">Ereignis</th>
-                            <th class="px-5 py-3">Akteur</th>
-                            <th class="px-5 py-3">Ziel</th>
-                            <th class="px-5 py-3 text-right">Zeitpunkt</th>
+                            <th class="px-5 py-3">
+                                {{ t('dashboard.columns.event') }}
+                            </th>
+                            <th class="px-5 py-3">
+                                {{ t('dashboard.columns.actor') }}
+                            </th>
+                            <th class="px-5 py-3">
+                                {{ t('dashboard.columns.target') }}
+                            </th>
+                            <th class="px-5 py-3 text-right">
+                                {{ t('dashboard.columns.time') }}
+                            </th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
@@ -193,11 +217,13 @@ function targetLabel(entry: AuditEntry): string {
                             </td>
                             <td class="px-5 py-4">
                                 <p class="font-semibold text-slate-800">
-                                    {{ entry.actor?.name ?? 'System' }}
+                                    {{
+                                        entry.actor?.name ?? t('common.system')
+                                    }}
                                 </p>
                                 <p
                                     v-if="entry.actor"
-                                    class="mt-0.5 text-xs text-slate-400"
+                                    class="mt-0.5 text-xs text-slate-600"
                                 >
                                     {{ entry.actor.email }}
                                 </p>
@@ -214,10 +240,10 @@ function targetLabel(entry: AuditEntry): string {
                     </tbody>
                 </table>
             </div>
-            <AdminEmptyState
+            <EmptyState
                 v-else
-                title="Noch keine Audit-Ereignisse"
-                description="Sobald Plattformaktionen protokolliert werden, erscheinen sie hier."
+                :title="t('dashboard.emptyTitle')"
+                :description="t('dashboard.emptyDescription')"
             />
         </SectionCard>
     </div>

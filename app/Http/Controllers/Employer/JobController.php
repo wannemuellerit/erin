@@ -11,6 +11,7 @@ use App\Models\JobPosting;
 use App\Models\Language;
 use App\Models\Occupation;
 use App\Models\Skill;
+use App\Services\Activity\ActivityRecorder;
 use App\Services\Audit\AuditLogger;
 use App\Services\Billing\EntitlementService;
 use App\Services\Companies\CurrentCompany;
@@ -55,6 +56,7 @@ class JobController extends Controller
         Request $request,
         CurrentCompany $currentCompany,
         AuditLogger $audit,
+        ActivityRecorder $activity,
     ): RedirectResponse {
         $company = $currentCompany->forRequest($request);
         $this->assertCanRecruit($request, $currentCompany);
@@ -74,6 +76,13 @@ class JobController extends Controller
         });
 
         $audit->record('job.created', $job, after: $job->toArray(), companyId: $company->getKey());
+        $activity->record(
+            'job.created',
+            $request->user(),
+            $company,
+            $job,
+            ['job_title' => $job->title],
+        );
 
         return redirect()->route('employer.jobs.edit', $job)->with('success', __('Stellenanzeige wurde als Entwurf gespeichert.'));
     }

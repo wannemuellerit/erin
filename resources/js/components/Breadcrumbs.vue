@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
+import { useI18n } from 'vue-i18n';
 import {
     Breadcrumb,
     BreadcrumbItem,
@@ -15,6 +16,8 @@ type Props = {
 };
 
 defineProps<Props>();
+const { t, te } = useI18n();
+const breadcrumbTitle = (title: string) => (te(title) ? t(title) : title);
 </script>
 
 <template>
@@ -23,11 +26,15 @@ defineProps<Props>();
             <template v-for="(item, index) in breadcrumbs" :key="index">
                 <BreadcrumbItem>
                     <template v-if="index === breadcrumbs.length - 1">
-                        <BreadcrumbPage>{{ item.title }}</BreadcrumbPage>
+                        <BreadcrumbPage>
+                            {{ breadcrumbTitle(item.title) }}
+                        </BreadcrumbPage>
                     </template>
                     <template v-else>
                         <BreadcrumbLink as-child>
-                            <Link :href="item.href">{{ item.title }}</Link>
+                            <Link :href="item.href">
+                                {{ breadcrumbTitle(item.title) }}
+                            </Link>
                         </BreadcrumbLink>
                     </template>
                 </BreadcrumbItem>

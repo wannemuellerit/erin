@@ -283,7 +283,7 @@ class EntitlementService
             return 0;
         }
 
-        $subscription = $company->subscription('default');
+        $subscription = $company->billingSubscription();
 
         if ($subscription === null) {
             return 0;

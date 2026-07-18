@@ -368,6 +368,18 @@ services:
       setup:
         condition: service_completed_successfully
 
+  stripe-cli:
+    image: stripe/stripe-cli:v1.43.8
+    profiles: ["stripe"]
+    command: ["listen", "--forward-to", "http://laravel:8000/billing/webhook"]
+    environment:
+      STRIPE_API_KEY: ${STRIPE_SECRET_KEY:-}
+    init: true
+    restart: "no"
+    depends_on:
+      laravel:
+        condition: service_healthy
+
   playwright:
     image: mcr.microsoft.com/playwright:v1.61.1-noble
     profiles: ["tools"]

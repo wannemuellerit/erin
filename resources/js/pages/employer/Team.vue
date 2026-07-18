@@ -2,10 +2,12 @@
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { Mail, ShieldCheck, Trash2, UserPlus, Users } from '@lucide/vue';
 import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import MetricCard from '@/components/product/MetricCard.vue';
 import PageHeader from '@/components/product/PageHeader.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
+import { useFormatters } from '@/composables/useFormatters';
 import { invite, remove } from '@/routes/employer/team';
 
 type Member = {
@@ -57,6 +59,8 @@ const props = withDefaults(
 );
 
 const showInviteForm = ref(false);
+const { t, te } = useI18n();
+const { formatDate } = useFormatters();
 const inviteForm = useForm({
     email: '',
     role: 'recruiter',
@@ -80,12 +84,14 @@ const initials = (name?: string) =>
         .slice(0, 2)
         .toUpperCase();
 const roleLabel = (role: string) =>
-    ({
-        owner: 'Inhaber',
-        admin: 'Admin',
-        recruiter: 'Recruiter',
-        viewer: 'Viewer',
-    })[role] ?? role;
+    te(`employer.team.roles.${role}`) ? t(`employer.team.roles.${role}`) : role;
+const memberCountLabel = (count: number) =>
+    t(
+        count === 1
+            ? 'employer.team.memberCount.one'
+            : 'employer.team.memberCount.other',
+        { count },
+    );
 const submitInvite = () => {
     inviteForm.post(invite.url(), {
         preserveScroll: true,
@@ -101,12 +107,12 @@ const removeMember = (member: Member) => {
 </script>
 
 <template>
-    <Head title="Team & Rollen" />
+    <Head :title="t('employer.team.metaTitle')" />
     <div class="erin-page">
         <PageHeader
-            eyebrow="Organisation"
-            title="Team & Rollen"
-            description="Verwalten Sie Recruiter, Zuständigkeiten und Zugriffsrechte."
+            :eyebrow="t('employer.team.eyebrow')"
+            :title="t('employer.team.title')"
+            :description="t('employer.team.description')"
             :icon="Users"
         >
             <template #actions>
@@ -117,7 +123,7 @@ const removeMember = (member: Member) => {
                     @click="showInviteForm = !showInviteForm"
                 >
                     <UserPlus class="size-4" />
-                    Mitglied einladen
+                    {{ t('employer.team.inviteMember') }}
                 </button>
             </template>
         </PageHeader>
@@ -129,7 +135,7 @@ const removeMember = (member: Member) => {
         >
             <label>
                 <span class="text-xs font-bold text-slate-600">
-                    E-Mail-Adresse
+                    {{ t('employer.team.email') }}
                 </span>
                 <input
                     v-model="inviteForm.email"
@@ -145,14 +151,22 @@ const removeMember = (member: Member) => {
                 </span>
             </label>
             <label>
-                <span class="text-xs font-bold text-slate-600">Rolle</span>
+                <span class="text-xs font-bold text-slate-600">
+                    {{ t('employer.team.role') }}
+                </span>
                 <select
                     v-model="inviteForm.role"
                     class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
                 >
-                    <option value="admin">Admin</option>
-                    <option value="recruiter">Recruiter</option>
-                    <option value="viewer">Viewer</option>
+                    <option value="admin">
+                        {{ t('employer.team.roles.admin') }}
+                    </option>
+                    <option value="recruiter">
+                        {{ t('employer.team.roles.recruiter') }}
+                    </option>
+                    <option value="viewer">
+                        {{ t('employer.team.roles.viewer') }}
+                    </option>
                 </select>
             </label>
             <button
@@ -160,24 +174,24 @@ const removeMember = (member: Member) => {
                 :disabled="inviteForm.processing"
                 class="mt-auto h-10 rounded-xl bg-[var(--erin-primary)] px-4 text-xs font-bold text-white disabled:opacity-50"
             >
-                Einladung senden
+                {{ t('employer.team.sendInvitation') }}
             </button>
         </form>
 
         <div class="grid gap-4 sm:grid-cols-3">
             <MetricCard
-                label="Teammitglieder"
+                :label="t('employer.team.metrics.members')"
                 :value="seatLabel"
                 :icon="Users"
             />
             <MetricCard
-                label="Recruiting-Zugriff"
+                :label="t('employer.team.metrics.recruitingAccess')"
                 :value="activeRecruiters"
                 :icon="ShieldCheck"
                 tone="teal"
             />
             <MetricCard
-                label="Offene Einladungen"
+                :label="t('employer.team.metrics.openInvitations')"
                 :value="invitations.length"
                 :icon="Mail"
                 tone="orange"
@@ -185,8 +199,8 @@ const removeMember = (member: Member) => {
         </div>
 
         <SectionCard
-            title="Mitglieder"
-            description="Zugriff auf das Unternehmensportal"
+            :title="t('employer.team.membersTitle')"
+            :description="t('employer.team.membersDescription')"
         >
             <div v-if="members.length" class="divide-y divide-slate-100">
                 <div
@@ -201,7 +215,10 @@ const removeMember = (member: Member) => {
                     </span>
                     <div class="min-w-0 flex-1">
                         <p class="text-sm font-bold text-slate-900">
-                            {{ member.user?.name ?? 'Unbekanntes Mitglied' }}
+                            {{
+                                member.user?.name ??
+                                t('employer.team.unknownMember')
+                            }}
                         </p>
                         <p class="text-xs text-slate-400">
                             {{ member.user?.email }}
@@ -215,23 +232,34 @@ const removeMember = (member: Member) => {
                             v-if="member.user?.last_active_at"
                             class="mt-1 text-[10px] text-slate-400"
                         >
-                            Aktiv
                             {{
-                                new Intl.DateTimeFormat('de-DE', {
-                                    dateStyle: 'medium',
-                                }).format(new Date(member.user.last_active_at))
+                                t('employer.team.activeOn', {
+                                    date: formatDate(
+                                        member.user.last_active_at,
+                                    ),
+                                })
                             }}
                         </p>
                     </div>
                     <StatusBadge
-                        :label="member.accepted_at ? 'Aktiv' : 'Ausstehend'"
+                        :label="
+                            member.accepted_at
+                                ? t('employer.team.status.active')
+                                : t('employer.team.status.pending')
+                        "
                         :tone="member.accepted_at ? 'green' : 'yellow'"
                     />
                     <button
                         v-if="can_manage && member.role !== 'owner'"
                         type="button"
                         class="grid size-9 place-items-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600"
-                        :aria-label="`${member.user?.name ?? 'Mitglied'} entfernen`"
+                        :aria-label="
+                            t('employer.team.removeMember', {
+                                name:
+                                    member.user?.name ??
+                                    t('employer.team.member'),
+                            })
+                        "
                         @click="removeMember(member)"
                     >
                         <Trash2 class="size-4" />
@@ -239,14 +267,14 @@ const removeMember = (member: Member) => {
                 </div>
             </div>
             <p v-else class="py-10 text-center text-sm text-slate-400">
-                Noch keine Teammitglieder vorhanden.
+                {{ t('employer.team.noMembers') }}
             </p>
         </SectionCard>
 
         <div class="grid gap-6 lg:grid-cols-2">
             <SectionCard
-                title="Offene Einladungen"
-                description="Noch nicht angenommene Teameinladungen"
+                :title="t('employer.team.invitationsTitle')"
+                :description="t('employer.team.invitationsDescription')"
             >
                 <div v-if="invitations.length" class="space-y-3">
                     <article
@@ -263,29 +291,31 @@ const removeMember = (member: Member) => {
                                     {{ roleLabel(invitation.role) }}
                                 </p>
                             </div>
-                            <StatusBadge label="Eingeladen" tone="yellow" />
+                            <StatusBadge
+                                :label="t('employer.team.status.invited')"
+                                tone="yellow"
+                            />
                         </div>
                         <p
                             v-if="invitation.expires_at"
                             class="mt-2 text-[10px] text-slate-400"
                         >
-                            Gültig bis
                             {{
-                                new Intl.DateTimeFormat('de-DE', {
-                                    dateStyle: 'medium',
-                                }).format(new Date(invitation.expires_at))
+                                t('employer.team.validUntil', {
+                                    date: formatDate(invitation.expires_at),
+                                })
                             }}
                         </p>
                     </article>
                 </div>
                 <p v-else class="py-8 text-center text-sm text-slate-400">
-                    Keine offenen Einladungen.
+                    {{ t('employer.team.noInvitations') }}
                 </p>
             </SectionCard>
 
             <SectionCard
-                title="Teams"
-                description="Organisierte Recruiting-Gruppen"
+                :title="t('employer.team.teamsTitle')"
+                :description="t('employer.team.teamsDescription')"
             >
                 <div v-if="teams.length" class="space-y-3">
                     <article
@@ -295,12 +325,14 @@ const removeMember = (member: Member) => {
                     >
                         <p class="text-sm font-bold">{{ team.name }}</p>
                         <p class="mt-1 text-xs text-slate-400">
-                            {{ team.memberships?.length ?? 0 }} Mitglieder
+                            {{
+                                memberCountLabel(team.memberships?.length ?? 0)
+                            }}
                         </p>
                     </article>
                 </div>
                 <p v-else class="py-8 text-center text-sm text-slate-400">
-                    Noch keine Teams angelegt.
+                    {{ t('employer.team.noTeams') }}
                 </p>
             </SectionCard>
         </div>

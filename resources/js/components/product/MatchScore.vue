@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
+import de from '@/i18n/messages/product-components-de';
+import en from '@/i18n/messages/product-components-en';
 
 const props = withDefaults(
     defineProps<{
@@ -9,9 +12,14 @@ const props = withDefaults(
     }>(),
     {
         size: 'md',
-        label: 'Match',
+        label: '',
     },
 );
+const { t } = useI18n({
+    useScope: 'local',
+    messages: { de, en },
+});
+const resolvedLabel = computed(() => props.label || t('matchScore.label'));
 
 const safeScore = computed(() => Math.max(0, Math.min(100, props.score)));
 const scoreColor = computed(() => {
@@ -60,7 +68,7 @@ const dimensions = {
                     v-if="size !== 'sm'"
                     class="text-[9px] font-semibold text-slate-400 uppercase"
                 >
-                    {{ label }}
+                    {{ resolvedLabel }}
                 </div>
             </div>
         </div>

@@ -2,11 +2,13 @@
 import { Head, router } from '@inertiajs/vue3';
 import { AlertCircle, Check, ChevronDown, Clock3, Plane } from '@lucide/vue';
 import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import MetricCard from '@/components/product/MetricCard.vue';
 import PageHeader from '@/components/product/PageHeader.vue';
 import ProgressBar from '@/components/product/ProgressBar.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
+import { useFormatters } from '@/composables/useFormatters';
 import { useStatusLabels } from '@/composables/useStatusLabels';
 import { steps as updateStep } from '@/routes/employer/visa';
 import type { StatusTone } from '@/types';
@@ -47,6 +49,8 @@ type VisaCase = {
 const props = withDefaults(defineProps<{ cases?: VisaCase[] }>(), {
     cases: () => [],
 });
+const { t } = useI18n();
+const { formatDate } = useFormatters();
 const { statusLabel } = useStatusLabels();
 
 const expandedCaseId = ref<number | null>(props.cases[0]?.id ?? null);
@@ -88,9 +92,16 @@ const averageDuration = computed(() => {
         return '—';
     }
 
-    return `${Math.round(
+    const days = Math.round(
         durations.reduce((total, days) => total + days, 0) / durations.length,
-    )} Tage`;
+    );
+
+    return t(
+        days === 1
+            ? 'employer.visa.durationDays.one'
+            : 'employer.visa.durationDays.other',
+        { count: days },
+    );
 });
 const candidateName = (visaCase: VisaCase) =>
     [
@@ -98,7 +109,10 @@ const candidateName = (visaCase: VisaCase) =>
         visaCase.candidate_profile?.last_name,
     ]
         .filter(Boolean)
-        .join(' ') || `Fachkraft #${visaCase.candidate_profile?.id ?? '—'}`;
+        .join(' ') ||
+    t('employer.visa.candidateFallback', {
+        id: visaCase.candidate_profile?.id ?? '—',
+    });
 const caseTone = (status: string): StatusTone => {
     if (status === 'completed') {
         return 'green';
@@ -141,35 +155,35 @@ const updateStepDeadline = (step: VisaStep, dueAt: string) => {
 </script>
 
 <template>
-    <Head title="Visa & Relocation" />
+    <Head :title="t('employer.visa.metaTitle')" />
     <div class="erin-page">
         <PageHeader
-            eyebrow="Relocation Management"
-            title="Visa & Relocation"
-            description="Steuern Sie alle Schritte vom Dokumentencheck bis zum erfolgreichen Arbeitsbeginn."
+            :eyebrow="t('employer.visa.eyebrow')"
+            :title="t('employer.visa.title')"
+            :description="t('employer.visa.description')"
             :icon="Plane"
         />
 
         <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <MetricCard
-                label="Aktive Visa-Fälle"
+                :label="t('employer.visa.metrics.activeCases')"
                 :value="activeCases"
                 :icon="Plane"
             />
             <MetricCard
-                label="Planmäßig"
+                :label="t('employer.visa.metrics.onTrack')"
                 :value="onTrackCases"
                 :icon="Check"
                 tone="teal"
             />
             <MetricCard
-                label="Handlungsbedarf"
+                :label="t('employer.visa.metrics.actionRequired')"
                 :value="blockedCases"
                 :icon="AlertCircle"
                 tone="orange"
             />
             <MetricCard
-                label="Ø Bearbeitungszeit"
+                :label="t('employer.visa.metrics.averageDuration')"
                 :value="averageDuration"
                 :icon="Clock3"
                 tone="violet"
@@ -177,8 +191,8 @@ const updateStepDeadline = (step: VisaStep, dueAt: string) => {
         </div>
 
         <SectionCard
-            title="Visa-Fälle"
-            description="Alle laufenden Relocation-Prozesse"
+            :title="t('employer.visa.casesTitle')"
+            :description="t('employer.visa.casesDescription')"
         >
             <div v-if="cases.length" class="space-y-3">
                 <article
@@ -190,6 +204,11 @@ const updateStepDeadline = (step: VisaStep, dueAt: string) => {
                         type="button"
                         class="grid w-full gap-4 p-4 text-left hover:bg-slate-50 lg:grid-cols-[1.1fr_1fr_0.75fr_auto] lg:items-center"
                         :aria-expanded="expandedCaseId === visaCase.id"
+                        :aria-label="
+                            t('employer.visa.toggleCase', {
+                                name: candidateName(visaCase),
+                            })
+                        "
                         @click="
                             expandedCaseId =
                                 expandedCaseId === visaCase.id
@@ -220,7 +239,7 @@ const updateStepDeadline = (step: VisaStep, dueAt: string) => {
                                             ?.current_position ??
                                         visaCase.application?.job_posting
                                             ?.title ??
-                                        'Position nicht angegeben'
+                                        t('employer.visa.positionMissing')
                                     }}
                                 </span>
                             </span>
@@ -228,7 +247,7 @@ const updateStepDeadline = (step: VisaStep, dueAt: string) => {
                         <span>
                             <span class="mb-2 flex justify-between text-xs">
                                 <span class="font-bold text-slate-600">
-                                    Fortschritt
+                                    {{ t('employer.visa.progress') }}
                                 </span>
                                 <span class="text-slate-400">
                                     {{ visaCase.progress }} %
@@ -249,13 +268,12 @@ const updateStepDeadline = (step: VisaStep, dueAt: string) => {
                                 v-if="visaCase.target_start_date"
                                 class="mt-1.5 block text-[10px] text-slate-400"
                             >
-                                Ziel:
                                 {{
-                                    new Intl.DateTimeFormat('de-DE', {
-                                        dateStyle: 'medium',
-                                    }).format(
-                                        new Date(visaCase.target_start_date),
-                                    )
+                                    t('employer.visa.targetDate', {
+                                        date: formatDate(
+                                            visaCase.target_start_date,
+                                        ),
+                                    })
                                 }}
                             </span>
                         </span>
@@ -285,8 +303,12 @@ const updateStepDeadline = (step: VisaStep, dueAt: string) => {
                                         v-if="step.responsible_user"
                                         class="mt-1 text-[10px] text-slate-400"
                                     >
-                                        Verantwortlich:
-                                        {{ step.responsible_user.name }}
+                                        {{
+                                            t('employer.visa.responsible', {
+                                                name: step.responsible_user
+                                                    .name,
+                                            })
+                                        }}
                                     </p>
                                 </div>
                                 <select
@@ -320,7 +342,7 @@ const updateStepDeadline = (step: VisaStep, dueAt: string) => {
                                     :value="step.due_at?.slice(0, 10) ?? ''"
                                     type="date"
                                     class="h-9 rounded-lg border border-slate-200 px-2 text-xs"
-                                    aria-label="Frist"
+                                    :aria-label="t('employer.visa.deadline')"
                                     @change="
                                         updateStepDeadline(
                                             step,
@@ -335,25 +357,26 @@ const updateStepDeadline = (step: VisaStep, dueAt: string) => {
                             v-else
                             class="py-6 text-center text-sm text-slate-400"
                         >
-                            Für diesen Fall sind noch keine Schritte angelegt.
+                            {{ t('employer.visa.noSteps') }}
                         </p>
                     </div>
                 </article>
             </div>
             <div v-else class="py-14 text-center">
                 <Plane class="mx-auto size-9 text-slate-300" />
-                <h2 class="mt-4 font-bold">Noch keine Visa-Fälle</h2>
+                <h2 class="mt-4 font-bold">
+                    {{ t('employer.visa.emptyTitle') }}
+                </h2>
                 <p class="mt-2 text-sm text-slate-500">
-                    Ein Visa-Workflow entsteht, sobald eine Bewerbung in „Visa
-                    in Bearbeitung“ verschoben wird.
+                    {{ t('employer.visa.emptyDescription') }}
                 </p>
             </div>
         </SectionCard>
 
         <SectionCard
             v-if="cases.some((visaCase) => visaCase.steps?.length)"
-            title="Visa-Workflow"
-            description="Transparente Schritte bis zum Arbeitsbeginn"
+            :title="t('employer.visa.workflowTitle')"
+            :description="t('employer.visa.workflowDescription')"
         >
             <div class="overflow-x-auto pb-2">
                 <div

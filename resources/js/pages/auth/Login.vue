@@ -120,7 +120,7 @@ const insertDemoCredentials = () => {
                     autofocus
                     :tabindex="1"
                     autocomplete="email"
-                    placeholder="name@unternehmen.de"
+                    :placeholder="t('auth.emailPlaceholder')"
                     v-model="email"
                 />
                 <InputError :message="errors.email" />

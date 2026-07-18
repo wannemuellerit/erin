@@ -1,16 +1,12 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
-import {
-    Building2,
-    Clock3,
-    MapPin,
-    Search,
-    ShieldCheck,
-    Users,
-} from '@lucide/vue';
+import { Building2, Clock3, MapPin, ShieldCheck, Users } from '@lucide/vue';
 import { ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import PageHeader from '@/components/product/PageHeader.vue';
+import SearchField from '@/components/product/SearchField.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
+import { useFormatters } from '@/composables/useFormatters';
 
 type Company = {
     id: number;
@@ -27,6 +23,8 @@ type Company = {
     relevant_jobs_count?: number;
 };
 withDefaults(defineProps<{ companies?: Company[] }>(), { companies: () => [] });
+const { t, te } = useI18n();
+const { formatDate, formatNumber } = useFormatters();
 const search = ref('');
 const benefits = (company: Company) => {
     if (Array.isArray(company.benefits)) {
@@ -39,37 +37,38 @@ const benefits = (company: Company) => {
 };
 const activity = (value?: string | null) =>
     value
-        ? new Intl.DateTimeFormat('de-DE', {
+        ? formatDate(value, {
               dateStyle: 'medium',
               timeStyle: 'short',
-          }).format(new Date(value))
-        : 'nicht angegeben';
+          })
+        : t('candidate.companies.activityMissing');
+const benefitLabel = (benefit: string) => {
+    const key = `candidate.companies.benefits.${benefit}`;
+
+    return te(key) ? t(key) : benefit.replaceAll('_', ' ');
+};
 </script>
 
 <template>
-    <Head title="Unternehmen" />
+    <Head :title="t('candidate.companies.metaTitle')" />
     <div class="erin-page">
         <PageHeader
-            eyebrow="Arbeitgeber entdecken"
-            title="Relevante Unternehmen"
-            description="Aktive Unternehmen, die Fachkräfte mit deiner Qualifikation suchen."
+            :eyebrow="t('candidate.companies.eyebrow')"
+            :title="t('candidate.companies.title')"
+            :description="t('candidate.companies.description')"
             :icon="Building2"
         >
             <template #actions
-                ><StatusBadge label="Nach Aktivität sortiert" tone="blue"
+                ><StatusBadge
+                    :label="t('candidate.companies.sortedByActivity')"
+                    tone="blue"
             /></template>
         </PageHeader>
         <div class="erin-panel p-4">
-            <div class="relative">
-                <Search
-                    class="absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-slate-400"
-                /><input
-                    v-model="search"
-                    type="search"
-                    placeholder="Unternehmen, Branche oder Standort suchen …"
-                    class="h-11 w-full rounded-xl border border-slate-200 pl-10 text-sm"
-                />
-            </div>
+            <SearchField
+                v-model="search"
+                :placeholder="t('candidate.companies.searchPlaceholder')"
+            />
         </div>
         <div v-if="companies.length" class="grid gap-4 lg:grid-cols-2">
             <article
@@ -106,14 +105,18 @@ const activity = (value?: string | null) =>
                             />
                         </div>
                         <p class="mt-1 text-xs text-slate-500">
-                            {{ company.industry || 'Branche nicht angegeben' }}
+                            {{
+                                company.industry ||
+                                t('candidate.companies.industryMissing')
+                            }}
                         </p>
                         <div
                             class="mt-2 flex flex-wrap gap-3 text-[10px] text-slate-400"
                         >
                             <span class="flex items-center gap-1"
                                 ><MapPin class="size-3" />{{
-                                    company.city || 'Standort offen'
+                                    company.city ||
+                                    t('candidate.companies.locationOpen')
                                 }}<template v-if="company.country_code"
                                     >, {{ company.country_code }}</template
                                 ></span
@@ -122,13 +125,19 @@ const activity = (value?: string | null) =>
                                 v-if="company.employee_count"
                                 class="flex items-center gap-1"
                                 ><Users class="size-3" />{{
-                                    company.employee_count
+                                    t('candidate.companies.employees', {
+                                        count: formatNumber(
+                                            company.employee_count,
+                                        ),
+                                    })
                                 }}
-                                Mitarbeitende</span
-                            >
+                            </span>
                             <span class="flex items-center gap-1 text-teal-600"
-                                ><Clock3 class="size-3" />Aktiv
-                                {{ activity(company.last_active_at) }}</span
+                                ><Clock3 class="size-3" />{{
+                                    t('candidate.companies.activeAt', {
+                                        date: activity(company.last_active_at),
+                                    })
+                                }}</span
                             >
                         </div>
                     </div>
@@ -146,7 +155,7 @@ const activity = (value?: string | null) =>
                         {{ company.relevant_jobs_count ?? 0 }}
                     </p>
                     <p class="text-[9px] text-slate-400">
-                        relevante aktive Jobs
+                        {{ t('candidate.companies.relevantJobs') }}
                     </p>
                 </div>
                 <div
@@ -157,7 +166,7 @@ const activity = (value?: string | null) =>
                         v-for="benefit in benefits(company)"
                         :key="benefit"
                         class="rounded-lg bg-teal-50 px-2.5 py-1 text-[10px] font-bold text-teal-700"
-                        >{{ benefit.replaceAll('_', ' ') }}</span
+                        >{{ benefitLabel(benefit) }}</span
                     >
                 </div>
             </article>
@@ -169,11 +178,10 @@ const activity = (value?: string | null) =>
             <div>
                 <Building2 class="mx-auto size-9 text-slate-300" />
                 <h2 class="mt-4 font-bold">
-                    Noch keine relevanten Unternehmen
+                    {{ t('candidate.companies.emptyTitle') }}
                 </h2>
                 <p class="mt-2 max-w-md text-sm text-slate-500">
-                    Sobald Unternehmen passende Stellen veröffentlichen, werden
-                    sie hier nach Aktivität angezeigt.
+                    {{ t('candidate.companies.emptyDescription') }}
                 </p>
             </div>
         </div>

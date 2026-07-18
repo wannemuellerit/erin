@@ -20,7 +20,8 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { edit } from '@/routes/notification-preferences';
 
-type EventKey = 'application' | 'interview' | 'message' | 'support' | 'system';
+type EventKey =
+    'application' | 'interview' | 'message' | 'reminder' | 'support' | 'system';
 
 type Preference = {
     database_enabled: boolean;
@@ -37,140 +38,33 @@ type Props = {
     push_subscription_count: number;
     push_subscription_store_url: string;
     push_subscription_destroy_url: string;
+    push_subscription_test_url: string;
 };
 
 const props = defineProps<Props>();
-const { locale } = useI18n();
-
-const translations = {
-    de: {
-        title: 'Benachrichtigungen',
-        description:
-            'Lege fest, wie Erin dich bei wichtigen Vorgängen erreichen darf.',
-        inApp: 'In-App',
-        email: 'E-Mail',
-        browserPush: 'Browser-Push',
-        sms: 'SMS',
-        whatsapp: 'WhatsApp',
-        comingLater: 'Später',
-        pushMissing:
-            'Browser-Push ist noch nicht serverseitig eingerichtet. Hinterlege zuerst die VAPID-Schlüssel.',
-        pushTitle: 'Browser-Push auf diesem Gerät',
-        pushDescription:
-            'Registriere diesen Browser, damit freigegebene Ereignisse auch bei geschlossenem Erin-Tab ankommen.',
-        pushActive: 'Auf diesem Gerät aktiv',
-        pushInactive: 'Auf diesem Gerät nicht aktiv',
-        pushUnsupported:
-            'Dieser Browser unterstützt keine Web-Push-Benachrichtigungen.',
-        pushDenied:
-            'Die Browser-Berechtigung wurde blockiert. Erlaube Benachrichtigungen in den Website-Einstellungen.',
-        pushEnable: 'Browser-Push aktivieren',
-        pushDisable: 'Auf diesem Gerät deaktivieren',
-        pushWorking: 'Wird eingerichtet …',
-        pushError:
-            'Browser-Push konnte nicht eingerichtet werden. Bitte versuche es erneut.',
-        registeredDevices: 'registrierte Geräte',
-        databaseHint:
-            'Wenn In-App deaktiviert ist, erscheint das Ereignis weder in der Glocke noch als Live-Hinweis.',
-        save: 'Einstellungen speichern',
-        saved: 'Gespeichert',
-        events: {
-            application: {
-                title: 'Bewerbungen',
-                description:
-                    'Neue Bewerbungen und Änderungen am Bewerbungsstatus.',
-            },
-            interview: {
-                title: 'Interviews',
-                description:
-                    'Terminvorschläge, Gegenangebote und bestätigte Gespräche.',
-            },
-            message: {
-                title: 'Nachrichten',
-                description: 'Neue Nachrichten im Erin-Nachrichtencenter.',
-            },
-            support: {
-                title: 'Support',
-                description:
-                    'Antworten und Statusänderungen bei Supporttickets.',
-            },
-            system: {
-                title: 'System & Sonstiges',
-                description:
-                    'Sicherheits-, Abrechnungs- und andere Plattformhinweise.',
-            },
-        },
-    },
-    en: {
-        title: 'Notifications',
-        description:
-            'Choose how Erin may contact you about important activity.',
-        inApp: 'In app',
-        email: 'Email',
-        browserPush: 'Browser push',
-        sms: 'SMS',
-        whatsapp: 'WhatsApp',
-        comingLater: 'Coming later',
-        pushMissing:
-            'Browser push is not configured on the server yet. Add the VAPID keys first.',
-        pushTitle: 'Browser push on this device',
-        pushDescription:
-            'Register this browser so enabled events can arrive while Erin is not open in a tab.',
-        pushActive: 'Active on this device',
-        pushInactive: 'Not active on this device',
-        pushUnsupported:
-            'This browser does not support web push notifications.',
-        pushDenied:
-            'Browser permission is blocked. Allow notifications in the site settings.',
-        pushEnable: 'Enable browser push',
-        pushDisable: 'Disable on this device',
-        pushWorking: 'Setting up …',
-        pushError: 'Browser push could not be configured. Please try again.',
-        registeredDevices: 'registered devices',
-        databaseHint:
-            'When in-app notifications are disabled, the event appears neither in the bell nor as a live update.',
-        save: 'Save settings',
-        saved: 'Saved',
-        events: {
-            application: {
-                title: 'Applications',
-                description:
-                    'New applications and changes to application statuses.',
-            },
-            interview: {
-                title: 'Interviews',
-                description:
-                    'Time suggestions, counterproposals and confirmed interviews.',
-            },
-            message: {
-                title: 'Messages',
-                description: 'New messages in the Erin message center.',
-            },
-            support: {
-                title: 'Support',
-                description: 'Replies and status changes for support tickets.',
-            },
-            system: {
-                title: 'System & other',
-                description:
-                    'Security, billing and other platform notifications.',
-            },
-        },
-    },
-} as const;
-
-const text = computed(() =>
-    locale.value === 'en' ? translations.en : translations.de,
-);
+const { t } = useI18n();
 const eventKeys: EventKey[] = [
     'application',
     'interview',
     'message',
+    'reminder',
     'support',
     'system',
 ];
+const initialPreferences = Object.fromEntries(
+    eventKeys.map((event) => [
+        event,
+        {
+            database_enabled: props.preferences[event].database_enabled,
+            email_enabled: props.preferences[event].email_enabled,
+            push_enabled: props.preferences[event].push_enabled,
+            sms_enabled: props.preferences[event].sms_enabled,
+            whatsapp_enabled: props.preferences[event].whatsapp_enabled,
+        },
+    ]),
+) as Record<EventKey, Preference>;
 const form = useForm({
-    preferences: structuredClone(props.preferences),
+    preferences: initialPreferences,
 });
 const preferenceError = computed(
     () =>
@@ -183,18 +77,22 @@ const pushPermission = ref<NotificationPermission>('default');
 const browserSubscription = ref<PushSubscription | null>(null);
 const pushProcessing = ref(false);
 const pushError = ref('');
+const pushTestProcessing = ref(false);
+const pushTestSent = ref(false);
 
 const isPushActive = computed(() => browserSubscription.value !== null);
 const pushStatusText = computed(() => {
     if (!pushSupported.value) {
-        return text.value.pushUnsupported;
+        return t('settings.notifications.pushUnsupported');
     }
 
     if (pushPermission.value === 'denied') {
-        return text.value.pushDenied;
+        return t('settings.notifications.pushDenied');
     }
 
-    return isPushActive.value ? text.value.pushActive : text.value.pushInactive;
+    return isPushActive.value
+        ? t('settings.notifications.pushActive')
+        : t('settings.notifications.pushInactive');
 });
 
 const applicationServerKey = (value: string): ArrayBuffer => {
@@ -293,7 +191,7 @@ const enablePush = async () => {
                     browserSubscription.value = subscription;
                 },
                 onError: () => {
-                    pushError.value = text.value.pushError;
+                    pushError.value = t('settings.notifications.pushError');
                 },
                 onFinish: () => {
                     pushProcessing.value = false;
@@ -301,7 +199,7 @@ const enablePush = async () => {
             },
         );
     } catch {
-        pushError.value = text.value.pushError;
+        pushError.value = t('settings.notifications.pushError');
         pushProcessing.value = false;
     }
 };
@@ -338,16 +236,43 @@ const disablePush = async () => {
                 });
             },
             onError: () => {
-                pushError.value = text.value.pushError;
+                pushError.value = t('settings.notifications.pushError');
             },
             onFinish: () => {
                 pushProcessing.value = false;
             },
         });
     } catch {
-        pushError.value = text.value.pushError;
+        pushError.value = t('settings.notifications.pushError');
         pushProcessing.value = false;
     }
+};
+
+const sendTestPush = () => {
+    if (pushTestProcessing.value || !isPushActive.value) {
+        return;
+    }
+
+    pushTestProcessing.value = true;
+    pushTestSent.value = false;
+    pushError.value = '';
+
+    router.post(
+        props.push_subscription_test_url,
+        {},
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                pushTestSent.value = true;
+            },
+            onError: () => {
+                pushError.value = t('settings.notifications.pushTestError');
+            },
+            onFinish: () => {
+                pushTestProcessing.value = false;
+            },
+        },
+    );
 };
 
 const submit = () => {
@@ -366,7 +291,7 @@ defineOptions({
     layout: {
         breadcrumbs: [
             {
-                title: 'Notifications',
+                title: 'settings.notifications.title',
                 href: edit(),
             },
         ],
@@ -375,15 +300,15 @@ defineOptions({
 </script>
 
 <template>
-    <Head :title="text.title" />
+    <Head :title="t('settings.notifications.title')" />
 
-    <h1 class="sr-only">{{ text.title }}</h1>
+    <h1 class="sr-only">{{ t('settings.notifications.title') }}</h1>
 
     <div class="space-y-6">
         <Heading
             variant="small"
-            :title="text.title"
-            :description="text.description"
+            :title="t('settings.notifications.title')"
+            :description="t('settings.notifications.description')"
         />
 
         <div
@@ -391,7 +316,7 @@ defineOptions({
         >
             <div class="flex gap-3">
                 <BellRing class="mt-0.5 size-5 shrink-0 text-blue-600" />
-                <p>{{ text.databaseHint }}</p>
+                <p>{{ t('settings.notifications.databaseHint') }}</p>
             </div>
         </div>
 
@@ -413,10 +338,10 @@ defineOptions({
                             id="browser-push-title"
                             class="font-semibold text-slate-950"
                         >
-                            {{ text.pushTitle }}
+                            {{ t('settings.notifications.pushTitle') }}
                         </h2>
                         <p class="mt-1 text-sm leading-5 text-slate-500">
-                            {{ text.pushDescription }}
+                            {{ t('settings.notifications.pushDescription') }}
                         </p>
                         <div
                             class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium"
@@ -439,25 +364,46 @@ defineOptions({
                                 class="text-slate-400"
                             >
                                 {{ push_subscription_count }}
-                                {{ text.registeredDevices }}
+                                {{
+                                    t(
+                                        'settings.notifications.registeredDevices',
+                                    )
+                                }}
                             </span>
                         </div>
                     </div>
                 </div>
 
-                <Button
-                    v-if="isPushActive"
-                    type="button"
-                    variant="outline"
-                    :disabled="pushProcessing"
-                    @click="disablePush"
-                >
-                    <LoaderCircle
-                        v-if="pushProcessing"
-                        class="size-4 animate-spin"
-                    />
-                    {{ text.pushDisable }}
-                </Button>
+                <div v-if="isPushActive" class="flex flex-wrap gap-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        :disabled="pushProcessing || pushTestProcessing"
+                        @click="sendTestPush"
+                    >
+                        <LoaderCircle
+                            v-if="pushTestProcessing"
+                            class="size-4 animate-spin"
+                        />
+                        {{
+                            pushTestProcessing
+                                ? t('settings.notifications.pushTestProcessing')
+                                : t('settings.notifications.pushTest')
+                        }}
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        :disabled="pushProcessing || pushTestProcessing"
+                        @click="disablePush"
+                    >
+                        <LoaderCircle
+                            v-if="pushProcessing"
+                            class="size-4 animate-spin"
+                        />
+                        {{ t('settings.notifications.pushDisable') }}
+                    </Button>
+                </div>
                 <Button
                     v-else
                     type="button"
@@ -473,7 +419,11 @@ defineOptions({
                         v-if="pushProcessing"
                         class="size-4 animate-spin"
                     />
-                    {{ pushProcessing ? text.pushWorking : text.pushEnable }}
+                    {{
+                        pushProcessing
+                            ? t('settings.notifications.pushWorking')
+                            : t('settings.notifications.pushEnable')
+                    }}
                 </Button>
             </div>
 
@@ -483,6 +433,13 @@ defineOptions({
                 role="alert"
             >
                 {{ pushError }}
+            </p>
+            <p
+                v-if="pushTestSent"
+                class="mt-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700"
+                role="status"
+            >
+                {{ t('settings.notifications.pushTestSent') }}
             </p>
         </section>
 
@@ -496,10 +453,14 @@ defineOptions({
                     class="border-b border-slate-100 bg-slate-50/70 px-5 py-4"
                 >
                     <h2 class="font-semibold text-slate-950">
-                        {{ text.events[event].title }}
+                        {{ t(`settings.notifications.events.${event}.title`) }}
                     </h2>
                     <p class="mt-1 text-sm leading-5 text-slate-500">
-                        {{ text.events[event].description }}
+                        {{
+                            t(
+                                `settings.notifications.events.${event}.description`,
+                            )
+                        }}
                     </p>
                 </header>
 
@@ -514,7 +475,7 @@ defineOptions({
                         />
                         <BellRing class="size-4 text-blue-600" />
                         <span class="text-sm font-medium text-slate-700">
-                            {{ text.inApp }}
+                            {{ t('settings.notifications.inApp') }}
                         </span>
                     </label>
 
@@ -528,7 +489,7 @@ defineOptions({
                         />
                         <Mail class="size-4 text-teal-600" />
                         <span class="text-sm font-medium text-slate-700">
-                            {{ text.email }}
+                            {{ t('settings.notifications.email') }}
                         </span>
                     </label>
 
@@ -542,7 +503,7 @@ defineOptions({
                         />
                         <MonitorSmartphone class="size-4 text-orange-600" />
                         <span class="text-sm font-medium text-slate-700">
-                            {{ text.browserPush }}
+                            {{ t('settings.notifications.browserPush') }}
                         </span>
                     </label>
 
@@ -556,9 +517,11 @@ defineOptions({
                             disabled
                         />
                         <Phone class="size-4" />
-                        <span class="text-sm font-medium">{{ text.sms }}</span>
+                        <span class="text-sm font-medium">
+                            {{ t('settings.notifications.sms') }}
+                        </span>
                         <Badge variant="outline" class="ml-auto text-[10px]">
-                            {{ text.comingLater }}
+                            {{ t('settings.notifications.comingLater') }}
                         </Badge>
                     </label>
 
@@ -572,11 +535,11 @@ defineOptions({
                             disabled
                         />
                         <MessageSquareText class="size-4" />
-                        <span class="text-sm font-medium">{{
-                            text.whatsapp
-                        }}</span>
+                        <span class="text-sm font-medium">
+                            {{ t('settings.notifications.whatsapp') }}
+                        </span>
                         <Badge variant="outline" class="ml-auto text-[10px]">
-                            {{ text.comingLater }}
+                            {{ t('settings.notifications.comingLater') }}
                         </Badge>
                     </label>
                 </div>
@@ -586,20 +549,20 @@ defineOptions({
                 v-if="!push_configured"
                 class="rounded-xl bg-orange-50 px-4 py-3 text-sm leading-5 text-orange-900"
             >
-                {{ text.pushMissing }}
+                {{ t('settings.notifications.pushMissing') }}
             </p>
 
             <InputError :message="preferenceError" />
 
             <div class="flex items-center gap-3">
                 <Button type="submit" :disabled="form.processing">
-                    {{ text.save }}
+                    {{ t('settings.notifications.save') }}
                 </Button>
                 <span
                     v-if="form.recentlySuccessful"
                     class="text-sm font-medium text-emerald-600"
                 >
-                    {{ text.saved }}
+                    {{ t('settings.notifications.saved') }}
                 </span>
             </div>
         </form>

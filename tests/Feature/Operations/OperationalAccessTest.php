@@ -87,6 +87,30 @@ it('registers request and response scrubbing for credentials, provider keys and 
         );
 });
 
+it('requires production platform staff to complete two factor before authorizing private broadcasts', function () {
+    $support = User::factory()->create([
+        'role' => UserRole::Support,
+        'two_factor_confirmed_at' => null,
+    ]);
+    $originalEnvironment = app()->environment();
+    $originalDemoMode = config('app.demo_mode');
+
+    app()->instance('env', 'production');
+    config()->set('app.demo_mode', false);
+
+    try {
+        $this->actingAs($support)
+            ->post('/broadcasting/auth', [
+                'channel_name' => 'private-App.Models.User.'.$support->getKey(),
+                'socket_id' => '1234.5678',
+            ])
+            ->assertRedirect(route('security.edit'));
+    } finally {
+        app()->instance('env', $originalEnvironment);
+        config()->set('app.demo_mode', $originalDemoMode);
+    }
+});
+
 it('drops signed URLs before Telescope can persist their query secrets', function () {
     $entry = IncomingEntry::make([
         'uri' => '/documents/42/download?expires=123456&signature=do-not-store',

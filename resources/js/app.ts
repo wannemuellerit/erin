@@ -57,15 +57,19 @@ createInertiaApp({
         color: '#2563EB',
     },
     withApp: (app, { page }) => {
-        const i18n = createErinI18n(localeFromPage(page.props));
+        const initialLocale = normalizeLocale(localeFromPage(page.props));
+        const i18n = createErinI18n(initialLocale);
 
         app.use(i18n);
 
         if (typeof window !== 'undefined') {
+            document.documentElement.lang = initialLocale;
             router.on('navigate', (event) => {
-                i18n.global.locale.value = normalizeLocale(
+                const nextLocale = normalizeLocale(
                     localeFromPage(event.detail.page.props),
                 );
+                i18n.global.locale.value = nextLocale;
+                document.documentElement.lang = nextLocale;
             });
         }
     },

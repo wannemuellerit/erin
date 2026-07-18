@@ -3,15 +3,20 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Enums\SupportTicketStatus;
+use App\Events\SupportTicketMessageCreated;
 use App\Http\Requests\Admin\ReplyToSupportTicketRequest;
 use App\Http\Requests\Admin\UpdateSupportTicketRequest;
+use App\Jobs\SyncSupportMessageToProvider;
+use App\Jobs\SyncSupportTicketToProvider;
 use App\Models\Feedback;
 use App\Models\ModerationCase;
 use App\Models\SupportTicket;
 use App\Models\User;
+use App\Notifications\ActivityNotification;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Bus;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -31,6 +36,9 @@ class SupportController extends AdminController
                 'requester:id,name,email,role,status',
                 'company:id,name,slug',
                 'assignee:id,name,email',
+                'messages' => fn ($query) => $query
+                    ->with('author:id,name,role')
+                    ->oldest(),
             ])
             ->withCount('messages')
             ->when($filters['search'] ?? null, function (Builder $query, string $search): void {
@@ -136,6 +144,15 @@ class SupportController extends AdminController
             'body' => $validated['body'],
             'is_internal' => (bool) ($validated['is_internal'] ?? false),
         ]);
+        SupportTicketMessageCreated::dispatch($message);
+        if ($ticket->external_id === null) {
+            Bus::chain([
+                new SyncSupportTicketToProvider($ticket->getKey()),
+                new SyncSupportMessageToProvider($message->getKey()),
+            ])->dispatch();
+        } else {
+            SyncSupportMessageToProvider::dispatch($message->getKey());
+        }
 
         $ticket->update([
             'assigned_to' => $ticket->assigned_to ?? $request->user()?->getKey(),
@@ -155,6 +172,24 @@ class SupportController extends AdminController
                 'is_internal' => (bool) ($validated['is_internal'] ?? false),
             ],
         );
+
+        if (! ($validated['is_internal'] ?? false)) {
+            $ticket->requester->notify(new ActivityNotification([
+                'event' => 'support.ticket_replied',
+                'translations' => [
+                    'de' => [
+                        'title' => 'Antwort vom Erin-Support',
+                        'message' => sprintf('Dein Ticket %s wurde beantwortet.', $ticket->number),
+                    ],
+                    'en' => [
+                        'title' => 'Reply from Erin support',
+                        'message' => sprintf('Your ticket %s has been answered.', $ticket->number),
+                    ],
+                ],
+                'url' => route('support.index', ['ticket' => $ticket->getKey()]),
+                'ticket_id' => $ticket->getKey(),
+            ]));
+        }
 
         return back()->with('success', __('Die Antwort wurde gespeichert.'));
     }

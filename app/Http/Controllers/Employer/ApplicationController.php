@@ -11,6 +11,7 @@ use App\Models\CandidateInternalReview;
 use App\Models\JobApplication;
 use App\Models\Referral;
 use App\Notifications\ActivityNotification;
+use App\Services\Activity\ActivityRecorder;
 use App\Services\Applications\ApplicationWorkflow;
 use App\Services\Audit\AuditLogger;
 use App\Services\Billing\EntitlementService;
@@ -77,6 +78,7 @@ class ApplicationController extends Controller
         ApplicationWorkflow $workflow,
         EntitlementService $entitlements,
         AuditLogger $audit,
+        ActivityRecorder $activity,
     ): RedirectResponse {
         $company = $currentCompany->forRequest($request);
         abort_unless($application->jobPosting()->where('company_id', $company->getKey())->exists(), 404);
@@ -195,6 +197,19 @@ class ApplicationController extends Controller
             ['status' => $target->value],
             ['human_decision' => true],
             companyId: $company->getKey(),
+        );
+        $activity->record(
+            'application.status_changed',
+            $request->user(),
+            $company,
+            $application,
+            [
+                'candidate_label' => $application->candidateProfile->anonymizedLabel(),
+                'job_title' => $application->jobPosting->title,
+                'status' => $target->value,
+            ],
+            $application->candidateProfile->user,
+            'shared',
         );
 
         return back()->with('success', __('Der Bewerbungsstatus wurde aktualisiert.'));

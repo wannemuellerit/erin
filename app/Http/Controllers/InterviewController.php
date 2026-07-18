@@ -11,6 +11,7 @@ use App\Models\Interview;
 use App\Models\InterviewProposal;
 use App\Models\JobApplication;
 use App\Notifications\ActivityNotification;
+use App\Services\Activity\ActivityRecorder;
 use App\Services\Applications\ApplicationWorkflow;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -66,8 +67,11 @@ class InterviewController extends Controller
         );
     }
 
-    public function propose(Request $request, JobApplication $application): RedirectResponse
-    {
+    public function propose(
+        Request $request,
+        JobApplication $application,
+        ActivityRecorder $activity,
+    ): RedirectResponse {
         $this->authorizeApplication($request, $application, true);
         $validated = $request->validate([
             'slots' => ['required', 'array', 'min:1', 'max:5'],
@@ -131,6 +135,18 @@ class InterviewController extends Controller
             'url' => route('interviews.index'),
             'interview_id' => $interview->getKey(),
         ]);
+        $activity->record(
+            'interview.proposed',
+            $request->user(),
+            $application->jobPosting->company_id,
+            $interview,
+            [
+                'candidate_label' => $application->candidateProfile->anonymizedLabel(),
+                'job_title' => $application->jobPosting->title,
+            ],
+            $application->candidateProfile->user,
+            'shared',
+        );
 
         return redirect()->route('interviews.index')->with('success', __('Die Terminvorschläge wurden gesendet.'));
     }
@@ -139,6 +155,7 @@ class InterviewController extends Controller
         Request $request,
         Interview $interview,
         ApplicationWorkflow $workflow,
+        ActivityRecorder $activity,
     ): RedirectResponse {
         $interview->load('application.jobPosting');
         $this->authorizeApplication($request, $interview->application, true);
@@ -158,6 +175,13 @@ class InterviewController extends Controller
                 'cancelled_at' => now(),
                 'cancellation_reason' => $validated['note'] ?? null,
             ]);
+            $activity->record(
+                'interview.cancelled',
+                $request->user(),
+                $interview->application->jobPosting->company_id,
+                $interview,
+                ['job_title' => $interview->application->jobPosting->title],
+            );
 
             return back()->with('success', __('Das Interview wurde abgesagt.'));
         }
@@ -181,6 +205,13 @@ class InterviewController extends Controller
                 }
                 $interview->update(['status' => InterviewStatus::CounterProposed]);
             });
+            $activity->record(
+                'interview.counter_proposed',
+                $request->user(),
+                $interview->application->jobPosting->company_id,
+                $interview,
+                ['job_title' => $interview->application->jobPosting->title],
+            );
 
             return back()->with('success', __('Deine Gegenvorschläge wurden gesendet.'));
         }
@@ -235,6 +266,13 @@ class InterviewController extends Controller
             'url' => route('interviews.index'),
             'interview_id' => $interview->getKey(),
         ]);
+        $activity->record(
+            'interview.confirmed',
+            $request->user(),
+            $interview->application->jobPosting->company_id,
+            $interview,
+            ['job_title' => $interview->application->jobPosting->title],
+        );
 
         return back()->with('success', __('Der Interviewtermin wurde bestätigt.'));
     }

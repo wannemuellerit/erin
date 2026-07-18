@@ -76,7 +76,7 @@ const isActive = (href: string) => {
                 >
                     <SidebarGroupLabel
                         v-if="group.label"
-                        class="mt-3 h-8 px-2 text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase"
+                        class="mt-3 h-8 px-2 text-[10px] font-bold tracking-[0.12em] text-slate-600 uppercase"
                     >
                         {{ group.label }}
                     </SidebarGroupLabel>

@@ -48,7 +48,7 @@ const { t } = useI18n();
             <template #actions
                 ><Link
                     href="/candidate/profile"
-                    class="inline-flex h-10 items-center gap-2 rounded-xl bg-[var(--erin-accent)] px-4 text-sm font-bold text-white"
+                    class="inline-flex h-10 items-center gap-2 rounded-xl bg-[var(--erin-accent)] px-4 text-sm font-bold text-slate-950"
                     ><UserRound class="size-4" />
                     {{ t('dashboard.candidate.editProfile') }}</Link
                 ></template
@@ -119,7 +119,7 @@ const { t } = useI18n();
                                     t('dashboard.candidate.jobFallback')
                                 }}
                             </p>
-                            <p class="truncate text-xs text-slate-400">
+                            <p class="truncate text-xs text-slate-600">
                                 {{
                                     application.job_posting?.company?.name ||
                                     t('dashboard.candidate.companyFallback')
@@ -134,7 +134,7 @@ const { t } = useI18n();
                         />
                     </div>
                 </div>
-                <p v-else class="py-10 text-center text-sm text-slate-400">
+                <p v-else class="py-10 text-center text-sm text-slate-600">
                     {{ t('dashboard.candidate.noApplications') }}
                 </p>
             </SectionCard>

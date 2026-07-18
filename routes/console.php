@@ -39,3 +39,8 @@ Schedule::command('telescope:prune --hours=72')
     ->dailyAt('02:30')
     ->onOneServer()
     ->withoutOverlapping();
+
+Schedule::command('erin:reminders:send-due')
+    ->everyMinute()
+    ->onOneServer()
+    ->withoutOverlapping();
