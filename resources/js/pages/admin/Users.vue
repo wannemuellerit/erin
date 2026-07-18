@@ -30,6 +30,15 @@ type UserRow = {
     suspended_at: string | null;
     blocked_reason: string | null;
     created_at: string;
+    storage_quota_bytes: number | null;
+    storage_usage: {
+        used_bytes: number;
+        quota_bytes: number;
+        remaining_bytes: number;
+        percentage: number;
+        reserved_bytes: number;
+        custom_quota: boolean;
+    };
     company_memberships_count: number;
     candidate_profile: {
         id: number;
@@ -70,6 +79,10 @@ const statusForm = useForm({
 
 const roleForm = useForm({
     role: '',
+});
+
+const quotaForm = useForm({
+    storage_quota_mb: null as number | null,
 });
 
 const { t, formatDate, humanize } = useAdminI18n();
@@ -146,6 +159,24 @@ function updateRole(user: UserRow, event: Event): void {
             select.value = user.role;
         },
         onFinish: () => roleForm.reset(),
+    });
+}
+
+function updateQuota(user: UserRow): void {
+    const current = Math.round(user.storage_usage.quota_bytes / 1024 / 1024);
+    const value = window.prompt(
+        t('users.storagePrompt'),
+        user.storage_usage.custom_quota ? current.toString() : '',
+    );
+
+    if (value === null) {
+        return;
+    }
+
+    quotaForm.storage_quota_mb = value.trim() === '' ? null : Number(value);
+    quotaForm.patch(adminUsers.storageQuota.update.url(user.id), {
+        preserveScroll: true,
+        onFinish: () => quotaForm.reset(),
     });
 }
 </script>
@@ -244,6 +275,9 @@ function updateRole(user: UserRow, event: Event): void {
                                 {{ t('users.columns.profile') }}
                             </th>
                             <th class="px-5 py-3">
+                                {{ t('users.columns.storage') }}
+                            </th>
+                            <th class="px-5 py-3">
                                 {{ t('users.columns.activity') }}
                             </th>
                             <th class="px-5 py-3">
@@ -326,6 +360,59 @@ function updateRole(user: UserRow, event: Event): void {
                                         )
                                     }}
                                 </template>
+                            </td>
+                            <td
+                                class="min-w-44 px-5 py-4 text-xs text-slate-600"
+                            >
+                                <div
+                                    class="flex items-center justify-between gap-2"
+                                >
+                                    <span class="font-semibold text-slate-800">
+                                        {{
+                                            (
+                                                user.storage_usage.used_bytes /
+                                                1024 /
+                                                1024
+                                            ).toFixed(1)
+                                        }}
+                                        MB
+                                    </span>
+                                    <button
+                                        type="button"
+                                        class="erin-focus rounded-lg text-xs font-bold text-blue-600"
+                                        @click="updateQuota(user)"
+                                    >
+                                        {{ t('users.changeStorageLimit') }}
+                                    </button>
+                                </div>
+                                <div
+                                    class="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"
+                                >
+                                    <div
+                                        class="h-full rounded-full bg-teal-500"
+                                        :style="{
+                                            width: `${user.storage_usage.percentage}%`,
+                                        }"
+                                    />
+                                </div>
+                                <p class="mt-1">
+                                    {{
+                                        t('users.storageUsage', {
+                                            percentage:
+                                                user.storage_usage.percentage,
+                                            quota: Math.round(
+                                                user.storage_usage.quota_bytes /
+                                                    1024 /
+                                                    1024,
+                                            ),
+                                        })
+                                    }}
+                                    <span
+                                        v-if="user.storage_usage.custom_quota"
+                                    >
+                                        · {{ t('users.individualLimit') }}
+                                    </span>
+                                </p>
                             </td>
                             <td
                                 class="px-5 py-4 text-xs whitespace-nowrap text-slate-500"

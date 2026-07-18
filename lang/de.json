@@ -218,5 +218,10 @@
     "Ändere jetzt dein Passwort erneut und richte anschließend Zwei-Faktor-Authentifizierung ein.": "Ändere jetzt dein Passwort erneut und richte anschließend Zwei-Faktor-Authentifizierung ein.",
     "Aktive Anzeigen benötigen einen Titel in beiden Sprachen.": "Aktive Anzeigen benötigen einen Titel in beiden Sprachen.",
     "Aktive Anzeigen benötigen einen Text in beiden Sprachen.": "Aktive Anzeigen benötigen einen Text in beiden Sprachen.",
-    "Dein Speicherlimit ist erreicht. Verwendet: :used MB, Limit: :limit MB.": "Dein Speicherlimit ist erreicht. Verwendet: :used MB, Limit: :limit MB."
+    "Dein Speicherlimit ist erreicht. Verwendet: :used MB, Limit: :limit MB.": "Dein Speicherlimit ist erreicht. Verwendet: :used MB, Limit: :limit MB.",
+    "Dein Speicherlimit ist erreicht. Verwendet: :used MB, reserviert: :reserved MB, Limit: :limit MB.": "Dein Speicherlimit ist erreicht. Verwendet: :used MB, reserviert: :reserved MB, Limit: :limit MB.",
+    "Das Anzeigenmotiv wurde aktualisiert.": "Das Anzeigenmotiv wurde aktualisiert.",
+    "Das Anzeigenmotiv wurde entfernt.": "Das Anzeigenmotiv wurde entfernt.",
+    "Das persönliche Speicherlimit wurde aktualisiert.": "Das persönliche Speicherlimit wurde aktualisiert.",
+    "Der Sicherheitsalarm wurde als geprüft markiert.": "Der Sicherheitsalarm wurde als geprüft markiert."
 }

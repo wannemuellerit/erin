@@ -34,6 +34,10 @@ Schedule::call(function (): void {
         ->whereNull('revoked_at')
         ->where('expires_at', '<=', now())
         ->update(['revoked_at' => now(), 'updated_at' => now()]);
+
+    DB::table('upload_reservations')
+        ->where('expires_at', '<=', now())
+        ->delete();
 })->name('erin:expire-sensitive-access')
     ->hourly()
     ->onOneServer()
@@ -63,6 +67,21 @@ Schedule::call(
 
 Schedule::command('erin:ops:prune --execute --json')
     ->dailyAt('03:15')
+    ->onOneServer()
+    ->withoutOverlapping();
+
+Schedule::command('erin:storage:prune --execute --json')
+    ->dailyAt('03:30')
+    ->onOneServer()
+    ->withoutOverlapping();
+
+Schedule::command('erin:audit:prune --execute --json')
+    ->dailyAt('03:40')
+    ->onOneServer()
+    ->withoutOverlapping();
+
+Schedule::command('erin:audit:detect-anomalies --json')
+    ->everyFiveMinutes()
     ->onOneServer()
     ->withoutOverlapping();
 

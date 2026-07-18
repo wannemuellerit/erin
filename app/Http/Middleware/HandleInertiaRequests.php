@@ -2,9 +2,11 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\AdCampaign;
 use App\Services\Platform\PlatformSettings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\URL;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -98,7 +100,7 @@ class HandleInertiaRequests extends Middleware
     }
 
     /**
-     * @return array{title: string, body: string, cta_label: string, url: string|null}|null
+     * @return array{id: int, title: string, body: string, cta_label: string, url: string|null, media_url: string|null}|null
      */
     private function dashboardAd(
         PlatformSettings $settings,
@@ -129,12 +131,19 @@ class HandleInertiaRequests extends Middleware
         }
 
         $language = $locale === 'en' ? 'en' : 'de';
+        $campaign = isset($ad['campaign_id'])
+            ? AdCampaign::query()->whereKey($ad['campaign_id'])->first()
+            : null;
 
         return [
+            'id' => $campaign?->getKey() ?? 0,
             'title' => (string) $ad['title_'.$language],
             'body' => (string) $ad['body_'.$language],
             'cta_label' => (string) $ad['cta_label_'.$language],
             'url' => is_string($ad['url']) && $ad['url'] !== '' ? $ad['url'] : null,
+            'media_url' => $campaign?->media_path
+                ? URL::temporarySignedRoute('ads.media', now()->addMinutes(15), ['campaign' => $campaign])
+                : null,
         ];
     }
 }

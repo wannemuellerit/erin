@@ -199,6 +199,13 @@ export default {
         after: 'Nachher',
         metadata: 'Metadaten',
         companyReference: 'Firma #{id}',
+        alertsTitle: 'Offene Sicherheitsalarme',
+        alertsDescription:
+            'Automatisch erkannte Zugriffsmuster müssen fachlich geprüft werden.',
+        unknownUser: 'Unbekannter Nutzer',
+        detections: '{count} Erkennungen',
+        resolveAlert: 'Als geprüft markieren',
+        exportCsv: 'Gefiltertes CSV exportieren',
     },
     users: {
         metaTitle: 'Benutzerverwaltung',
@@ -217,6 +224,7 @@ export default {
         columns: {
             user: 'Nutzer',
             profile: 'Profil',
+            storage: 'Speicher',
             activity: 'Aktivität',
             role: 'Rolle',
             status: 'Status',
@@ -230,6 +238,11 @@ export default {
         createdAt: 'Erstellt {date}',
         showHistory: 'Aktivitätshistorie',
         roleConfirm: 'Plattformrolle von {name} wirklich auf „{role}“ ändern?',
+        storagePrompt:
+            'Persönliches Speicherlimit in MB. Leer lassen, um den Plattformstandard zu verwenden.',
+        changeStorageLimit: 'Limit ändern',
+        storageUsage: '{percentage} % von {quota} MB',
+        individualLimit: 'individuell',
     },
     companies: {
         metaTitle: 'Unternehmen',
@@ -531,6 +544,14 @@ export default {
             'Niedrigere fachliche Grenzen, etwa für Profilbilder, bleiben zusätzlich bestehen.',
         maxFileSize: 'Maximale Dateigröße in MB',
         userStorageQuota: 'Speicherlimit je Nutzer in MB',
+        retentionTitle: 'Aufbewahrung und automatische Löschung',
+        retentionDescription:
+            'Fristen werden täglich angewendet. Der Wert 0 deaktiviert die jeweilige Löschung.',
+        rejectedDocumentDays: 'Abgelehnte Dokumente (Tage)',
+        messageAttachmentDays: 'Nachrichtenanhänge (Tage)',
+        supportAttachmentDays: 'Supportanhänge (Tage)',
+        auditLogDays: 'Audit-Protokolle (Tage)',
+        orphanGraceHours: 'Karenz für verwaiste Dateien (Stunden)',
         adTitle: 'Dashboard-Anzeige',
         adDescription:
             'Zeitlich steuerbare Anzeige für Fachkräfte, Unternehmen oder beide Zielgruppen.',
@@ -543,6 +564,14 @@ export default {
         adCtaEnglish: 'Buttontext Englisch',
         adStartsAt: 'Sichtbar ab',
         adEndsAt: 'Sichtbar bis',
+        adCampaignName: 'Kampagnenname',
+        adImpressions: 'Einblendungen',
+        adClicks: 'Klicks',
+        adCtr: 'Klickrate',
+        adArtwork: 'Anzeigenmotiv',
+        adArtworkAlt: 'Aktuelles Anzeigenmotiv',
+        uploadArtwork: 'Motiv hochladen',
+        removeArtwork: 'Motiv entfernen',
         savePlatform: 'Plattformkonfiguration speichern',
     },
     support: {

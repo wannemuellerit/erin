@@ -13,9 +13,20 @@ class PlatformSettings
         'user_quota_mb' => 1024,
     ];
 
+    /** @var array<string, int> */
+    public const DEFAULT_RETENTION = [
+        'rejected_document_days' => 30,
+        'message_attachment_days' => 365,
+        'support_attachment_days' => 365,
+        'audit_log_days' => 730,
+        'orphan_grace_hours' => 24,
+    ];
+
     /** @var array<string, bool|string|null> */
     public const DEFAULT_DASHBOARD_AD = [
         'enabled' => false,
+        'campaign_id' => null,
+        'campaign_name' => '',
         'audience' => 'all',
         'title_de' => '',
         'title_en' => '',

@@ -2,13 +2,16 @@
 import { usePage } from '@inertiajs/vue3';
 import { Megaphone } from '@lucide/vue';
 import { computed } from 'vue';
+import { onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 type DashboardAd = {
+    id: number;
     title: string;
     body: string;
     cta_label: string;
     url: string | null;
+    media_url: string | null;
 };
 
 const page = usePage();
@@ -27,6 +30,27 @@ const ad = computed(
             }
         )?.dashboard_ad ?? null,
 );
+
+function record(type: 'impression' | 'click'): void {
+    if (!ad.value || ad.value.id === 0) {
+        return;
+    }
+
+    void fetch(`/ads/${ad.value.id}/${type}`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+            'X-CSRF-TOKEN':
+                document.querySelector<HTMLMetaElement>(
+                    'meta[name="csrf-token"]',
+                )?.content ?? '',
+            Accept: 'application/json',
+        },
+        keepalive: true,
+    });
+}
+
+onMounted(() => record('impression'));
 </script>
 
 <template>
@@ -36,6 +60,12 @@ const ad = computed(
         :aria-label="t('label')"
     >
         <div class="flex items-start gap-4">
+            <img
+                v-if="ad.media_url"
+                :src="ad.media_url"
+                alt=""
+                class="h-28 w-40 rounded-2xl object-cover"
+            />
             <span
                 class="grid size-11 shrink-0 place-items-center rounded-2xl bg-orange-100 text-orange-600"
             >
@@ -56,6 +86,7 @@ const ad = computed(
                 <a
                     v-if="ad.url && ad.cta_label"
                     :href="ad.url"
+                    @click="record('click')"
                     rel="noopener noreferrer"
                     class="erin-focus mt-4 inline-flex h-10 items-center rounded-xl bg-orange-500 px-4 text-sm font-bold text-white hover:bg-orange-600"
                 >

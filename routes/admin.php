@@ -41,6 +41,11 @@ Route::middleware(['auth', 'verified', 'role:super_admin,support', 'staff.2fa'])
         Route::get('system', [SystemController::class, 'index'])->name('system.index');
 
         Route::middleware('role:super_admin')->group(function (): void {
+            Route::get('audit/export', [AuditController::class, 'export'])
+                ->middleware('throttle:5,1')
+                ->name('audit.export');
+            Route::patch('audit/alerts/{alert}/resolve', [AuditController::class, 'resolve'])
+                ->name('audit.alerts.resolve');
             Route::get('documents', [DocumentController::class, 'index'])->name('documents.index');
             Route::patch('documents/{document}/review', [DocumentController::class, 'review'])
                 ->name('documents.review');
@@ -48,6 +53,8 @@ Route::middleware(['auth', 'verified', 'role:super_admin,support', 'staff.2fa'])
                 ->name('users.status.update');
             Route::patch('users/{user}/role', [UserController::class, 'updateRole'])
                 ->name('users.role.update');
+            Route::patch('users/{user}/storage-quota', [UserController::class, 'updateStorageQuota'])
+                ->name('users.storage-quota.update');
             Route::patch('companies/{company}/status', [CompanyController::class, 'updateStatus'])
                 ->name('companies.status.update');
             Route::patch('billing/plans/{plan}', [BillingController::class, 'updatePlan'])
@@ -62,6 +69,10 @@ Route::middleware(['auth', 'verified', 'role:super_admin,support', 'staff.2fa'])
                 ->name('settings.theme.update');
             Route::patch('settings/platform', [SettingController::class, 'update'])
                 ->name('settings.platform.update');
+            Route::post('settings/ads/{campaign}/media', [SettingController::class, 'uploadAdMedia'])
+                ->name('settings.ads.media.store');
+            Route::delete('settings/ads/{campaign}/media', [SettingController::class, 'deleteAdMedia'])
+                ->name('settings.ads.media.destroy');
             Route::post('system/feature-flags', [FeatureFlagController::class, 'store'])
                 ->name('feature-flags.store');
             Route::patch('system/feature-flags/{featureFlag}', [FeatureFlagController::class, 'update'])

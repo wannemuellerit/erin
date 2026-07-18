@@ -197,6 +197,13 @@ export default {
         after: 'After',
         metadata: 'Metadata',
         companyReference: 'Company #{id}',
+        alertsTitle: 'Open security alerts',
+        alertsDescription:
+            'Automatically detected access patterns require expert review.',
+        unknownUser: 'Unknown user',
+        detections: '{count} detections',
+        resolveAlert: 'Mark as reviewed',
+        exportCsv: 'Export filtered CSV',
     },
     users: {
         metaTitle: 'User management',
@@ -215,6 +222,7 @@ export default {
         columns: {
             user: 'User',
             profile: 'Profile',
+            storage: 'Storage',
             activity: 'Activity',
             role: 'Role',
             status: 'Status',
@@ -228,6 +236,11 @@ export default {
         createdAt: 'Created {date}',
         showHistory: 'Activity history',
         roleConfirm: 'Really change the platform role for {name} to “{role}”?',
+        storagePrompt:
+            'Individual storage limit in MB. Leave blank to use the platform default.',
+        changeStorageLimit: 'Change limit',
+        storageUsage: '{percentage}% of {quota} MB',
+        individualLimit: 'individual',
     },
     companies: {
         metaTitle: 'Companies',
@@ -528,6 +541,14 @@ export default {
             'Lower feature-specific limits, such as for profile photos, continue to apply.',
         maxFileSize: 'Maximum file size in MB',
         userStorageQuota: 'Storage limit per user in MB',
+        retentionTitle: 'Retention and automatic deletion',
+        retentionDescription:
+            'Retention periods run daily. A value of 0 disables the respective deletion.',
+        rejectedDocumentDays: 'Rejected documents (days)',
+        messageAttachmentDays: 'Message attachments (days)',
+        supportAttachmentDays: 'Support attachments (days)',
+        auditLogDays: 'Audit logs (days)',
+        orphanGraceHours: 'Orphan file grace period (hours)',
         adTitle: 'Dashboard advertisement',
         adDescription:
             'Scheduled advertisement for professionals, companies or both audiences.',
@@ -540,6 +561,14 @@ export default {
         adCtaEnglish: 'English button label',
         adStartsAt: 'Visible from',
         adEndsAt: 'Visible until',
+        adCampaignName: 'Campaign name',
+        adImpressions: 'Impressions',
+        adClicks: 'Clicks',
+        adCtr: 'Click-through rate',
+        adArtwork: 'Advertisement artwork',
+        adArtworkAlt: 'Current advertisement artwork',
+        uploadArtwork: 'Upload artwork',
+        removeArtwork: 'Remove artwork',
         savePlatform: 'Save platform configuration',
     },
     support: {
