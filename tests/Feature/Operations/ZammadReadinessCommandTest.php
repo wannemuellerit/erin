@@ -9,6 +9,12 @@ function configureZammadReadiness(): void
     config()->set('app.url', 'https://staging.erin.wannemueller.dev');
     config()->set('services.zammad.enabled', true);
     config()->set('services.zammad.url', 'https://support.wannemueller.dev');
+    config()->set(
+        'services.zammad.webhook_callback_url',
+        'https://staging.erin.wannemueller.dev/integrations/zammad/webhook',
+    );
+    config()->set('services.zammad.allow_local_http', false);
+    config()->set('services.zammad.local_http_hosts', []);
     config()->set('services.zammad.token', 'never-print-this-zammad-token');
     config()->set('services.zammad.group', 'Erin Support');
     config()->set('services.zammad.webhook_secret', str_repeat('w', 40));
@@ -44,6 +50,10 @@ it('fails locally without sending a request when the Zammad configuration is uns
     config()->set('app.url', 'http://localhost:8000');
     config()->set('services.zammad.enabled', true);
     config()->set('services.zammad.url', 'http://127.0.0.1:3000?token=unsafe');
+    config()->set(
+        'services.zammad.webhook_callback_url',
+        'http://localhost:8000/integrations/zammad/webhook',
+    );
     config()->set('services.zammad.token', 'sensitive-token');
     config()->set('services.zammad.group', '');
     config()->set('services.zammad.webhook_secret', 'short-secret');
@@ -54,11 +64,63 @@ it('fails locally without sending a request when the Zammad configuration is uns
 
     expect($exitCode)->toBe(1)
         ->and($output)->toContain('Zammad ist noch nicht staging-bereit')
-        ->toContain('ZAMMAD_URL muss eine HTTPS-URL')
+        ->toContain('ZAMMAD_URL muss HTTPS verwenden')
         ->toContain('ZAMMAD_WEBHOOK_SECRET muss mindestens 32')
         ->not->toContain('sensitive-token')
         ->not->toContain('short-secret');
 
+    Http::assertNothingSent();
+});
+
+it('accepts only explicitly allowlisted Docker hosts in local environments', function () {
+    config()->set('app.env', 'local');
+    config()->set('services.zammad.enabled', true);
+    config()->set('services.zammad.url', 'http://zammad:8080');
+    config()->set('services.zammad.webhook_callback_url', 'http://laravel:8000/integrations/zammad/webhook');
+    config()->set('services.zammad.allow_local_http', true);
+    config()->set('services.zammad.local_http_hosts', ['zammad', 'laravel']);
+    config()->set('services.zammad.token', 'local-zammad-token');
+    config()->set('services.zammad.group', 'Erin Support');
+    config()->set('services.zammad.webhook_secret', str_repeat('l', 40));
+    Http::fake([
+        'http://zammad:8080/api/v1/users/me' => Http::response([
+            'id' => 43,
+            'active' => true,
+        ]),
+    ]);
+
+    $exitCode = Artisan::call('erin:zammad:smoke');
+
+    expect($exitCode)->toBe(0);
+    Http::assertSentCount(1);
+
+    config()->set('services.zammad.url', 'http://postgres:5432');
+    Http::fake();
+
+    $exitCode = Artisan::call('erin:zammad:smoke');
+
+    expect($exitCode)->toBe(1);
+    Http::assertNothingSent();
+});
+
+it('rejects local HTTP endpoints in production even when the flag and hosts are configured', function () {
+    config()->set('app.env', 'production');
+    config()->set('services.zammad.enabled', true);
+    config()->set('services.zammad.url', 'http://zammad:8080');
+    config()->set('services.zammad.webhook_callback_url', 'http://laravel:8000/integrations/zammad/webhook');
+    config()->set('services.zammad.allow_local_http', true);
+    config()->set('services.zammad.local_http_hosts', ['zammad', 'laravel']);
+    config()->set('services.zammad.token', 'must-remain-private');
+    config()->set('services.zammad.group', 'Erin Support');
+    config()->set('services.zammad.webhook_secret', str_repeat('p', 40));
+    Http::fake();
+
+    $exitCode = Artisan::call('erin:zammad:smoke');
+    $output = Artisan::output();
+
+    expect($exitCode)->toBe(1)
+        ->and($output)->toContain('ZAMMAD_URL muss HTTPS verwenden')
+        ->not->toContain('must-remain-private');
     Http::assertNothingSent();
 });
 

@@ -4,12 +4,14 @@ use App\Enums\CompanyMemberRole;
 use App\Enums\SupportTicketStatus;
 use App\Enums\UserRole;
 use App\Events\SupportTicketMessageCreated;
+use App\Jobs\ImportZammadAttachment;
 use App\Jobs\SyncSupportMessageToProvider;
 use App\Jobs\SyncSupportTicketToProvider;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\IntegrationReceipt;
 use App\Models\SupportTicket;
+use App\Models\SupportTicketAttachment;
 use App\Models\SupportTicketMessage;
 use App\Models\User;
 use App\Notifications\ActivityNotification;
@@ -28,8 +30,15 @@ uses(RefreshDatabase::class);
 
 function erinConfigureZammad(): void
 {
+    config()->set('app.env', 'testing');
     config()->set('services.zammad.enabled', true);
     config()->set('services.zammad.url', 'https://zammad.example.test');
+    config()->set(
+        'services.zammad.webhook_callback_url',
+        'https://erin.example.test/integrations/zammad/webhook',
+    );
+    config()->set('services.zammad.allow_local_http', false);
+    config()->set('services.zammad.local_http_hosts', []);
     config()->set('services.zammad.token', 'zammad-test-token');
     config()->set('services.zammad.webhook_secret', 'zammad-webhook-secret');
     config()->set('services.zammad.group', 'Erin Support');
@@ -133,14 +142,14 @@ it('synchronizes new tickets and replies with the authenticated Zammad API', fun
         ->delivery_status->toBe('delivered')
         ->and($reply->fresh()?->delivered_at)->not->toBeNull();
 
-    Http::assertSent(function (ClientRequest $request) use ($firstMessage): bool {
+    Http::assertSent(function (ClientRequest $request) use ($firstMessage, $requester): bool {
         if ($request->url() !== 'https://zammad.example.test/api/v1/tickets') {
             return false;
         }
 
         return $request->hasHeader('Authorization', 'Token token=zammad-test-token')
             && $request['group'] === 'Erin Support'
-            && $request['customer'] !== null
+            && $request['customer_id'] === 'guess:'.$requester->email
             && $request['article']['subject'] === 'Erin operation message:'.$firstMessage->getKey()
             && $request['article']['sender'] === 'Customer'
             && $request['article']['internal'] === false;
@@ -181,6 +190,27 @@ it('refuses unsafe Zammad endpoints and never forwards the API token across redi
     Http::assertNotSent(
         fn (ClientRequest $request): bool => str_contains($request->url(), 'redirect.example.test'),
     );
+});
+
+it('allows the exact local Zammad service host only outside production', function () {
+    erinConfigureZammad();
+    config()->set('app.env', 'local');
+    config()->set('services.zammad.url', 'http://zammad:8080');
+    config()->set('services.zammad.allow_local_http', true);
+    config()->set('services.zammad.local_http_hosts', ['zammad', 'laravel']);
+
+    $provider = new ZammadTicketingProvider;
+
+    expect($provider->enabled())->toBeTrue();
+
+    config()->set('services.zammad.url', 'http://zammad-postgresql:5432');
+
+    expect($provider->enabled())->toBeFalse();
+
+    config()->set('services.zammad.url', 'http://zammad:8080');
+    config()->set('app.env', 'production');
+
+    expect($provider->enabled())->toBeFalse();
 });
 
 it('reconciles uncertain Zammad writes instead of creating duplicate tickets or articles', function () {
@@ -332,6 +362,7 @@ it('recreates missing Zammad tickets and articles after reconciling a failed wri
 it('verifies Zammad HMAC signatures and imports each webhook reply exactly once', function () {
     erinConfigureZammad();
     Notification::fake();
+    Bus::fake([ImportZammadAttachment::class]);
     $requester = User::factory()->create(['locale' => 'de']);
     $ticket = SupportTicket::query()->create([
         'requester_id' => $requester->getKey(),
@@ -374,6 +405,7 @@ it('verifies Zammad HMAC signatures and imports each webhook reply exactly once'
         ->assertOk();
 
     $message = SupportTicketMessage::query()->sole();
+    $attachment = SupportTicketAttachment::query()->sole();
 
     expect($ticket->fresh())
         ->subject->toBe('Aktualisierter Betreff')
@@ -384,15 +416,82 @@ it('verifies Zammad HMAC signatures and imports each webhook reply exactly once'
         ->source->toBe('zammad')
         ->delivery_status->toBe('delivered')
         ->body->toBe("Wir haben das Problem behoben.\nBitte erneut testen.")
-        ->and($message->attachments)->toHaveCount(1)
-        ->and($message->attachments[0]['external_id'])->toBe(44)
-        ->and($message->attachments[0]['filename'])->toBe('anleitung.pdf')
-        ->and($message->attachments[0]['size'])->toBe(12345)
-        ->and($message->attachments[0])->not->toHaveKey('content')
+        ->and($message->attachments)->toBeNull()
+        ->and($attachment->external_id)->toBe('44')
+        ->and($attachment->original_name)->toBe('anleitung.pdf')
+        ->and($attachment->size_bytes)->toBe(12345)
+        ->and($attachment->scan_result)->toBe('pending')
+        ->and($attachment->path)->toBeNull()
         ->and(IntegrationReceipt::query()->count())->toBe(1)
         ->and(IntegrationReceipt::query()->sole()->status)->toBe('processed');
 
+    Bus::assertDispatched(
+        ImportZammadAttachment::class,
+        fn (ImportZammadAttachment $job): bool => $job->attachmentId === $attachment->getKey(),
+    );
     Notification::assertSentToTimes($requester, ActivityNotification::class, 1);
+});
+
+it('caps incoming Zammad attachments before creating records or import jobs', function () {
+    erinConfigureZammad();
+    config()->set('support.attachments.max_files', 2);
+    Notification::fake();
+    Bus::fake([ImportZammadAttachment::class]);
+    $requester = User::factory()->create();
+    SupportTicket::query()->create([
+        'requester_id' => $requester->getKey(),
+        'number' => 'ERIN-260718-ATTACHMENT-LIMIT',
+        'subject' => 'Begrenzte Zammad-Anhänge',
+        'priority' => 'normal',
+        'status' => SupportTicketStatus::Open,
+        'external_system' => 'zammad',
+        'external_id' => '778',
+        'sync_status' => 'synced',
+        'last_reply_at' => now(),
+    ]);
+    $payload = [
+        'ticket' => [
+            'id' => 778,
+            'title' => 'Begrenzte Zammad-Anhänge',
+            'state' => 'open',
+            'article' => [
+                'id' => 9002,
+                'sender' => 'Agent',
+                'internal' => false,
+                'body' => 'Drei Anhänge wurden hinzugefügt.',
+                'attachments' => [
+                    ['id' => 51, 'filename' => 'eins.pdf', 'size' => 100],
+                    ['id' => 52, 'filename' => 'zwei.pdf', 'size' => 100],
+                    ['id' => 53, 'filename' => 'drei.pdf', 'size' => 100],
+                ],
+            ],
+        ],
+    ];
+
+    erinZammadWebhook($this, $payload, 'delivery-9002')
+        ->assertOk()
+        ->assertJson(['accepted' => true, 'matched' => true]);
+
+    expect(SupportTicketAttachment::query()->orderBy('id')->pluck('external_id')->all())
+        ->toBe(['51', '52']);
+    Bus::assertDispatchedTimes(ImportZammadAttachment::class, 2);
+});
+
+it('rejects oversized Zammad webhooks before processing or storing their payload', function () {
+    erinConfigureZammad();
+    config()->set('services.zammad.webhook_max_bytes', 128);
+    $payload = [
+        'ticket' => [
+            'id' => 777,
+            'title' => str_repeat('x', 256),
+        ],
+    ];
+
+    erinZammadWebhook($this, $payload, 'delivery-oversized')
+        ->assertStatus(413);
+
+    expect(IntegrationReceipt::query()->count())->toBe(0)
+        ->and(config('telescope.ignore_paths'))->toContain('integrations/zammad/webhook');
 });
 
 it('rejects a reused Zammad delivery ID when the payload differs', function () {

@@ -2,6 +2,7 @@
 import { Form, Head, setLayoutProps } from '@inertiajs/vue3';
 import { ref, watchEffect } from 'vue';
 import { useI18n } from 'vue-i18n';
+import DemoAccountPicker from '@/components/auth/DemoAccountPicker.vue';
 import InputError from '@/components/InputError.vue';
 import PasswordInput from '@/components/PasswordInput.vue';
 import TextLink from '@/components/TextLink.vue';
@@ -18,23 +19,23 @@ import { request } from '@/routes/password';
 /* @chisel-passkeys */
 import PasskeyVerify from '@/components/PasskeyVerify.vue';
 /* @end-chisel-passkeys */
+import type { DemoAccount } from '@/types/demo';
 
 withDefaults(
     defineProps<{
         status?: string;
         canResetPassword: boolean;
         demoMode?: boolean;
+        demoAccounts?: DemoAccount[];
+        demoPassword?: string;
     }>(),
     {
         status: '',
         demoMode: false,
+        demoAccounts: () => [],
+        demoPassword: '',
     },
 );
-
-const demoCredentials = {
-    email: 'admin@wannemueller.dev',
-    password: 'password',
-};
 
 const email = ref('');
 const password = ref('');
@@ -47,9 +48,9 @@ watchEffect(() => {
     });
 });
 
-const insertDemoCredentials = () => {
-    email.value = demoCredentials.email;
-    password.value = demoCredentials.password;
+const insertDemoCredentials = (account: DemoAccount, demoPassword: string) => {
+    email.value = account.email;
+    password.value = demoPassword;
 };
 </script>
 
@@ -70,43 +71,14 @@ const insertDemoCredentials = () => {
         class="flex min-w-0 flex-col gap-6"
     >
         <div class="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
-            <div
-                v-if="demoMode"
-                class="flex items-center justify-between gap-4 rounded-lg border bg-muted/50 p-4"
-            >
-                <div class="min-w-0 text-sm">
-                    <p class="font-semibold text-slate-900">
-                        {{ t('auth.demoAccess') }}
-                    </p>
-                    <p class="mt-1 truncate text-muted-foreground">
-                        {{ t('auth.email') }}:
-                        <code
-                            class="font-mono text-foreground"
-                            data-test="demo-email"
-                            >{{ demoCredentials.email }}</code
-                        >
-                    </p>
-                    <p class="truncate text-muted-foreground">
-                        {{ t('auth.password') }}:
-                        <code
-                            class="font-mono text-foreground"
-                            data-test="demo-password"
-                            >{{ demoCredentials.password }}</code
-                        >
-                    </p>
-                </div>
-
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    class="shrink-0"
-                    data-test="insert-demo-credentials"
-                    @click="insertDemoCredentials"
-                >
-                    {{ t('auth.insert') }}
-                </Button>
-            </div>
+            <DemoAccountPicker
+                v-if="demoMode && demoAccounts.length"
+                :accounts="demoAccounts"
+                :password="demoPassword"
+                @select="
+                    (account) => insertDemoCredentials(account, demoPassword)
+                "
+            />
 
             <div class="grid gap-2">
                 <Label for="email" class="text-sm font-semibold text-slate-700">

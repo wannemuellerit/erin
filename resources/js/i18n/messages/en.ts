@@ -79,7 +79,12 @@ export default {
         createAccountDescription:
             'Choose your area and get started in a few minutes.',
         signInTitle: 'Sign in',
-        demoAccess: 'Demo access',
+        demoAccess: 'Demo accounts',
+        demoAccessDescription:
+            'Choose an account. The shared password is shown next to it.',
+        demoSharedPassword: 'Password for all',
+        demoAccountCount: '{count} account | {count} accounts',
+        insertDemoAccount: 'Insert credentials for {name}',
         email: 'Email address',
         emailPlaceholder: "name{'@'}example.com",
         password: 'Password',

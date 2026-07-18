@@ -15,6 +15,8 @@ use App\Models\ModerationCase;
 use App\Models\SupportTicket;
 use App\Notifications\ActivityNotification;
 use App\Services\Activity\ActivityRecorder;
+use App\Services\Ticketing\SupportAttachmentManager;
+use App\Services\Ticketing\SupportTicketMessagePresenter;
 use App\Services\Trust\CompanyTrustMetricService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,8 +30,10 @@ use Inertia\Response;
 
 class SupportActionController extends Controller
 {
-    public function index(Request $request): Response
-    {
+    public function index(
+        Request $request,
+        SupportTicketMessagePresenter $presenter,
+    ): Response {
         $user = $request->user();
         abort_if($user === null, 401);
         $companyId = $this->activeCompanyId($request);
@@ -44,19 +48,28 @@ class SupportActionController extends Controller
                 'assignee:id,name',
                 'messages' => fn ($query) => $query
                     ->where('is_internal', false)
-                    ->with('author:id,name,role')
+                    ->with(['author:id,name,role', 'files'])
                     ->oldest(),
             ])
             ->latest('last_reply_at')
             ->latest()
             ->get();
+        $tickets = $tickets->map(function (SupportTicket $ticket) use ($presenter): array {
+            $serialized = $ticket->toArray();
+            $serialized['messages'] = $ticket->messages
+                ->map(fn ($message): array => $presenter->present($message))
+                ->values()
+                ->all();
+
+            return $serialized;
+        });
         $requestedTicketId = $request->integer('ticket');
 
         return Inertia::render('Support', [
             'tickets' => $tickets,
             'selected' => $requestedTicketId > 0 && $tickets->contains('id', $requestedTicketId)
                 ? $requestedTicketId
-                : $tickets->first()?->getKey(),
+                : ($tickets->first()['id'] ?? null),
             'ticketing' => [
                 'provider' => 'zammad',
                 'enabled' => (bool) config('services.zammad.enabled'),
@@ -67,12 +80,13 @@ class SupportActionController extends Controller
     public function createTicket(
         Request $request,
         ActivityRecorder $activity,
+        SupportAttachmentManager $attachmentManager,
     ): RedirectResponse {
         $validated = $request->validate([
             'subject' => ['required', 'string', 'max:180'],
             'category' => ['nullable', 'string', 'max:80'],
             'priority' => ['required', Rule::in(['low', 'normal', 'high', 'urgent'])],
-            'message' => ['required', 'string', 'max:20000'],
+            ...SupportAttachmentManager::validationRules('message'),
         ]);
         $user = $request->user();
         abort_if($user === null, 401);
@@ -81,6 +95,8 @@ class SupportActionController extends Controller
             $user,
             $companyId,
             $validated,
+            $request,
+            $attachmentManager,
         ): array {
             $ticket = SupportTicket::query()->create([
                 'requester_id' => $user->getKey(),
@@ -94,13 +110,19 @@ class SupportActionController extends Controller
             ]);
             $message = $ticket->messages()->create([
                 'author_id' => $user->getKey(),
-                'body' => $validated['message'],
+                'body' => $validated['message'] ?? '',
                 'is_internal' => false,
             ]);
+            $files = $request->file('attachments', []);
+            $attachmentManager->storeUploads(
+                $message,
+                is_array($files) ? array_values($files) : [],
+                $user->getKey(),
+            );
 
             return [$ticket, $message];
         });
-        SupportTicketMessageCreated::dispatch($message);
+        SupportTicketMessageCreated::dispatch($message->load('files'));
         SyncSupportTicketToProvider::dispatch($ticket->getKey());
         $activity->record(
             'support.ticket_created',
@@ -120,6 +142,7 @@ class SupportActionController extends Controller
         Request $request,
         SupportTicket $ticket,
         ActivityRecorder $activity,
+        SupportAttachmentManager $attachmentManager,
     ): RedirectResponse {
         $user = $request->user();
         abort_if($user === null, 401);
@@ -128,19 +151,35 @@ class SupportActionController extends Controller
             abort_unless($ticket->company_id === $companyId, 404);
         }
         Gate::authorize('reply', $ticket);
-        $validated = $request->validate(['message' => ['required', 'string', 'max:20000']]);
-        $message = $ticket->messages()->create([
-            'author_id' => $user->getKey(),
-            'body' => $validated['message'],
-            'is_internal' => false,
-        ]);
-        $ticket->update([
-            'last_reply_at' => now(),
-            'status' => $user->isPlatformStaff()
-                ? SupportTicketStatus::WaitingForCustomer
-                : SupportTicketStatus::Open,
-        ]);
-        SupportTicketMessageCreated::dispatch($message);
+        $validated = $request->validate(SupportAttachmentManager::validationRules('message'));
+        $message = DB::transaction(function () use (
+            $ticket,
+            $user,
+            $validated,
+            $request,
+            $attachmentManager,
+        ) {
+            $message = $ticket->messages()->create([
+                'author_id' => $user->getKey(),
+                'body' => $validated['message'] ?? '',
+                'is_internal' => false,
+            ]);
+            $files = $request->file('attachments', []);
+            $attachmentManager->storeUploads(
+                $message,
+                is_array($files) ? array_values($files) : [],
+                $user->getKey(),
+            );
+            $ticket->update([
+                'last_reply_at' => now(),
+                'status' => $user->isPlatformStaff()
+                    ? SupportTicketStatus::WaitingForCustomer
+                    : SupportTicketStatus::Open,
+            ]);
+
+            return $message;
+        });
+        SupportTicketMessageCreated::dispatch($message->load('files'));
         if ($ticket->external_id === null) {
             Bus::chain([
                 new SyncSupportTicketToProvider($ticket->getKey()),

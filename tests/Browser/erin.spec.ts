@@ -4,6 +4,17 @@ import type { Page } from '@playwright/test';
 
 const password = 'password';
 
+const demoAccounts = [
+    'admin@wannemueller.dev',
+    'unternehmen.mueller@wannemueller.dev',
+    'unternehmen.rheincargo@wannemueller.dev',
+    ...Array.from(
+        { length: 10 },
+        (_, index) =>
+            `candidate${String(index + 1).padStart(2, '0')}@wannemueller.dev`,
+    ),
+] as const;
+
 const accounts = {
     admin: {
         email: 'admin@wannemueller.dev',
@@ -124,7 +135,7 @@ async function expectNoHorizontalOverflow(page: Page): Promise<void> {
 }
 
 test.describe('Login und Rollenbereiche', () => {
-    test('zeigt den Demo-Zugang und setzt die Zugangsdaten barrierearm ein', async ({
+    test('zeigt alle Demo-Zugänge und setzt jeden Zugang barrierearm ein', async ({
         page,
     }) => {
         await page.goto('/login');
@@ -140,25 +151,40 @@ test.describe('Login und Rollenbereiche', () => {
 
         const email = page.getByLabel('E-Mail-Adresse', { exact: true });
         const loginPassword = page.getByLabel('Passwort', { exact: true });
-        const insert = page.getByTestId('insert-demo-credentials');
+        const insert = page.getByTestId('insert-demo-account-rheincargo');
         const submit = page.getByTestId('login-button');
 
         await expect(
-            page.getByText('Demo-Zugang', { exact: true }),
+            page.getByText('Demo-Zugänge', { exact: true }),
         ).toBeVisible();
-        await expect(page.getByTestId('demo-email')).toHaveText(
-            accounts.admin.email,
-        );
+        await expect(page.getByTestId('demo-account-picker')).toBeVisible();
         await expect(page.getByTestId('demo-password')).toHaveText(password);
+        await expect(
+            page.locator('li[data-test^="demo-account-"]'),
+        ).toHaveCount(13);
+        await expect(
+            page.locator('[data-test^="insert-demo-account-"]'),
+        ).toHaveCount(13);
+
+        for (const demoAccount of demoAccounts) {
+            await expect(
+                page.getByText(demoAccount, { exact: true }),
+            ).toBeVisible();
+        }
+
         await expect(email).toHaveAccessibleName('E-Mail-Adresse');
         await expect(loginPassword).toHaveAccessibleName('Passwort');
-        await expect(insert).toHaveAccessibleName('Einsetzen');
+        await expect(insert).toHaveAccessibleName(
+            'Zugangsdaten für Daniel Schneider einsetzen',
+        );
         await expect(submit).toHaveAccessibleName('Anmelden');
         await expectNoSeriousAccessibilityViolations(page);
 
         await insert.click();
 
-        await expect(email).toHaveValue(accounts.admin.email);
+        await expect(email).toHaveValue(
+            'unternehmen.rheincargo@wannemueller.dev',
+        );
         await expect(loginPassword).toHaveValue(password);
     });
 
@@ -453,10 +479,20 @@ test.describe('Support und Mandantentrennung', () => {
 test.describe('Englische Oberfläche', () => {
     test.use({ locale: 'en-GB' });
 
-    test('übersetzt den Gast-Login anhand der Browsersprache', async ({
+    test('startet trotz englischer Browsersprache auf Deutsch und lässt sich umstellen', async ({
         page,
     }) => {
         await page.goto('/login');
+
+        await expect(
+            page.getByRole('heading', {
+                level: 1,
+                name: 'Schön, Sie wiederzusehen',
+            }),
+        ).toBeVisible();
+        await page
+            .getByRole('button', { name: 'Englisch', exact: true })
+            .click();
 
         await expect(
             page.getByRole('heading', {
@@ -465,11 +501,11 @@ test.describe('Englische Oberfläche', () => {
             }),
         ).toBeVisible();
         await expect(
-            page.getByText('Demo access', { exact: true }),
+            page.getByText('Demo accounts', { exact: true }),
         ).toBeVisible();
-        await expect(page.getByTestId('insert-demo-credentials')).toHaveText(
-            'Insert',
-        );
+        await expect(
+            page.getByTestId('insert-demo-account-superadmin'),
+        ).toHaveText('Insert');
         await expect(page.getByTestId('login-button')).toHaveAccessibleName(
             'Sign in',
         );
@@ -481,26 +517,28 @@ test.describe('Englische Oberfläche', () => {
     }) => {
         await page.goto('/');
 
-        await page.getByRole('button', { name: 'German', exact: true }).click();
+        await page
+            .getByRole('button', { name: 'Englisch', exact: true })
+            .click();
         await expect(
             page.getByRole('heading', {
                 level: 1,
-                name: 'Die besten Fachkräfte. Grenzenlos gefunden.',
+                name: 'The best professionals. Found without borders.',
             }),
         ).toBeVisible();
 
         await page.goto('/login');
         await page
-            .getByRole('button', { name: 'Englisch', exact: true })
+            .getByRole('button', { name: 'German', exact: true })
             .click();
 
         await expect(
             page.getByRole('heading', {
                 level: 1,
-                name: 'Welcome back',
+                name: 'Schön, Sie wiederzusehen',
             }),
         ).toBeVisible();
-        await expect(page.getByTestId('locale-en')).toHaveAttribute(
+        await expect(page.getByTestId('locale-de')).toHaveAttribute(
             'aria-pressed',
             'true',
         );
@@ -511,6 +549,9 @@ test.describe('Englische Oberfläche', () => {
         page,
     }) => {
         await page.goto('/login');
+        await page
+            .getByRole('button', { name: 'Englisch', exact: true })
+            .click();
         await page
             .getByLabel('Email address', { exact: true })
             .fill(accounts.candidate.email);

@@ -46,4 +46,14 @@ class NullTicketingProvider implements TicketingProvider
     {
         throw new LogicException('Es ist kein externes Ticketsystem konfiguriert.');
     }
+
+    public function downloadAttachment(
+        string $externalTicketId,
+        string $externalArticleId,
+        string $externalAttachmentId,
+        mixed $destination,
+        int $maxBytes,
+    ): array {
+        throw new LogicException('Es ist kein externes Ticketsystem konfiguriert.');
+    }
 }

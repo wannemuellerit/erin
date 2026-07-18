@@ -5,12 +5,15 @@ namespace App\Http\Controllers\Integrations;
 use App\Contracts\TicketingProvider;
 use App\Enums\SupportTicketStatus;
 use App\Events\SupportTicketMessageCreated;
+use App\Exceptions\SupportAttachmentLimitExceeded;
 use App\Http\Controllers\Controller;
+use App\Jobs\ImportZammadAttachment;
 use App\Models\SupportTicket;
 use App\Models\SupportTicketMessage;
 use App\Notifications\ActivityNotification;
 use App\Services\Activity\ActivityRecorder;
 use App\Services\Billing\IntegrationEventGuard;
+use App\Services\Ticketing\SupportAttachmentLimits;
 use App\Services\Ticketing\ZammadWebhookSignature;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -29,9 +32,20 @@ class ZammadWebhookController extends Controller
         abort_unless($provider->enabled(), Response::HTTP_SERVICE_UNAVAILABLE);
         $secret = (string) config('services.zammad.webhook_secret');
         abort_if($secret === '', Response::HTTP_SERVICE_UNAVAILABLE);
+        $maxBytes = max(1, (int) config('services.zammad.webhook_max_bytes', 2 * 1024 * 1024));
+        $declaredBytes = $request->header('Content-Length');
+        abort_if(
+            is_numeric($declaredBytes) && (int) $declaredBytes > $maxBytes,
+            Response::HTTP_REQUEST_ENTITY_TOO_LARGE,
+        );
+        $rawPayload = $request->getContent();
+        abort_if(
+            strlen($rawPayload) > $maxBytes,
+            Response::HTTP_REQUEST_ENTITY_TOO_LARGE,
+        );
         abort_unless(
             $signatures->isValid(
-                $request->getContent(),
+                $rawPayload,
                 (string) $request->header('X-Hub-Signature'),
                 $secret,
             ),
@@ -94,8 +108,9 @@ class ZammadWebhookController extends Controller
                 'delivered_at' => now(),
                 'body' => $this->plainText((string) ($article['body'] ?? '')),
                 'is_internal' => false,
-                'attachments' => $this->attachmentMetadata($article),
+                'attachments' => null,
             ]);
+            $attachmentIds = $this->createAttachmentRecords($message, $article);
             $ticket->update([
                 'last_reply_at' => now(),
                 'status' => $sender === 'customer'
@@ -103,8 +118,11 @@ class ZammadWebhookController extends Controller
                     : SupportTicketStatus::WaitingForCustomer,
             ]);
 
-            DB::afterCommit(static function () use ($message): void {
+            DB::afterCommit(static function () use ($message, $attachmentIds): void {
                 SupportTicketMessageCreated::dispatch($message);
+                foreach ($attachmentIds as $attachmentId) {
+                    ImportZammadAttachment::dispatch($attachmentId);
+                }
             });
             $activity->record(
                 'support.message_received',
@@ -186,22 +204,90 @@ class ZammadWebhookController extends Controller
 
     /**
      * @param  array<string, mixed>  $article
-     * @return list<array<string, mixed>>|null
+     * @return list<int>
      */
-    private function attachmentMetadata(array $article): ?array
-    {
+    private function createAttachmentRecords(
+        SupportTicketMessage $message,
+        array $article,
+    ): array {
         $attachments = is_array($article['attachments'] ?? null) ? $article['attachments'] : [];
-        $safe = [];
+        $attachmentIds = [];
+        $limits = app(SupportAttachmentLimits::class);
+        $declaredTotalBytes = 0;
+        $acceptedAttachmentCount = 0;
+        $seenExternalIds = [];
+
         foreach ($attachments as $attachment) {
-            $safe[] = [
-                'external_id' => is_array($attachment) ? ($attachment['id'] ?? null) : null,
-                'filename' => is_array($attachment)
-                    ? mb_substr((string) ($attachment['filename'] ?? 'Anhang'), 0, 255)
-                    : 'Anhang',
-                'size' => is_array($attachment) ? ($attachment['size'] ?? null) : null,
-            ];
+            if (! is_array($attachment) || ! is_scalar($attachment['id'] ?? null)) {
+                continue;
+            }
+
+            $externalId = (string) $attachment['id'];
+            if (isset($seenExternalIds[$externalId])) {
+                continue;
+            }
+
+            try {
+                $limits->assertFileCount($acceptedAttachmentCount + 1);
+            } catch (SupportAttachmentLimitExceeded) {
+                break;
+            }
+
+            $seenExternalIds[$externalId] = true;
+            $acceptedAttachmentCount++;
+            $declaredSize = is_numeric($attachment['size'] ?? null)
+                ? (int) $attachment['size']
+                : null;
+            $isRejected = false;
+            if ($declaredSize !== null) {
+                try {
+                    $limits->assertFileSize($declaredSize);
+                    $limits->assertTotalSize($declaredTotalBytes + $declaredSize);
+                    $declaredTotalBytes += $declaredSize;
+                } catch (SupportAttachmentLimitExceeded) {
+                    $isRejected = true;
+                }
+            }
+            $record = $message->files()->firstOrCreate(
+                ['external_id' => $externalId],
+                [
+                    'source' => 'zammad',
+                    'original_name' => mb_substr(
+                        basename(str_replace(
+                            '\\',
+                            '/',
+                            (string) ($attachment['filename'] ?? 'Anhang'),
+                        )),
+                        0,
+                        255,
+                    ),
+                    'mime_type' => $this->attachmentMimeType($attachment),
+                    'size_bytes' => $declaredSize,
+                    'scan_result' => $isRejected ? 'rejected' : 'pending',
+                    'scan_completed_at' => $isRejected ? now() : null,
+                ],
+            );
+            if ($record->scan_result === 'pending') {
+                $attachmentIds[] = $record->getKey();
+            }
         }
 
-        return $safe === [] ? null : $safe;
+        return $attachmentIds;
+    }
+
+    /**
+     * @param  array<string, mixed>  $attachment
+     */
+    private function attachmentMimeType(array $attachment): ?string
+    {
+        $preferences = is_array($attachment['preferences'] ?? null)
+            ? $attachment['preferences']
+            : [];
+        $value = $attachment['mime_type']
+            ?? $attachment['mime-type']
+            ?? $preferences['Mime-Type']
+            ?? null;
+
+        return is_string($value) ? mb_substr($value, 0, 160) : null;
     }
 }

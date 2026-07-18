@@ -232,6 +232,9 @@ ZAMMAD_URL=https://support.example.com
 ZAMMAD_TOKEN=
 ZAMMAD_GROUP=Users
 ZAMMAD_WEBHOOK_SECRET=
+ZAMMAD_WEBHOOK_CALLBACK_URL=https://app.example.com/integrations/zammad/webhook
+ZAMMAD_ALLOW_LOCAL_HTTP=false
+ZAMMAD_LOCAL_HTTP_HOSTS=
 ZAMMAD_TIMEOUT=10
 ```
 

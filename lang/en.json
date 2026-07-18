@@ -61,6 +61,7 @@
     "Deine KI-Einwilligung wurde protokolliert.": "Your AI consent has been recorded.",
     "Deine Verfügbarkeit wurde gespeichert.": "Your availability has been saved.",
     "Der Anhang ist noch nicht sicherheitsgeprüft.": "The attachment has not passed the security scan yet.",
+    "Der Anhang stimmt nicht mehr mit der geprüften Datei überein.": "The attachment no longer matches the verified file.",
     "Der Bewerbungsstatus wurde aktualisiert.": "The application status has been updated.",
     "Der Browser-Push-Endpunkt muss HTTPS verwenden und zu einem freigegebenen Push-Dienst gehören.": "The browser push endpoint must use HTTPS and belong to an approved push service.",
     "Der Credit-Verbrauch muss mindestens 1 betragen.": "Credit usage must be at least 1.",

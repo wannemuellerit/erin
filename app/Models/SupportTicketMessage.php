@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SupportTicketMessage extends Model
 {
@@ -32,5 +33,13 @@ class SupportTicketMessage extends Model
     public function author(): BelongsTo
     {
         return $this->belongsTo(User::class, 'author_id');
+    }
+
+    /**
+     * @return HasMany<SupportTicketAttachment, $this>
+     */
+    public function files(): HasMany
+    {
+        return $this->hasMany(SupportTicketAttachment::class);
     }
 }

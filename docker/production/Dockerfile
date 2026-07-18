@@ -1,4 +1,5 @@
 ARG PHP_VERSION=8.4
+ARG ERIN_BUILD_SHA
 
 FROM php:${PHP_VERSION}-fpm-bookworm AS php-base
 
@@ -79,15 +80,23 @@ RUN npm ci --no-audit --no-fund \
 
 FROM php-base AS php
 
+ARG ERIN_BUILD_SHA
+
 ENV APP_ENV=production \
     APP_DEBUG=false \
+    ERIN_BUILD_SHA=${ERIN_BUILD_SHA} \
     LOG_CHANNEL=stderr
+
+LABEL org.opencontainers.image.revision="${ERIN_BUILD_SHA}"
 
 COPY --from=php-builder --chown=www-data:www-data /app /app
 COPY --from=frontend-builder --chown=www-data:www-data /app/public/build /app/public/build
 COPY --chown=www-data:www-data docker/production/entrypoint.sh /usr/local/bin/erin-entrypoint
 
-RUN chmod +x /usr/local/bin/erin-entrypoint \
+RUN printf '%s' "${ERIN_BUILD_SHA}" | grep -Eq '^[0-9a-f]{40}$' \
+    && printf '%s\n' "${ERIN_BUILD_SHA}" > /app/.erin-build-sha \
+    && chmod 0444 /app/.erin-build-sha \
+    && chmod +x /usr/local/bin/erin-entrypoint \
     && mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
     && chown -R www-data:www-data storage bootstrap/cache
 
@@ -98,5 +107,11 @@ CMD ["php-fpm", "--nodaemonize"]
 
 FROM nginx:1.28-alpine AS nginx
 
+ARG ERIN_BUILD_SHA
+
+LABEL org.opencontainers.image.revision="${ERIN_BUILD_SHA}"
+
 COPY docker/production/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=php /app/public /app/public
+
+RUN printf '%s' "${ERIN_BUILD_SHA}" | grep -Eq '^[0-9a-f]{40}$'

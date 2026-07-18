@@ -1,10 +1,18 @@
 <script setup lang="ts">
 import { useForm } from '@inertiajs/vue3';
 import { useEcho } from '@laravel/echo-vue';
-import { Bot, CheckCircle2, Clock3, Send, UserRound } from '@lucide/vue';
+import {
+    Bot,
+    CheckCircle2,
+    Clock3,
+    FileText,
+    Send,
+    UserRound,
+} from '@lucide/vue';
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import FormField from '@/components/product/FormField.vue';
+import FileAttachmentPicker from '@/components/product/FileAttachmentPicker.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
 import Textarea from '@/components/product/Textarea.vue';
 import type { StatusTone, SupportTicket, SupportTicketMessage } from '@/types';
@@ -31,6 +39,7 @@ const form = useForm({
     message: '',
     body: '',
     is_internal: false,
+    attachments: [] as File[],
 });
 const draft = computed({
     get: () => (props.messageField === 'body' ? form.body : form.message),
@@ -50,8 +59,14 @@ useEcho<{ message: SupportTicketMessage }>(
     `support-ticket.${props.ticket.id}`,
     '.support.message.created',
     ({ message }) => {
-        if (!messages.value.some((item) => item.id === message.id)) {
+        const existingIndex = messages.value.findIndex(
+            (item) => item.id === message.id,
+        );
+
+        if (existingIndex === -1) {
             messages.value.push(message);
+        } else {
+            messages.value.splice(existingIndex, 1, message);
         }
     },
 );
@@ -72,9 +87,10 @@ const formatDate = (value: string) =>
 
 const send = () => {
     form.post(props.replyUrl, {
+        forceFormData: true,
         preserveScroll: true,
         onSuccess: () => {
-            form.reset('message', 'body', 'is_internal');
+            form.reset('message', 'body', 'is_internal', 'attachments');
         },
     });
 };
@@ -150,6 +166,37 @@ const send = () => {
                         {{ message.body }}
                     </p>
                     <div
+                        v-if="message.attachments?.length"
+                        class="mt-3 space-y-2"
+                    >
+                        <a
+                            v-for="attachment in message.attachments"
+                            :key="attachment.id"
+                            :href="attachment.download_url ?? undefined"
+                            class="flex items-center gap-2 rounded-lg bg-black/10 px-2.5 py-2 text-xs font-bold"
+                            :class="{
+                                'pointer-events-none opacity-60':
+                                    !attachment.download_url,
+                            }"
+                            :aria-disabled="!attachment.download_url"
+                        >
+                            <FileText class="size-4 shrink-0" />
+                            <span class="truncate">
+                                {{ attachment.original_name }}
+                            </span>
+                            <span
+                                v-if="!attachment.download_url"
+                                class="ml-auto text-[10px] font-semibold"
+                            >
+                                {{
+                                    t(
+                                        `operations.support.attachmentStatus.${attachment.scan_result}`,
+                                    )
+                                }}
+                            </span>
+                        </a>
+                    </div>
+                    <div
                         class="mt-2 flex flex-wrap items-center gap-2 text-[10px]"
                         :class="
                             message.author_id === currentUserId
@@ -201,10 +248,24 @@ const send = () => {
                     id="support-reply"
                     v-model="draft"
                     rows="3"
-                    required
                     :placeholder="t('operations.support.replyPlaceholder')"
                 />
             </FormField>
+            <div class="mt-3">
+                <FileAttachmentPicker
+                    :id="`support-attachments-${ticket.id}`"
+                    v-model="form.attachments"
+                    :label="t('operations.support.attachments')"
+                    :remove-label="t('operations.support.removeAttachment')"
+                    :disabled="form.processing"
+                />
+                <p
+                    v-if="form.errors.attachments"
+                    class="mt-1 text-xs text-red-600"
+                >
+                    {{ form.errors.attachments }}
+                </p>
+            </div>
             <div
                 class="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
             >
@@ -222,7 +283,10 @@ const send = () => {
                 <span v-else />
                 <button
                     type="submit"
-                    :disabled="form.processing || !draft.trim()"
+                    :disabled="
+                        form.processing ||
+                        (!draft.trim() && !form.attachments.length)
+                    "
                     class="erin-focus inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     <Send class="size-4" />

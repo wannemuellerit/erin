@@ -25,6 +25,7 @@ use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\PublicPageController;
 use App\Http\Controllers\ReferralController;
 use App\Http\Controllers\SupportActionController;
+use App\Http\Controllers\SupportAttachmentController;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
@@ -100,6 +101,9 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         ->name('support.tickets.store');
     Route::post('support/tickets/{ticket}/reply', [SupportActionController::class, 'replyTicket'])
         ->name('support.tickets.reply');
+    Route::get('support/attachments/{attachment}', SupportAttachmentController::class)
+        ->middleware(['signed', 'throttle:60,1'])
+        ->name('support.attachments.download');
     Route::post('applications/{application}/feedback', [SupportActionController::class, 'feedback'])
         ->name('feedback.store');
 

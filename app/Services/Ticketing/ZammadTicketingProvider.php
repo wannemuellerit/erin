@@ -3,6 +3,7 @@
 namespace App\Services\Ticketing;
 
 use App\Contracts\TicketingProvider;
+use App\Exceptions\SupportAttachmentLimitExceeded;
 use App\Models\SupportTicket;
 use App\Models\SupportTicketMessage;
 use Illuminate\Http\Client\PendingRequest;
@@ -14,7 +15,7 @@ class ZammadTicketingProvider implements TicketingProvider
     public function enabled(): bool
     {
         return (bool) config('services.zammad.enabled')
-            && ZammadEndpoint::secureBaseUrl(config('services.zammad.url')) !== null
+            && ZammadEndpoint::configuredBaseUrl() !== null
             && filled(config('services.zammad.token'));
     }
 
@@ -23,19 +24,25 @@ class ZammadTicketingProvider implements TicketingProvider
         SupportTicketMessage $firstMessage,
     ): array {
         $ticket->loadMissing('requester:id,name,email');
+        $article = [
+            'subject' => $this->messageMarker($firstMessage),
+            'body' => $firstMessage->body,
+            'content_type' => 'text/plain',
+            'type' => 'web',
+            'internal' => false,
+            'sender' => 'Customer',
+        ];
+        $attachments = app(SupportAttachmentPayloadBuilder::class)
+            ->forMessage($firstMessage);
+        if ($attachments !== []) {
+            $article['attachments'] = $attachments;
+        }
         $response = $this->request(false)->post('/api/v1/tickets', [
             'title' => $ticket->subject,
             'group' => (string) config('services.zammad.group', 'Users'),
-            'customer' => $ticket->requester->email,
+            'customer_id' => 'guess:'.$ticket->requester->email,
             'note' => $this->ticketMarker($ticket),
-            'article' => [
-                'subject' => $this->messageMarker($firstMessage),
-                'body' => $firstMessage->body,
-                'content_type' => 'text/plain',
-                'type' => 'web',
-                'internal' => false,
-                'sender' => 'Customer',
-            ],
+            'article' => $article,
         ])->throw()->json();
 
         if (! is_array($response) || ! isset($response['id'])) {
@@ -125,7 +132,7 @@ class ZammadTicketingProvider implements TicketingProvider
 
         $message->loadMissing('author:id,name,email,role');
         $isStaff = $message->author?->isPlatformStaff() === true;
-        $response = $this->request(false)->post('/api/v1/ticket_articles', [
+        $payload = [
             'ticket_id' => (int) $ticket->external_id,
             'subject' => $this->messageMarker($message),
             'body' => $message->body,
@@ -133,7 +140,16 @@ class ZammadTicketingProvider implements TicketingProvider
             'type' => $isStaff ? 'note' : 'web',
             'internal' => $message->is_internal,
             'sender' => $isStaff ? 'Agent' : 'Customer',
-        ])->throw()->json();
+        ];
+        $attachments = app(SupportAttachmentPayloadBuilder::class)
+            ->forMessage($message);
+        if ($attachments !== []) {
+            $payload['attachments'] = $attachments;
+        }
+        $response = $this->request(false)
+            ->post('/api/v1/ticket_articles', $payload)
+            ->throw()
+            ->json();
 
         if (! is_array($response) || ! isset($response['id'])) {
             throw new RuntimeException('Zammad hat keine gültige Artikel-ID zurückgegeben.');
@@ -196,6 +212,65 @@ class ZammadTicketingProvider implements TicketingProvider
         return $response;
     }
 
+    public function downloadAttachment(
+        string $externalTicketId,
+        string $externalArticleId,
+        string $externalAttachmentId,
+        mixed $destination,
+        int $maxBytes,
+    ): array {
+        if (! is_resource($destination)) {
+            throw new RuntimeException('Für den Zammad-Anhang wurde kein gültiger Zielstream übergeben.');
+        }
+        if ($maxBytes < 1) {
+            throw new SupportAttachmentLimitExceeded(
+                'Für den Zammad-Anhang wurde keine gültige Dateigrenze festgelegt.',
+            );
+        }
+
+        $response = $this->request()
+            ->accept('*/*')
+            ->withOptions(['stream' => true])
+            ->get(sprintf(
+                '/api/v1/ticket_attachment/%s/%s/%s',
+                rawurlencode($externalTicketId),
+                rawurlencode($externalArticleId),
+                rawurlencode($externalAttachmentId),
+            ))
+            ->throw();
+        $mimeType = trim(explode(';', $response->header('Content-Type'), 2)[0]);
+        $source = $response->toPsrResponse()->getBody();
+        $size = 0;
+        $hash = hash_init('sha256');
+
+        while (! $source->eof()) {
+            $chunk = $source->read(64 * 1024);
+            if ($chunk === '') {
+                break;
+            }
+
+            $nextSize = $size + strlen($chunk);
+            if ($nextSize > $maxBytes) {
+                throw new SupportAttachmentLimitExceeded(
+                    'Der Zammad-Anhang überschreitet die erlaubte Einzelgröße.',
+                );
+            }
+            if (fwrite($destination, $chunk) !== strlen($chunk)) {
+                throw new RuntimeException('Der Zammad-Anhang konnte nicht vollständig zwischengespeichert werden.');
+            }
+
+            $size = $nextSize;
+            hash_update($hash, $chunk);
+        }
+        rewind($destination);
+
+        return [
+            'mime_type' => $mimeType !== '' ? $mimeType : null,
+            'size_bytes' => $size,
+            'checksum_sha256' => hash_final($hash),
+        ];
+    }
+
     private function ticketMarker(SupportTicket $ticket): string
     {
         return 'Erin operation ticket:'.$ticket->number;
@@ -212,7 +287,7 @@ class ZammadTicketingProvider implements TicketingProvider
             throw new RuntimeException('Die Zammad-Integration ist nicht vollständig konfiguriert.');
         }
 
-        $baseUrl = ZammadEndpoint::secureBaseUrl(config('services.zammad.url'));
+        $baseUrl = ZammadEndpoint::configuredBaseUrl();
         if ($baseUrl === null) {
             throw new RuntimeException('Die Zammad-URL erfüllt die Sicherheitsanforderungen nicht.');
         }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Services\Ticketing\SupportAttachmentManager;
 use Illuminate\Foundation\Http\FormRequest;
 
 class ReplyToSupportTicketRequest extends FormRequest
@@ -17,7 +18,7 @@ class ReplyToSupportTicketRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'body' => ['required', 'string', 'min:2', 'max:20000'],
+            ...SupportAttachmentManager::validationRules('body'),
             'is_internal' => ['sometimes', 'boolean'],
         ];
     }

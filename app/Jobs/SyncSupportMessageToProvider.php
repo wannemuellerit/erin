@@ -3,7 +3,9 @@
 namespace App\Jobs;
 
 use App\Contracts\TicketingProvider;
+use App\Models\SupportTicketAttachment;
 use App\Models\SupportTicketMessage;
+use App\Services\Ticketing\SupportSyncLock;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -29,9 +31,26 @@ class SyncSupportMessageToProvider implements ShouldBeUnique, ShouldQueue
 
     public function handle(TicketingProvider $provider): void
     {
+        $locks = app(SupportSyncLock::class);
+        $lock = $locks->forMessage($this->messageId);
+        if (! $lock->get()) {
+            $this->release($locks->retrySeconds());
+
+            return;
+        }
+
+        try {
+            $this->synchronize($provider);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function synchronize(TicketingProvider $provider): void
+    {
         /** @var SupportTicketMessage $message */
         $message = SupportTicketMessage::query()
-            ->with(['supportTicket', 'author:id,name,email,role'])
+            ->with(['supportTicket', 'author:id,name,email,role', 'files'])
             ->findOrFail($this->messageId);
 
         if ($message->external_article_id !== null || $message->source === 'zammad') {
@@ -40,6 +59,19 @@ class SyncSupportMessageToProvider implements ShouldBeUnique, ShouldQueue
 
         if (! $provider->enabled()) {
             $message->update(['delivery_status' => 'local_only']);
+
+            return;
+        }
+
+        if ($message->files->contains('scan_result', 'pending')) {
+            $this->release(10);
+
+            return;
+        }
+        if ($message->files->contains(
+            static fn (SupportTicketAttachment $attachment): bool => $attachment->scan_result !== 'clean',
+        )) {
+            $message->update(['delivery_status' => 'failed']);
 
             return;
         }

@@ -4,6 +4,7 @@ import { LifeBuoy, MessageCircleQuestion, Plus } from '@lucide/vue';
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import EmptyState from '@/components/product/EmptyState.vue';
+import FileAttachmentPicker from '@/components/product/FileAttachmentPicker.vue';
 import FormField from '@/components/product/FormField.vue';
 import PageHeader from '@/components/product/PageHeader.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
@@ -44,6 +45,7 @@ const form = useForm({
     category: '',
     priority: 'normal',
     message: '',
+    attachments: [] as File[],
 });
 
 watch(
@@ -58,6 +60,7 @@ watch(
 
 const createTicket = () => {
     form.post('/support/tickets', {
+        forceFormData: true,
         preserveScroll: true,
         onSuccess: () => {
             form.reset();
@@ -170,13 +173,30 @@ const toneFor = (status: string): StatusTone =>
                         <Textarea
                             id="support-message"
                             v-model="form.message"
-                            required
                             rows="5"
                             :placeholder="
                                 t('operations.support.messagePlaceholder')
                             "
                         />
                     </FormField>
+                </div>
+                <div class="lg:col-span-2">
+                    <FileAttachmentPicker
+                        id="support-new-ticket-attachments"
+                        v-model="form.attachments"
+                        :label="t('operations.support.attachments')"
+                        :remove-label="t('operations.support.removeAttachment')"
+                        :disabled="form.processing"
+                    />
+                    <p
+                        v-if="form.errors.attachments"
+                        class="mt-1 text-xs text-red-600"
+                    >
+                        {{ form.errors.attachments }}
+                    </p>
+                    <p class="mt-1 text-xs text-slate-500">
+                        {{ t('operations.support.attachmentHint') }}
+                    </p>
                 </div>
                 <div class="lg:col-span-2 lg:text-right">
                     <button

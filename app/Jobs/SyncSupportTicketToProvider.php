@@ -4,6 +4,8 @@ namespace App\Jobs;
 
 use App\Contracts\TicketingProvider;
 use App\Models\SupportTicket;
+use App\Models\SupportTicketAttachment;
+use App\Services\Ticketing\SupportSyncLock;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -29,9 +31,29 @@ class SyncSupportTicketToProvider implements ShouldBeUnique, ShouldQueue
 
     public function handle(TicketingProvider $provider): void
     {
+        $locks = app(SupportSyncLock::class);
+        $lock = $locks->forTicket($this->ticketId);
+        if (! $lock->get()) {
+            $this->release($locks->retrySeconds());
+
+            return;
+        }
+
+        try {
+            $this->synchronize($provider);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function synchronize(TicketingProvider $provider): void
+    {
         /** @var SupportTicket $ticket */
         $ticket = SupportTicket::query()
-            ->with(['requester:id,name,email', 'messages' => fn ($query) => $query->oldest()])
+            ->with([
+                'requester:id,name,email',
+                'messages' => fn ($query) => $query->with('files')->oldest(),
+            ])
             ->findOrFail($this->ticketId);
 
         if ($ticket->external_id !== null) {
@@ -46,6 +68,22 @@ class SyncSupportTicketToProvider implements ShouldBeUnique, ShouldQueue
 
         $firstMessage = $ticket->messages->first();
         if ($firstMessage === null) {
+            return;
+        }
+        if ($firstMessage->files->contains('scan_result', 'pending')) {
+            $this->release(10);
+
+            return;
+        }
+        if ($firstMessage->files->contains(
+            static fn (SupportTicketAttachment $attachment): bool => $attachment->scan_result !== 'clean',
+        )) {
+            $ticket->update([
+                'sync_status' => 'failed',
+                'sync_error' => 'Ein Supportanhang wurde nicht sicherheitsgeprüft freigegeben.',
+            ]);
+            $firstMessage->update(['delivery_status' => 'failed']);
+
             return;
         }
 

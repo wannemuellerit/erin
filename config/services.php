@@ -74,7 +74,17 @@ return [
         'token' => env('ZAMMAD_TOKEN'),
         'group' => env('ZAMMAD_GROUP', 'Users'),
         'webhook_secret' => env('ZAMMAD_WEBHOOK_SECRET'),
+        'webhook_callback_url' => env(
+            'ZAMMAD_WEBHOOK_CALLBACK_URL',
+            rtrim((string) env('APP_URL', ''), '/').'/integrations/zammad/webhook',
+        ),
+        'allow_local_http' => (bool) env('ZAMMAD_ALLOW_LOCAL_HTTP', false),
+        'local_http_hosts' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('ZAMMAD_LOCAL_HTTP_HOSTS', '')),
+        ))),
         'timeout' => (int) env('ZAMMAD_TIMEOUT', 10),
+        'webhook_max_bytes' => (int) env('ZAMMAD_WEBHOOK_MAX_BYTES', 2 * 1024 * 1024),
     ],
 
     'clamav' => [

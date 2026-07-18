@@ -53,11 +53,17 @@ class FortifyServiceProvider extends ServiceProvider
      */
     private function configureViews(): void
     {
-        Fortify::loginView(fn (Request $request) => Inertia::render('auth/Login', [
-            'canResetPassword' => Features::enabled(Features::resetPasswords()),
-            'status' => $request->session()->get('status'),
-            'demoMode' => (bool) config('app.demo_mode'),
-        ]));
+        Fortify::loginView(function (Request $request) {
+            $demoMode = (bool) config('app.demo_mode');
+
+            return Inertia::render('auth/Login', [
+                'canResetPassword' => Features::enabled(Features::resetPasswords()),
+                'status' => $request->session()->get('status'),
+                'demoMode' => $demoMode,
+                'demoAccounts' => $demoMode ? config('demo.accounts', []) : [],
+                'demoPassword' => $demoMode ? (string) config('demo.password') : '',
+            ]);
+        });
 
         Fortify::resetPasswordView(fn (Request $request) => Inertia::render('auth/ResetPassword', [
             'email' => $request->email,

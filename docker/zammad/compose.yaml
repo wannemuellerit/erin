@@ -1,0 +1,224 @@
+# Based on the official zammad/zammad-docker-compose v15.5.6 stack:
+# https://github.com/zammad/zammad-docker-compose/releases/tag/v15.5.6
+#
+# Keep this as a separate Compose project. Exact image versions are pinned in
+# .env.example and copied into the ignored .env by configure.sh.
+name: erin-zammad
+
+x-zammad-service: &zammad-service
+  image: ${IMAGE_REPO:-ghcr.io/zammad/zammad}:${VERSION:-7.1.1-0020}
+  restart: ${RESTART:-unless-stopped}
+  environment: &zammad-environment
+    MEMCACHE_SERVERS: zammad-memcached:11211
+    POSTGRESQL_DB: ${POSTGRES_DB:-zammad_production}
+    POSTGRESQL_HOST: zammad-postgresql
+    POSTGRESQL_USER: ${POSTGRES_USER:-zammad}
+    POSTGRESQL_PASS: ${POSTGRES_PASS:?POSTGRES_PASS muss in docker/zammad/.env gesetzt sein}
+    POSTGRESQL_PORT: 5432
+    POSTGRESQL_OPTIONS: ${POSTGRESQL_OPTIONS:-?pool=50}
+    POSTGRESQL_DB_CREATE: "true"
+    REDIS_URL: redis://zammad-redis:6379
+    BACKUP_DIR: /var/tmp/zammad
+    BACKUP_TIME: ${BACKUP_TIME:-03:00}
+    HOLD_DAYS: ${HOLD_DAYS:-10}
+    TZ: ${TZ:-Europe/Berlin}
+    AUTOWIZARD_JSON: ${AUTOWIZARD_JSON:-}
+    ELASTICSEARCH_ENABLED: "true"
+    ELASTICSEARCH_SCHEMA: http
+    ELASTICSEARCH_HOST: zammad-elasticsearch
+    ELASTICSEARCH_PORT: 9200
+    ELASTICSEARCH_NAMESPACE: ${ELASTICSEARCH_NAMESPACE:-zammad}
+    ELASTICSEARCH_REINDEX: ${ELASTICSEARCH_REINDEX:-true}
+    NGINX_PORT: ${NGINX_PORT:-8080}
+    NGINX_CLIENT_MAX_BODY_SIZE: ${NGINX_CLIENT_MAX_BODY_SIZE:-25M}
+    NGINX_SERVER_NAME: ${ZAMMAD_FQDN:-localhost}
+    NGINX_SERVER_SCHEME: ${ZAMMAD_HTTP_TYPE:-http}
+    ZAMMAD_HTTP_TYPE: ${ZAMMAD_HTTP_TYPE:-http}
+    ZAMMAD_FQDN: ${ZAMMAD_FQDN:-localhost}
+  volumes:
+    - zammad-backup:/var/tmp/zammad:ro
+    - zammad-storage:/opt/zammad/storage
+  depends_on:
+    zammad-memcached:
+      condition: service_healthy
+    zammad-postgresql:
+      condition: service_healthy
+    zammad-redis:
+      condition: service_healthy
+
+services:
+  zammad-backup:
+    <<: *zammad-service
+    command: ["zammad-backup"]
+    user: "0:0"
+    volumes:
+      - zammad-backup:/var/tmp/zammad
+      - zammad-storage:/opt/zammad/storage
+    depends_on:
+      zammad-init:
+        condition: service_completed_successfully
+      zammad-postgresql:
+        condition: service_healthy
+
+  zammad-elasticsearch:
+    image: elasticsearch:${ELASTICSEARCH_VERSION:-9.4.3}
+    restart: ${RESTART:-unless-stopped}
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: ${ELASTICSEARCH_JAVA_OPTS:--Xms512m -Xmx512m}
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl --fail --silent http://127.0.0.1:9200/_cluster/health >/dev/null",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 30
+      start_period: 60s
+
+  zammad-init:
+    <<: *zammad-service
+    command: ["zammad-init"]
+    restart: on-failure
+    user: "0:0"
+    depends_on:
+      zammad-elasticsearch:
+        condition: service_healthy
+      zammad-memcached:
+        condition: service_healthy
+      zammad-postgresql:
+        condition: service_healthy
+      zammad-redis:
+        condition: service_healthy
+
+  zammad-memcached:
+    image: memcached:${MEMCACHE_VERSION:-1.6.44-alpine}
+    command: ["memcached", "-m", "256M"]
+    restart: ${RESTART:-unless-stopped}
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "printf 'version\\r\\n' | nc -w 2 127.0.0.1 11211 | grep -q '^VERSION'",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  zammad-nginx:
+    <<: *zammad-service
+    command: ["zammad-nginx"]
+    ports:
+      - "${ZAMMAD_BIND_ADDRESS:-127.0.0.1}:${ZAMMAD_FORWARD_PORT:-8090}:${NGINX_PORT:-8080}"
+    networks:
+      default:
+      erin:
+        aliases:
+          - zammad
+    depends_on:
+      zammad-railsserver:
+        condition: service_healthy
+      zammad-websocket:
+        condition: service_started
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "/bin/bash",
+          "-c",
+          "exec 3<>/dev/tcp/127.0.0.1/$${NGINX_PORT:-8080} && printf 'GET / HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && grep -q 'HTTP/1.[01] [23]' <&3",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  zammad-postgresql:
+    image: postgres:${POSTGRES_VERSION:-17.10-alpine}
+    restart: ${RESTART:-unless-stopped}
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-zammad_production}
+      POSTGRES_USER: ${POSTGRES_USER:-zammad}
+      POSTGRES_PASSWORD: ${POSTGRES_PASS:?POSTGRES_PASS muss in docker/zammad/.env gesetzt sein}
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -q -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  zammad-railsserver:
+    <<: *zammad-service
+    command: ["zammad-railsserver"]
+    volumes:
+      - zammad-backup:/var/tmp/zammad:ro
+      - zammad-storage:/opt/zammad/storage
+      - ../../scripts/zammad/bootstrap.rb:/opt/erin/bootstrap.rb:ro
+    networks:
+      default:
+      erin:
+    depends_on:
+      zammad-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "/bin/bash",
+          "-c",
+          "exec 3<>/dev/tcp/127.0.0.1/3000",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  zammad-redis:
+    image: redis:${REDIS_VERSION:-8.8-alpine}
+    restart: ${RESTART:-unless-stopped}
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  zammad-scheduler:
+    <<: *zammad-service
+    command: ["zammad-scheduler"]
+    networks:
+      default:
+      erin:
+    depends_on:
+      zammad-init:
+        condition: service_completed_successfully
+
+  zammad-websocket:
+    <<: *zammad-service
+    command: ["zammad-websocket"]
+    depends_on:
+      zammad-init:
+        condition: service_completed_successfully
+
+networks:
+  erin:
+    external: true
+    name: ${ERIN_DOCKER_NETWORK:-erin_default}
+
+volumes:
+  elasticsearch-data:
+  postgresql-data:
+  redis-data:
+  zammad-backup:
+  zammad-storage:

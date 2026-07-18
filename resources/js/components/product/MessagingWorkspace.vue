@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { router, useForm, usePage } from '@inertiajs/vue3';
-import { FileText, Inbox, Languages, Paperclip, Send } from '@lucide/vue';
+import { FileText, Inbox, Languages, Send } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import EmptyState from '@/components/product/EmptyState.vue';
+import FileAttachmentPicker from '@/components/product/FileAttachmentPicker.vue';
 import SearchField from '@/components/product/SearchField.vue';
 import de from '@/i18n/messages/product-components-de';
 import en from '@/i18n/messages/product-components-en';
@@ -280,20 +281,14 @@ const submit = () => {
                     class="flex items-end gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2"
                     @submit.prevent="submit"
                 >
-                    <label
-                        class="grid size-9 shrink-0 cursor-pointer place-items-center rounded-xl text-slate-400 hover:bg-white hover:text-[var(--erin-primary)]"
-                        :aria-label="t('messagingWorkspace.attachFiles')"
-                        ><Paperclip class="size-[18px]" /><input
-                            type="file"
-                            multiple
-                            class="sr-only"
-                            @change="
-                                messageForm.attachments = Array.from(
-                                    ($event.target as HTMLInputElement).files ??
-                                        [],
-                                )
-                            "
-                    /></label>
+                    <FileAttachmentPicker
+                        id="message-attachments"
+                        v-model="messageForm.attachments"
+                        compact
+                        :label="t('messagingWorkspace.attachFiles')"
+                        :remove-label="t('messagingWorkspace.removeAttachment')"
+                        :disabled="messageForm.processing"
+                    />
                     <textarea
                         v-model="messageForm.body"
                         rows="1"

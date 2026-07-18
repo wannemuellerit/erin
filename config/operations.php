@@ -2,7 +2,31 @@
 
 use Monolog\Formatter\JsonFormatter;
 
+$embeddedBuildShaPath = base_path('.erin-build-sha');
+$embeddedBuildSha = is_readable($embeddedBuildShaPath)
+    ? trim((string) file_get_contents($embeddedBuildShaPath))
+    : null;
+
 return [
+    'build' => [
+        'sha' => $embeddedBuildSha !== '' && $embeddedBuildSha !== null
+            ? $embeddedBuildSha
+            : env('ERIN_BUILD_SHA'),
+        'image_tag' => env('ERIN_APP_TAG'),
+    ],
+
+    'network' => [
+        'internal_subnet' => env('ERIN_INTERNAL_SUBNET'),
+        'trusted_proxies' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('TRUSTED_PROXIES', '')),
+        ))),
+    ],
+
+    'storage' => [
+        'minio_app_user' => env('MINIO_APP_USER'),
+    ],
+
     'queue' => [
         'queues' => array_values(array_filter(array_map(
             'trim',
@@ -34,17 +58,78 @@ return [
     | Evidence-backed launch gates
     |--------------------------------------------------------------------------
     |
-    | References are deliberately empty by default. They identify external
-    | evidence and approvals; setting them does not replace the corresponding
-    | review.
+    | A reference alone is intentionally insufficient. Every formal gate is
+    | tied to a release, a real named identity and a UTC approval timestamp.
+    | The readiness validator also rejects placeholders, stale records and
+    | self-approval. These values are evidence pointers, never secrets.
     |
     */
-    'gates' => [
-        'backup_restore_verified_at' => env('ERIN_BACKUP_RESTORE_VERIFIED_AT'),
-        'security_review_reference' => env('ERIN_SECURITY_REVIEW_REFERENCE'),
-        'dpo_approval_reference' => env('ERIN_DPO_APPROVAL_REFERENCE'),
-        'legal_approval_reference' => env('ERIN_LEGAL_APPROVAL_REFERENCE'),
-        'pilot_owner' => env('ERIN_PILOT_OWNER'),
+    'launch_evidence' => [
+        'release' => [
+            'id' => env('ERIN_RELEASE_ID'),
+            'commit_sha' => env('ERIN_RELEASE_COMMIT_SHA'),
+            'prepared_by' => env('ERIN_RELEASE_PREPARED_BY'),
+        ],
+        'backup_restore' => [
+            'reference' => env('ERIN_BACKUP_RESTORE_REFERENCE'),
+            'verified_by' => env('ERIN_BACKUP_RESTORE_VERIFIED_BY'),
+            'verified_at' => env('ERIN_BACKUP_RESTORE_VERIFIED_AT'),
+            'release_id' => env('ERIN_BACKUP_RESTORE_RELEASE_ID'),
+            'database_rpo_target_minutes' => env('ERIN_BACKUP_DB_RPO_TARGET_MINUTES'),
+            'database_rpo_achieved_minutes' => env('ERIN_BACKUP_DB_RPO_ACHIEVED_MINUTES'),
+            'database_rto_target_minutes' => env('ERIN_BACKUP_DB_RTO_TARGET_MINUTES'),
+            'database_rto_achieved_minutes' => env('ERIN_BACKUP_DB_RTO_ACHIEVED_MINUTES'),
+            'object_storage_rpo_target_minutes' => env('ERIN_BACKUP_OBJECT_RPO_TARGET_MINUTES'),
+            'object_storage_rpo_achieved_minutes' => env('ERIN_BACKUP_OBJECT_RPO_ACHIEVED_MINUTES'),
+            'object_storage_rto_target_minutes' => env('ERIN_BACKUP_OBJECT_RTO_TARGET_MINUTES'),
+            'object_storage_rto_achieved_minutes' => env('ERIN_BACKUP_OBJECT_RTO_ACHIEVED_MINUTES'),
+            'encrypted_backup_verified' => env('ERIN_BACKUP_ENCRYPTION_VERIFIED', false),
+            'isolated_restore_verified' => env('ERIN_BACKUP_ISOLATION_VERIFIED', false),
+        ],
+        'security_review' => [
+            'reference' => env('ERIN_SECURITY_REVIEW_REFERENCE'),
+            'reviewed_by' => env('ERIN_SECURITY_REVIEWED_BY'),
+            'reviewed_at' => env('ERIN_SECURITY_REVIEWED_AT'),
+            'release_id' => env('ERIN_SECURITY_REVIEW_RELEASE_ID'),
+            'commit_sha' => env('ERIN_SECURITY_REVIEW_COMMIT_SHA'),
+            'automated_evidence_reference' => env('ERIN_SECURITY_AUTOMATED_EVIDENCE_REFERENCE'),
+            'open_critical_findings' => env('ERIN_SECURITY_OPEN_CRITICAL_FINDINGS'),
+            'open_high_findings' => env('ERIN_SECURITY_OPEN_HIGH_FINDINGS'),
+        ],
+        'dpo_approval' => [
+            'reference' => env('ERIN_DPO_APPROVAL_REFERENCE'),
+            'approved_by' => env('ERIN_DPO_APPROVED_BY'),
+            'approved_at' => env('ERIN_DPO_APPROVED_AT'),
+            'release_id' => env('ERIN_DPO_APPROVAL_RELEASE_ID'),
+            'status' => env('ERIN_DPO_APPROVAL_STATUS'),
+        ],
+        'legal_approval' => [
+            'reference' => env('ERIN_LEGAL_APPROVAL_REFERENCE'),
+            'approved_by' => env('ERIN_LEGAL_APPROVED_BY'),
+            'approved_at' => env('ERIN_LEGAL_APPROVED_AT'),
+            'release_id' => env('ERIN_LEGAL_APPROVAL_RELEASE_ID'),
+            'status' => env('ERIN_LEGAL_APPROVAL_STATUS'),
+        ],
+        'pilot' => [
+            'reference' => env('ERIN_PILOT_DECISION_REFERENCE'),
+            'owner' => env('ERIN_PILOT_OWNER'),
+            'deputy' => env('ERIN_PILOT_DEPUTY'),
+            'decision_by' => env('ERIN_PILOT_DECISION_BY'),
+            'decision_at' => env('ERIN_PILOT_DECISION_AT'),
+            'release_id' => env('ERIN_PILOT_RELEASE_ID'),
+            'plan_reference' => env('ERIN_PILOT_PLAN_REFERENCE'),
+            'acceptance_reference' => env('ERIN_PILOT_ACCEPTANCE_REFERENCE'),
+            'rollback_reference' => env('ERIN_PILOT_ROLLBACK_REFERENCE'),
+            'status' => env('ERIN_PILOT_STATUS'),
+        ],
+    ],
+
+    'evidence_freshness' => [
+        'backup_restore_days' => (int) env('ERIN_BACKUP_EVIDENCE_MAX_AGE_DAYS', 90),
+        'security_review_days' => (int) env('ERIN_SECURITY_EVIDENCE_MAX_AGE_DAYS', 30),
+        'dpo_approval_days' => (int) env('ERIN_DPO_EVIDENCE_MAX_AGE_DAYS', 365),
+        'legal_approval_days' => (int) env('ERIN_LEGAL_EVIDENCE_MAX_AGE_DAYS', 365),
+        'pilot_decision_days' => (int) env('ERIN_PILOT_EVIDENCE_MAX_AGE_DAYS', 90),
     ],
 
     'expected_json_log_formatter' => JsonFormatter::class,

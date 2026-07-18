@@ -49,4 +49,16 @@ interface TicketingProvider
      * @return array<string, mixed>
      */
     public function article(string $externalArticleId): array;
+
+    /**
+     * @param  resource  $destination
+     * @return array{mime_type: string|null, size_bytes: int, checksum_sha256: string}
+     */
+    public function downloadAttachment(
+        string $externalTicketId,
+        string $externalArticleId,
+        string $externalAttachmentId,
+        mixed $destination,
+        int $maxBytes,
+    ): array;
 }

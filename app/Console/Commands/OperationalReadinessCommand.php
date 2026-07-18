@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Plan;
 use App\Services\Documents\ClamAvScanner;
+use App\Services\Operations\LaunchEvidenceValidator;
 use App\Services\Ticketing\ZammadEndpoint;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -21,9 +22,11 @@ class OperationalReadinessCommand extends Command
 
     protected $description = 'Prüft Produktionskonfiguration und dokumentierte Launch-Gates';
 
-    public function handle(ClamAvScanner $scanner): int
-    {
-        $checks = $this->configurationChecks();
+    public function handle(
+        ClamAvScanner $scanner,
+        LaunchEvidenceValidator $evidenceValidator,
+    ): int {
+        $checks = $this->configurationChecks($evidenceValidator);
 
         if ((bool) $this->option('probe')) {
             $checks = [...$checks, ...$this->activeChecks($scanner)];
@@ -73,15 +76,19 @@ class OperationalReadinessCommand extends Command
     }
 
     /**
-     * @return list<array{id: string, status: 'pass'|'warn'|'fail', message: string}>
+     * @return list<array{
+     *     id: string,
+     *     status: 'pass'|'warn'|'fail',
+     *     message: string,
+     *     errors?: list<string>
+     * }>
      */
-    private function configurationChecks(): array
+    private function configurationChecks(LaunchEvidenceValidator $evidenceValidator): array
     {
         $production = config('app.env') === 'production';
         $key = config('app.key');
         $privateDisk = config('filesystems.disks.private');
         $retention = config('operations.retention', []);
-        $gates = config('operations.gates', []);
 
         return [
             $this->check(
@@ -174,12 +181,13 @@ class OperationalReadinessCommand extends Command
             $this->check(
                 'zammad.configured',
                 config('services.zammad.enabled') === true
-                    && ZammadEndpoint::secureBaseUrl(config('services.zammad.url')) !== null
+                    && ZammadEndpoint::configuredBaseUrl() !== null
+                    && ZammadEndpoint::configuredCallbackUrl() !== null
                     && filled(config('services.zammad.token'))
                     && filled(config('services.zammad.group'))
                     && strlen((string) config('services.zammad.webhook_secret')) >= 32,
-                'Zammad verwendet eine sichere HTTPS-URL und vollständige Zugangsdaten.',
-                'Zammad benötigt eine sichere HTTPS-URL, Gruppe, Token und ein Webhook-Secret mit mindestens 32 Zeichen.',
+                'Zammad verwendet sicher freigegebene Endpunkte und vollständige Zugangsdaten.',
+                'Zammad benötigt sicher freigegebene Endpunkte, Gruppe, Token und ein Webhook-Secret mit mindestens 32 Zeichen.',
                 $production ? 'fail' : 'warn',
             ),
             $this->check(
@@ -192,31 +200,7 @@ class OperationalReadinessCommand extends Command
                 'Für alle automatischen Löschregeln sind Fristen gesetzt.',
                 'Mindestens eine Aufbewahrungsfrist ist deaktiviert oder noch nicht freigegeben.',
             ),
-            $this->evidenceCheck(
-                'backup.restore_drill',
-                $gates['backup_restore_verified_at'] ?? null,
-                'Ein erfolgreicher Restore-Drill ist referenziert.',
-            ),
-            $this->evidenceCheck(
-                'security.review',
-                $gates['security_review_reference'] ?? null,
-                'Die Sicherheitsprüfung ist referenziert.',
-            ),
-            $this->evidenceCheck(
-                'dpo.approval',
-                $gates['dpo_approval_reference'] ?? null,
-                'Die Datenschutzfreigabe ist referenziert.',
-            ),
-            $this->evidenceCheck(
-                'legal.approval',
-                $gates['legal_approval_reference'] ?? null,
-                'Die rechtliche Freigabe ist referenziert.',
-            ),
-            $this->evidenceCheck(
-                'pilot.owner',
-                $gates['pilot_owner'] ?? null,
-                'Für den Pilotbetrieb ist eine verantwortliche Person benannt.',
-            ),
+            ...$evidenceValidator->checks(),
         ];
     }
 
@@ -315,19 +299,6 @@ class OperationalReadinessCommand extends Command
                 (string) $plan->stripe_product_id,
                 'prod_',
             ) && str_starts_with((string) $plan->stripe_price_id, 'price_'),
-        );
-    }
-
-    /**
-     * @return array{id: string, status: 'pass'|'warn'|'fail', message: string}
-     */
-    private function evidenceCheck(string $id, mixed $value, string $success): array
-    {
-        return $this->check(
-            $id,
-            is_string($value) && trim($value) !== '',
-            $success,
-            'Es ist noch keine belastbare Freigabe oder Evidenz hinterlegt.',
         );
     }
 

@@ -81,7 +81,12 @@ export default {
         createAccountDescription:
             'Wählen Sie Ihren Bereich und starten Sie in wenigen Minuten.',
         signInTitle: 'Anmelden',
-        demoAccess: 'Demo-Zugang',
+        demoAccess: 'Demo-Zugänge',
+        demoAccessDescription:
+            'Wählen Sie ein Konto aus. Das gemeinsame Passwort steht direkt daneben.',
+        demoSharedPassword: 'Passwort für alle',
+        demoAccountCount: '{count} Konto | {count} Konten',
+        insertDemoAccount: 'Zugangsdaten für {name} einsetzen',
         email: 'E-Mail-Adresse',
         emailPlaceholder: "name{'@'}beispiel.de",
         password: 'Passwort',

@@ -11,6 +11,16 @@ export type SupportTicketMessage = {
     source?: string;
     delivery_status?: string;
     created_at: string;
+    attachments?: SupportTicketAttachment[];
+};
+
+export type SupportTicketAttachment = {
+    id: number;
+    original_name: string;
+    mime_type?: string | null;
+    size_bytes?: number | null;
+    scan_result: string;
+    download_url?: string | null;
 };
 
 export type SupportTicket = {
