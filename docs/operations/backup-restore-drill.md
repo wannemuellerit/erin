@@ -1,5 +1,14 @@
 # Was Schritt 4 bedeutet: verschlüsselter DB-/MinIO-Restore-Drill
 
+Der reguläre Produktionsjob
+[`scripts/ops/offsite-backup.sh`](../../scripts/ops/offsite-backup.sh) erstellt
+alle sechs Stunden einen konsistenten MySQL-Dump und einen privaten
+Objektstorage-Snapshot, schreibt ein SHA-256-Manifest und überträgt beides in
+ein getrenntes, durch Restic clientseitig verschlüsseltes Repository. Der Job
+prüft bei jedem Lauf einen Teil der Daten und setzt eine gestaffelte
+48-Stunden-/Tages-/Wochen-/Monats-Retention durch; das getrennte
+`production-backup`-Environment besitzt ausschließlich Backup-Rechte.
+
 Ein Backup ist erst belastbar, wenn nachgewiesen wurde, dass es in einer
 isolierten Umgebung vollständig und rechtzeitig wiederhergestellt werden kann.
 Das bloße Vorhandensein einer `.sql`-Datei oder eines MinIO-Volumes reicht

@@ -1,0 +1,36 @@
+name: Produktanforderung
+description: Fachlich und technisch abnehmbares Erin-Feature
+title: "[Feature] "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Gewünschtes Ergebnis
+      description: Welches Problem wird für welche Rolle gelöst?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Umfang und Grenzen
+      description: Backend, UI, Rollen, Daten, Notifications und externe Anbieter.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Akzeptanzkriterien
+      description: Messbare Positiv-, Negativ-, Sicherheits- und Browserfälle.
+    validations:
+      required: true
+  - type: checkboxes
+    id: crosscutting
+    attributes:
+      label: Übergreifende Anforderungen
+      options:
+        - label: Mandantenisolation und Rollen berücksichtigt
+        - label: Deutsch/Englisch und Barrierefreiheit berücksichtigt
+        - label: Datenschutz, Audit und Retention berücksichtigt
+        - label: Betrieb, Monitoring und Rollback berücksichtigt

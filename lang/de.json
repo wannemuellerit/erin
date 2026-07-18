@@ -202,5 +202,18 @@
     "Dieser manuelle Prüffall wurde bereits aufgelöst oder besitzt keinen sicheren Firmen-Lock.": "Dieser manuelle Prüffall wurde bereits aufgelöst oder besitzt keinen sicheren Firmen-Lock.",
     "Die verantwortliche Person konnte nicht sicher ermittelt werden.": "Die verantwortliche Person konnte nicht sicher ermittelt werden.",
     "Der Tarifwechsel wurde für einen sicheren erneuten Stripe-Abgleich freigegeben.": "Der Tarifwechsel wurde für einen sicheren erneuten Stripe-Abgleich freigegeben.",
-    "Der Tarifwechsel wurde ohne lokale Tarifänderung geschlossen.": "Der Tarifwechsel wurde ohne lokale Tarifänderung geschlossen."
+    "Der Tarifwechsel wurde ohne lokale Tarifänderung geschlossen.": "Der Tarifwechsel wurde ohne lokale Tarifänderung geschlossen.",
+    "Das Profilbild konnte nicht privat gespeichert werden.": "Das Profilbild konnte nicht privat gespeichert werden.",
+    "Dein Profilbild wird sicher geprüft.": "Dein Profilbild wird sicher geprüft.",
+    "Dein Profilbild wurde gelöscht.": "Dein Profilbild wurde gelöscht.",
+    "Die Löschung ist durch einen aktiven Legal Hold gesperrt.": "Die Löschung ist durch einen aktiven Legal Hold gesperrt.",
+    "Die Registrierung konnte nicht abgeschlossen werden. Bitte prüfe deine Angaben oder kontaktiere den Support.": "Die Registrierung konnte nicht abgeschlossen werden. Bitte prüfe deine Angaben oder kontaktiere den Support.",
+    "Diese Admin-Einladung ist abgelaufen oder wurde bereits verwendet.": "Diese Admin-Einladung ist abgelaufen oder wurde bereits verwendet.",
+    "Diese Regel würde den letzten erreichbaren Superadmin aussperren.": "Diese Regel würde den letzten erreichbaren Superadmin aussperren.",
+    "Dieser DSGVO-Statusübergang ist nicht zulässig.": "Dieser DSGVO-Statusübergang ist nicht zulässig.",
+    "Dieses Paket enthält die in Erin gespeicherten personenbezogenen Daten und technischen Historien. Binäre Dokumentinhalte werden aus Sicherheitsgründen getrennt verwaltet.": "Dieses Paket enthält die in Erin gespeicherten personenbezogenen Daten und technischen Historien. Binäre Dokumentinhalte werden aus Sicherheitsgründen getrennt verwaltet.",
+    "Für diese E-Mail existiert bereits eine andere Rolle.": "Für diese E-Mail existiert bereits eine andere Rolle.",
+    "Prüfung und Freigabe müssen durch zwei verschiedene Superadmins erfolgen.": "Prüfung und Freigabe müssen durch zwei verschiedene Superadmins erfolgen.",
+    "Vor der weiteren Nutzung ist ein Passwortwechsel erforderlich.": "Vor der weiteren Nutzung ist ein Passwortwechsel erforderlich.",
+    "Ändere jetzt dein Passwort erneut und richte anschließend Zwei-Faktor-Authentifizierung ein.": "Ändere jetzt dein Passwort erneut und richte anschließend Zwei-Faktor-Authentifizierung ein."
 }

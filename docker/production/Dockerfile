@@ -2,7 +2,7 @@ ARG PHP_VERSION=8.4
 ARG ERIN_BUILD_SHA
 ARG ERIN_GOVERNANCE_TRUST_ROOT_SHA256
 
-FROM php:${PHP_VERSION}-fpm-bookworm AS php-base
+FROM php:${PHP_VERSION}-fpm-bookworm@sha256:66a10c4b32b2f5886c32a4fb23c6cc3e727661e6a929c241befb335aaee0290e AS php-base
 
 ENV COMPOSER_ALLOW_SUPERUSER=1 \
     COMPOSER_HOME=/tmp/composer \
@@ -37,7 +37,7 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+COPY --from=composer:2@sha256:5946476338742b200bb9ff88f8be56275ddae4b3949c72305cb0dbf10cfcb760 /usr/bin/composer /usr/bin/composer
 COPY docker/php/php.ini /usr/local/etc/php/conf.d/99-erin.ini
 COPY docker/production/php.ini /usr/local/etc/php/conf.d/100-erin-production.ini
 
@@ -57,7 +57,7 @@ COPY . .
 RUN php artisan package:discover --ansi \
     && php artisan wayfinder:generate --with-form
 
-FROM node:22-bookworm-slim AS frontend-builder
+FROM node:22-bookworm-slim@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3 AS frontend-builder
 
 ARG VITE_APP_NAME=Erin
 ARG VITE_BROADCAST_CONNECTION=reverb
@@ -110,7 +110,7 @@ USER www-data
 ENTRYPOINT ["erin-entrypoint"]
 CMD ["php-fpm", "--nodaemonize"]
 
-FROM nginx:1.28-alpine AS nginx
+FROM nginx:1.28-alpine@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236 AS nginx
 
 ARG ERIN_BUILD_SHA
 ARG ERIN_GOVERNANCE_TRUST_ROOT_SHA256

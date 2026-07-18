@@ -3,12 +3,19 @@
 namespace App\Http\Middleware;
 
 use App\Enums\UserStatus;
+use App\Services\Access\AccessListResolver;
+use App\Services\Audit\AuditLogger;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 class EnsurePlatformAccess
 {
+    public function __construct(
+        private readonly AccessListResolver $accessList,
+        private readonly AuditLogger $audit,
+    ) {}
+
     /**
      * @param  Closure(Request): Response  $next
      */
@@ -21,8 +28,24 @@ class EnsurePlatformAccess
         }
 
         $status = $user->status->value;
+        $access = $this->accessList->decide($user->email, $request->ip());
 
-        if (in_array($status, [UserStatus::Suspended->value, UserStatus::Blocked->value], true)) {
+        if (
+            in_array($status, [UserStatus::Suspended->value, UserStatus::Blocked->value], true)
+            || $access->blocked()
+        ) {
+            if ($access->blocked()) {
+                $this->audit->record(
+                    'access.blocked.active_session',
+                    $user,
+                    metadata: [
+                        'access_list_entry_id' => $access->matchedEntry?->getKey(),
+                        'subject_type' => $access->matchedEntry?->subject_type,
+                    ],
+                    request: $request,
+                );
+            }
+
             auth()->logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();

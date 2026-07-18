@@ -1,0 +1,109 @@
+name: release-images
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+  attestations: write
+
+jobs:
+  publish:
+    name: Build, attest and sign
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 45
+    steps:
+      - name: Checkout release commit
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Require immutable release tag
+        run: |
+          test "${GITHUB_REF_TYPE}" = "tag"
+          test -n "${GITHUB_SHA}"
+          printf '%s' "${GITHUB_SHA}" | grep -Eq '^[0-9a-f]{40}$'
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Authenticate to GitHub Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
+
+      - name: Build and publish PHP image by commit
+        id: php
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: docker/production/Dockerfile
+          target: php
+          push: true
+          provenance: mode=max
+          sbom: true
+          tags: ghcr.io/${{ github.repository }}/app:${{ github.sha }}
+          build-args: |
+            ERIN_BUILD_SHA=${{ github.sha }}
+            ERIN_GOVERNANCE_TRUST_ROOT_SHA256=${{ secrets.ERIN_GOVERNANCE_TRUST_ROOT_SHA256 }}
+            VITE_APP_NAME=Erin
+            VITE_BROADCAST_CONNECTION=reverb
+            VITE_REVERB_PUBLIC_KEY=${{ vars.VITE_REVERB_PUBLIC_KEY }}
+            VITE_REVERB_HOST=${{ vars.VITE_REVERB_HOST }}
+            VITE_REVERB_PORT=443
+            VITE_REVERB_SCHEME=https
+            VITE_LIVEKIT_URL=${{ vars.VITE_LIVEKIT_URL }}
+
+      - name: Build and publish Nginx image by commit
+        id: nginx
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: docker/production/Dockerfile
+          target: nginx
+          push: true
+          provenance: mode=max
+          sbom: true
+          tags: ghcr.io/${{ github.repository }}/nginx:${{ github.sha }}
+          build-args: |
+            ERIN_BUILD_SHA=${{ github.sha }}
+            ERIN_GOVERNANCE_TRUST_ROOT_SHA256=${{ secrets.ERIN_GOVERNANCE_TRUST_ROOT_SHA256 }}
+            VITE_APP_NAME=Erin
+            VITE_BROADCAST_CONNECTION=reverb
+            VITE_REVERB_PUBLIC_KEY=${{ vars.VITE_REVERB_PUBLIC_KEY }}
+            VITE_REVERB_HOST=${{ vars.VITE_REVERB_HOST }}
+            VITE_REVERB_PORT=443
+            VITE_REVERB_SCHEME=https
+            VITE_LIVEKIT_URL=${{ vars.VITE_LIVEKIT_URL }}
+
+      - name: Attest PHP image provenance
+        uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661 # v3
+        with:
+          subject-name: ghcr.io/${{ github.repository }}/app
+          subject-digest: ${{ steps.php.outputs.digest }}
+          push-to-registry: true
+
+      - name: Attest Nginx image provenance
+        uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661 # v3
+        with:
+          subject-name: ghcr.io/${{ github.repository }}/nginx
+          subject-digest: ${{ steps.nginx.outputs.digest }}
+          push-to-registry: true
+
+      - name: Keyless-sign immutable images
+        env:
+          APP_DIGEST: ${{ steps.php.outputs.digest }}
+          NGINX_DIGEST: ${{ steps.nginx.outputs.digest }}
+        run: |
+          cosign sign --yes "ghcr.io/${GITHUB_REPOSITORY}/app@${APP_DIGEST}"
+          cosign sign --yes "ghcr.io/${GITHUB_REPOSITORY}/nginx@${NGINX_DIGEST}"

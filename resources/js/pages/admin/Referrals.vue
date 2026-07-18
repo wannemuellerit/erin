@@ -90,6 +90,7 @@ const filters = reactive({
 const updateForm = useForm({
     status: '',
     reason: '',
+    payout_reference: '',
 });
 
 const { t, formatCurrency, formatDate, humanize } = useAdminI18n();
@@ -117,6 +118,7 @@ function updateReferral(
     status: 'approved' | 'paid' | 'rejected',
 ): void {
     let reason = '';
+    let payoutReference = '';
 
     if (status === 'rejected') {
         const input = window.prompt(t('referrals.rejectionPrompt'));
@@ -126,6 +128,14 @@ function updateReferral(
         }
 
         reason = input.trim();
+    } else if (status === 'paid') {
+        const input = window.prompt(t('referrals.payoutReferencePrompt'));
+
+        if (input === null || input.trim().length < 3) {
+            return;
+        }
+
+        payoutReference = input.trim();
     } else if (
         !window.confirm(
             t('referrals.confirm', {
@@ -139,6 +149,7 @@ function updateReferral(
 
     updateForm.status = status;
     updateForm.reason = reason;
+    updateForm.payout_reference = payoutReference;
     updateForm.patch(adminReferrals.update.url(referral.id), {
         preserveScroll: true,
         onFinish: () => updateForm.reset(),
@@ -179,6 +190,22 @@ function updateReferral(
                 tone="violet"
             />
         </div>
+
+        <p
+            v-if="
+                updateForm.errors.status ||
+                updateForm.errors.reason ||
+                updateForm.errors.payout_reference
+            "
+            role="alert"
+            class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
+        >
+            {{
+                updateForm.errors.status ||
+                updateForm.errors.reason ||
+                updateForm.errors.payout_reference
+            }}
+        </p>
 
         <SectionCard flush>
             <form

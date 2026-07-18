@@ -36,11 +36,12 @@ use NotificationChannels\WebPush\HasPushSubscriptions;
  * @property Carbon|null $last_active_at
  * @property Carbon|null $suspended_at
  * @property Carbon|null $onboarding_completed_at
+ * @property Carbon|null $password_change_required_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read CandidateProfile|null $candidateProfile
  */
-#[Fillable(['name', 'email', 'password', 'role', 'status', 'locale', 'timezone', 'onboarding_completed_at'])]
+#[Fillable(['name', 'email', 'password', 'role', 'status', 'locale', 'timezone', 'onboarding_completed_at', 'password_change_required_at'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 {
@@ -195,6 +196,7 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
             'last_active_at' => 'datetime',
             'suspended_at' => 'datetime',
             'onboarding_completed_at' => 'datetime',
+            'password_change_required_at' => 'datetime',
             /* @chisel-2fa */
             'two_factor_confirmed_at' => 'datetime',
             /* @end-chisel-2fa */

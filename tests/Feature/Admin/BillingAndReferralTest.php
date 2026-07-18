@@ -11,6 +11,7 @@ use App\Models\Referral;
 use App\Models\ReferralCode;
 use App\Models\User;
 use App\Services\Billing\BillingPlanChangeManager;
+use App\Services\Platform\PlatformSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -407,10 +408,29 @@ it('enforces the referral hold period before manual approval and payout', functi
     $this->actingAs($admin)
         ->patch(route('admin.referrals.update', $referral), [
             'status' => ReferralStatus::Paid->value,
+            'payout_reference' => 'BANK-2026-0001',
         ])
         ->assertRedirect();
 
     expect($referral->refresh()->status)->toBe(ReferralStatus::Paid)
         ->and($referral->approved_at)->not->toBeNull()
-        ->and($referral->paid_at)->not->toBeNull();
+        ->and($referral->paid_at)->not->toBeNull()
+        ->and($referral->metadata['payout_reference'])->toBe('BANK-2026-0001');
+});
+
+it('snapshots the configured referral commission when creating a personal code', function () {
+    $candidate = User::factory()->create(['role' => UserRole::Candidate]);
+    app(PlatformSettings::class)->put(
+        'referrals.default_commission_cents',
+        75000,
+        'billing',
+    );
+
+    $this->actingAs($candidate)
+        ->post(route('referrals.create'))
+        ->assertRedirect();
+
+    $code = ReferralCode::query()->where('user_id', $candidate->getKey())->sole();
+    expect($code->commission_cents)->toBe(75000)
+        ->and($code->currency)->toBe('EUR');
 });

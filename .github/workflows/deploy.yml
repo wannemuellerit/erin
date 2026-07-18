@@ -1,0 +1,82 @@
+name: deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Zielumgebung
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      release_sha:
+        description: Vollständiger Commit-SHA eines veröffentlichten Release-Images
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+  attestations: read
+  id-token: write
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.environment }}
+    environment: ${{ inputs.environment }}
+    runs-on:
+      - self-hosted
+      - erin
+      - ${{ inputs.environment }}
+    timeout-minutes: 30
+    steps:
+      - name: Validate immutable release
+        env:
+          RELEASE_SHA: ${{ inputs.release_sha }}
+        run: |
+          printf '%s' "${RELEASE_SHA}" | grep -Eq '^[0-9a-f]{40}$'
+
+      - name: Checkout exact release code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.release_sha }}
+          persist-credentials: false
+
+      - name: Authenticate to GitHub Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify GitHub build attestations
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_SHA: ${{ inputs.release_sha }}
+        run: |
+          gh attestation verify "oci://ghcr.io/${GITHUB_REPOSITORY}/app:${RELEASE_SHA}" --repo "${GITHUB_REPOSITORY}"
+          gh attestation verify "oci://ghcr.io/${GITHUB_REPOSITORY}/nginx:${RELEASE_SHA}" --repo "${GITHUB_REPOSITORY}"
+
+      - name: Deploy, migrate and verify
+        env:
+          ERIN_DEPLOY_CONFIRM: DEPLOY_VERIFIED_RELEASE
+          ERIN_DEPLOY_ENVIRONMENT: ${{ inputs.environment }}
+          ERIN_RELEASE_SHA: ${{ inputs.release_sha }}
+          ERIN_APP_IMAGE: ghcr.io/${{ github.repository }}/app
+          ERIN_NGINX_IMAGE: ghcr.io/${{ github.repository }}/nginx
+          ERIN_DEPLOY_ENV_FILE: ${{ secrets.ERIN_DEPLOY_ENV_FILE }}
+        run: scripts/ops/deploy-release.sh
+
+      - name: Persist deployment evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: deployment-${{ inputs.environment }}-${{ inputs.release_sha }}
+          path: storage/app/operations/evidence/deployments/
+          if-no-files-found: error
+          retention-days: 90

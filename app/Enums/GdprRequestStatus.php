@@ -8,5 +8,6 @@ enum GdprRequestStatus: string
     case Verified = 'verified';
     case Processing = 'processing';
     case Completed = 'completed';
+    case Failed = 'failed';
     case Rejected = 'rejected';
 }

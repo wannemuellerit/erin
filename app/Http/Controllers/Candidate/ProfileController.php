@@ -6,6 +6,7 @@ use App\Enums\CandidateDocumentStatus;
 use App\Enums\CandidateDocumentType;
 use App\Http\Controllers\Controller;
 use App\Jobs\ScanCandidateDocument;
+use App\Jobs\ScanCandidateProfilePhoto;
 use App\Models\CandidateDocument;
 use App\Models\CandidateProfile;
 use App\Models\Language;
@@ -22,6 +23,7 @@ use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProfileController extends Controller
 {
@@ -34,6 +36,13 @@ class ProfileController extends Controller
         return Inertia::render('candidate/Profile', [
             'profile' => [
                 ...Arr::except($profile->toArray(), ['documents']),
+                'profile_photo_url' => $profile->profile_photo_scan_result === 'clean'
+                    && filled($profile->profile_photo_path)
+                    ? URL::temporarySignedRoute(
+                        'candidate.profile.photo',
+                        now()->addMinutes(15),
+                    )
+                    : null,
                 'documents' => $profile->documents->map(
                     fn (CandidateDocument $document): array => [
                         'id' => $document->getKey(),
@@ -63,6 +72,107 @@ class ProfileController extends Controller
             'languages' => Language::query()->orderBy('name_de')->get(),
             'document_types' => collect(CandidateDocumentType::cases())->map->value,
         ]);
+    }
+
+    public function uploadPhoto(
+        Request $request,
+        AuditLogger $audit,
+    ): RedirectResponse {
+        $profile = $request->user()?->candidateProfile()->firstOrFail();
+        $validated = $request->validate([
+            'photo' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png', 'max:10240', 'dimensions:max_width=10000,max_height=10000'],
+        ]);
+        $photo = $request->file('photo');
+        abort_if($photo === null, 422);
+        $path = $photo->store("candidates/{$profile->getKey()}/profile/quarantine", 'private');
+        abort_if($path === false, 500, __('Das Profilbild konnte nicht privat gespeichert werden.'));
+        $previousQuarantine = $profile->profile_photo_quarantine_path;
+
+        try {
+            $profile->update([
+                'profile_photo_quarantine_path' => $path,
+                'profile_photo_disk' => 'private',
+                'profile_photo_original_name' => $photo->getClientOriginalName(),
+                'profile_photo_mime_type' => $photo->getMimeType(),
+                'profile_photo_size_bytes' => $photo->getSize(),
+                'profile_photo_scan_result' => 'pending',
+                'profile_photo_scan_completed_at' => null,
+            ]);
+        } catch (\Throwable $exception) {
+            Storage::disk('private')->delete($path);
+            throw $exception;
+        }
+
+        if (filled($previousQuarantine) && $previousQuarantine !== $path) {
+            Storage::disk('private')->delete((string) $previousQuarantine);
+        }
+        ScanCandidateProfilePhoto::dispatch($profile->getKey(), $path);
+        $audit->record('candidate.profile_photo_uploaded', $profile, after: [
+            'mime_type' => $profile->profile_photo_mime_type,
+            'size_bytes' => $profile->profile_photo_size_bytes,
+            'scan_result' => 'pending',
+        ]);
+
+        return back()->with('success', __('Dein Profilbild wird sicher geprüft.'));
+    }
+
+    public function deletePhoto(
+        Request $request,
+        ProfileCompletenessCalculator $completeness,
+        AuditLogger $audit,
+    ): RedirectResponse {
+        $profile = $request->user()?->candidateProfile()->firstOrFail();
+        $paths = array_values(array_filter([
+            $profile->profile_photo_path,
+            $profile->profile_photo_quarantine_path,
+        ], 'is_string'));
+        Storage::disk($profile->profile_photo_disk ?: 'private')->delete($paths);
+        $before = [
+            'had_photo' => filled($profile->profile_photo_path),
+            'scan_result' => $profile->profile_photo_scan_result,
+        ];
+        $profile->update([
+            'profile_photo_path' => null,
+            'profile_photo_quarantine_path' => null,
+            'profile_photo_original_name' => null,
+            'profile_photo_mime_type' => null,
+            'profile_photo_size_bytes' => null,
+            'profile_photo_scan_result' => null,
+            'profile_photo_scan_completed_at' => null,
+        ]);
+        $this->recalculate($profile, $completeness, true);
+        $audit->record('candidate.profile_photo_deleted', $profile, before: $before);
+
+        return back()->with('success', __('Dein Profilbild wurde gelöscht.'));
+    }
+
+    public function photo(Request $request): StreamedResponse
+    {
+        $profile = $request->user()?->candidateProfile()->firstOrFail();
+        abort_unless(
+            $profile->profile_photo_scan_result === 'clean'
+            && filled($profile->profile_photo_path),
+            404,
+        );
+        $disk = Storage::disk($profile->profile_photo_disk ?: 'private');
+        $path = (string) $profile->profile_photo_path;
+        abort_unless($disk->exists($path), 404);
+        $stream = $disk->readStream($path);
+        abort_unless(is_resource($stream), 404);
+
+        return response()->stream(
+            static function () use ($stream): void {
+                fpassthru($stream);
+                fclose($stream);
+            },
+            200,
+            [
+                'Content-Type' => $profile->profile_photo_mime_type ?: 'image/jpeg',
+                'Cache-Control' => 'private, no-store, max-age=0',
+                'Content-Disposition' => 'inline; filename="profilbild.jpg"',
+                'X-Content-Type-Options' => 'nosniff',
+            ],
+        );
     }
 
     public function update(

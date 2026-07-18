@@ -10,6 +10,7 @@ use App\Models\Company;
 use App\Models\CompanyMedia;
 use App\Models\JobApplication;
 use App\Models\JobInvitation;
+use App\Models\JobMedia;
 use App\Models\JobPosting;
 use App\Models\Referral;
 use App\Notifications\ActivityNotification;
@@ -76,6 +77,59 @@ class MarketplaceController extends Controller
         return Inertia::render('candidate/Jobs', [
             'jobs' => $jobs,
             'filters' => $request->only(['search', 'employment_type', 'visa_support', 'remote']),
+            'can_apply' => $profile->canApply(),
+            'profile_completeness' => $profile->completeness,
+        ]);
+    }
+
+    public function showJob(
+        Request $request,
+        JobPosting $job,
+        CandidateMatchService $matching,
+    ): Response {
+        abort_unless(
+            $job->status === JobStatus::Published && $job->published_at !== null,
+            404,
+        );
+
+        $profile = $request->user()?->candidateProfile()
+            ->with(['skills', 'languages', 'documents'])
+            ->firstOrFail();
+        $job->load([
+            'company.logoMedia',
+            'company.trustMetric',
+            'location',
+            'occupation',
+            'skills',
+            'languages',
+            'screeningQuestions',
+            'media' => fn ($query) => $query
+                ->where('scan_result', 'clean')
+                ->orderBy('original_name'),
+        ]);
+
+        $data = $job->toArray();
+        $data['company'] = $this->serializeCompany($job->company, includeTrustMetrics: true);
+        $data['media'] = $job->media->map(fn (JobMedia $medium): array => [
+            'id' => $medium->getKey(),
+            'name' => $medium->original_name,
+            'mime_type' => $medium->mime_type,
+            'size_bytes' => $medium->size_bytes,
+            'download_url' => URL::temporarySignedRoute(
+                'jobs.media.download',
+                now()->addMinutes(10),
+                ['media' => $medium],
+            ),
+        ])->values()->all();
+
+        return Inertia::render('candidate/JobShow', [
+            'job' => [
+                ...$data,
+                'match' => $matching->for($profile, $job),
+                'already_applied' => $profile->applications()
+                    ->where('job_posting_id', $job->getKey())
+                    ->exists(),
+            ],
             'can_apply' => $profile->canApply(),
             'profile_completeness' => $profile->completeness,
         ]);
@@ -270,6 +324,47 @@ class MarketplaceController extends Controller
             ->map(fn (Company $company): array => $this->serializeCompany($company, includeTrustMetrics: true));
 
         return Inertia::render('candidate/Companies', ['companies' => $companies]);
+    }
+
+    public function showCompany(Request $request, Company $company): Response
+    {
+        abort_unless($company->status->value === 'active', 404);
+
+        $profile = $request->user()?->candidateProfile()->firstOrFail();
+        $company->load([
+            'logoMedia',
+            'trustMetric',
+            'locations' => fn ($query) => $query->orderByDesc('is_headquarters')->orderBy('name'),
+            'media' => fn ($query) => $query
+                ->where('scan_result', 'clean')
+                ->orderBy('id'),
+        ]);
+        $relevantJobs = $company->jobPostings()
+            ->published()
+            ->when(
+                $profile->occupation_id,
+                fn ($query) => $query->where('occupation_id', $profile->occupation_id),
+            )
+            ->with(['location', 'occupation', 'skills'])
+            ->orderByDesc('boosted_until')
+            ->latest('published_at')
+            ->get();
+        abort_if($relevantJobs->isEmpty(), 404);
+
+        $serialized = $this->serializeCompany($company, includeTrustMetrics: true);
+        $serialized['media'] = $company->media
+            ->reject(fn (CompanyMedia $medium): bool => $medium->is($company->logoMedia))
+            ->map(fn (CompanyMedia $medium): array => [
+                'id' => $medium->getKey(),
+                'type' => $medium->type,
+                'name' => $medium->original_name,
+                'url' => $this->mediaUrl($medium),
+            ])->values()->all();
+
+        return Inertia::render('candidate/CompanyShow', [
+            'company' => $serialized,
+            'jobs' => $relevantJobs,
+        ]);
     }
 
     public function respondToInvitation(

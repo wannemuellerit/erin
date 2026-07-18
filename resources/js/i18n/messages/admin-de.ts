@@ -354,6 +354,8 @@ export default {
         holdUntil: 'Haltefrist bis {date}',
         approve: 'Freigeben',
         markPaid: 'Als ausgezahlt markieren',
+        payoutReferencePrompt:
+            'Bitte die externe Auszahlungs- oder Belegreferenz eingeben.',
         reject: 'Ablehnen',
         codeRate: 'Code-Satz: {amount}',
         clickedAt: 'Klick {date}',
@@ -633,6 +635,11 @@ export default {
             dueAt: 'Frist',
             saveStatus: 'Status speichern',
             saveRequest: 'Anfrage speichern',
+            legalHold: 'Legal Hold',
+            legalHoldHint:
+                'Sperrt Löschläufe, solange eine dokumentierte Aufbewahrungspflicht besteht.',
+            legalHoldReason: 'Begründung des Legal Holds',
+            downloadExport: 'Verschlüsselten Export einmalig herunterladen',
         },
         access: {
             title: 'Blacklist & Whitelist',

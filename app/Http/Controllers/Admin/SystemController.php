@@ -10,6 +10,7 @@ use App\Models\GdprRequest;
 use App\Models\IntegrationReceipt;
 use App\Models\LoginHistory;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\URL;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -32,9 +33,19 @@ class SystemController extends AdminController
                     'id',
                     'user_id',
                     'handled_by',
+                    'verified_by',
+                    'approved_by',
                     'type',
                     'status',
                     'reason',
+                    'legal_hold',
+                    'legal_hold_reason',
+                    'processing_started_at',
+                    'failed_at',
+                    'failure_reason',
+                    'export_expires_at',
+                    'downloaded_at',
+                    'result_summary',
                     'verified_at',
                     'due_at',
                     'completed_at',
@@ -44,13 +55,30 @@ class SystemController extends AdminController
                 ->with([
                     'user:id,name,email,role,status',
                     'handler:id,name,email',
+                    'verifier:id,name,email',
+                    'approver:id,name,email',
                 ])
                 ->orderByRaw(
                     "case status when 'requested' then 0 when 'verified' then 1 when 'processing' then 2 else 3 end",
                 )
                 ->latest('created_at')
                 ->paginate(10, pageName: 'gdpr_page')
-                ->withQueryString(),
+                ->withQueryString()
+                ->through(function (GdprRequest $request): array {
+                    $data = $request->toArray();
+                    $data['download_url'] = $request->type === 'export'
+                        && $request->status === GdprRequestStatus::Completed
+                        && $request->downloaded_at === null
+                        && ($request->export_expires_at?->isFuture() ?? false)
+                            ? URL::temporarySignedRoute(
+                                'admin.gdpr-requests.download',
+                                now()->addMinutes(10),
+                                ['gdprRequest' => $request],
+                            )
+                            : null;
+
+                    return $data;
+                }),
             'gdpr_statuses' => array_map(
                 static fn (GdprRequestStatus $status): string => $status->value,
                 GdprRequestStatus::cases(),

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 import { Building2, Clock3, MapPin, ShieldCheck, Users } from '@lucide/vue';
 import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
@@ -7,6 +7,7 @@ import PageHeader from '@/components/product/PageHeader.vue';
 import SearchField from '@/components/product/SearchField.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
 import { useFormatters } from '@/composables/useFormatters';
+import { show } from '@/routes/candidate/companies';
 
 type Company = {
     id: number;
@@ -169,6 +170,12 @@ const benefitLabel = (benefit: string) => {
                         >{{ benefitLabel(benefit) }}</span
                     >
                 </div>
+                <Link
+                    :href="show.url(company.id)"
+                    class="mt-4 inline-flex h-10 items-center rounded-xl border border-slate-200 px-4 text-xs font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700"
+                >
+                    {{ t('candidate.jobDetail.companyProfile') }}
+                </Link>
             </article>
         </div>
         <div

@@ -2,6 +2,39 @@
 
 set -eu
 
+load_secret_file() {
+    secret_path="${ERIN_RUNTIME_ENV_FILE:-}"
+
+    if [ -z "$secret_path" ]; then
+        return
+    fi
+
+    if [ ! -r "$secret_path" ]; then
+        echo "Die konfigurierte Runtime-Secret-Datei ist nicht lesbar." >&2
+        exit 1
+    fi
+
+    while IFS= read -r line || [ -n "$line" ]; do
+        case "$line" in
+            ""|\#*)
+                continue
+                ;;
+        esac
+
+        key="${line%%=*}"
+        value="${line#*=}"
+
+        if ! printf '%s' "$key" | grep -Eq '^[A-Z][A-Z0-9_]*$'; then
+            echo "Die Runtime-Secret-Datei enthält einen ungültigen Schlüssel." >&2
+            exit 1
+        fi
+
+        export "$key=$value"
+    done < "$secret_path"
+}
+
+load_secret_file
+
 if [ "${APP_ENV:-production}" = "production" ] && [ "${APP_DEMO_MODE:-false}" = "true" ]; then
     echo "APP_DEMO_MODE darf in der Produktion nicht aktiviert sein." >&2
     exit 1
@@ -34,6 +67,11 @@ if [ "${APP_ENV:-production}" = "production" ]; then
         echo "Build-SHA, Laufzeit-SHA und unveränderliches Image-Tag stimmen nicht überein." >&2
         exit 1
     fi
+fi
+
+if [ "${APP_ENV:-production}" = "production" ] && [ -z "${APP_KEY:-}" ]; then
+    echo "APP_KEY fehlt in der Runtime-Secret-Datei oder Umgebung." >&2
+    exit 1
 fi
 
 mkdir -p \

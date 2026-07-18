@@ -134,6 +134,7 @@ it('keeps every governance mutation restricted to superadmins', function () {
 
 it('creates and advances gdpr requests without hard deletion and audits each mutation', function () {
     $admin = User::factory()->create(['role' => UserRole::SuperAdmin]);
+    $approver = User::factory()->create(['role' => UserRole::SuperAdmin]);
     $subject = User::factory()->create();
 
     $this->actingAs($admin)
@@ -183,10 +184,10 @@ it('creates and advances gdpr requests without hard deletion and audits each mut
         ->and($gdprRequest->verified_at)->not->toBeNull()
         ->and($gdprRequest->completed_at)->toBeNull();
 
-    $this->actingAs($admin)
+    $this->actingAs($approver)
         ->patch(route('admin.gdpr-requests.update', $gdprRequest), [
             'type' => 'delete',
-            'status' => GdprRequestStatus::Completed->value,
+            'status' => GdprRequestStatus::Processing->value,
             'reason' => 'Daten wurden pseudonymisiert',
             'due_at' => now()->addWeek()->toIso8601String(),
         ])

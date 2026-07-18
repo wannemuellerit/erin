@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, router, useForm } from '@inertiajs/vue3';
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { BriefcaseBusiness, Clock3, MapPin } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
@@ -12,6 +12,7 @@ import { useFormatters } from '@/composables/useFormatters';
 import { useLocalizedField } from '@/composables/useLocalizedField';
 import { jobs as jobsIndex } from '@/routes/candidate';
 import { apply } from '@/routes/candidate/jobs';
+import { show } from '@/routes/candidate/jobs';
 
 type Job = {
     id: number;
@@ -321,6 +322,12 @@ const employmentTypeLabel = (value: string) => {
                         :label="t('candidate.jobs.alreadyApplied')"
                         tone="green"
                     />
+                    <Link
+                        :href="show.url(job.id)"
+                        class="h-10 rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700"
+                    >
+                        {{ t('candidate.jobDetail.overview') }}
+                    </Link>
                 </div>
                 <form
                     v-if="applyingJobId === job.id"

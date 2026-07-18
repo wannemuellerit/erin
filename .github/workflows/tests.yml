@@ -85,6 +85,11 @@ jobs:
       - name: Install PHP dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
+      - name: Verify PHP platform requirements
+        run: |
+          php -v
+          composer check-platform-reqs
+
       - name: Install Node dependencies
         run: npm ci --no-audit --no-fund
 
@@ -95,11 +100,62 @@ jobs:
           php artisan migrate --force --no-interaction
           php artisan wayfinder:generate --with-form
 
+      - name: Check PHP formatting
+        run: composer lint:check
+
+      - name: Run PHPStan Level 7
+        run: composer types:check
+
+      - name: Run Pest
+        run: php vendor/bin/pest --colors=always
+
+      - name: Check ESLint
+        run: npm run lint:check
+
+      - name: Check Prettier
+        run: npm run format:check
+
+      - name: Check i18n catalogs and UI literals
+        run: npm run i18n:check
+
+      - name: Check Vue and TypeScript
+        run: npm run types:check
+
       - name: Build production assets
         run: npm run build
 
-      - name: Run CI Checks
-        run: composer ci:check
+  production-image:
+    name: Production image
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build production Nginx and PHP images
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: docker/production/Dockerfile
+          target: nginx
+          push: false
+          provenance: false
+          sbom: false
+          build-args: |
+            ERIN_BUILD_SHA=${{ github.sha }}
+            ERIN_GOVERNANCE_TRUST_ROOT_SHA256=0000000000000000000000000000000000000000000000000000000000000000
+            VITE_APP_NAME=Erin
+            VITE_BROADCAST_CONNECTION=reverb
+            VITE_REVERB_HOST=localhost
+            VITE_REVERB_PORT=443
+            VITE_REVERB_SCHEME=https
+          cache-from: type=gha,scope=production-image
+          cache-to: type=gha,mode=max,scope=production-image
 
   e2e:
     runs-on: ubuntu-latest

@@ -37,6 +37,16 @@ class UpdateReferralRequest extends FormRequest
                 'min:5',
                 'max:1000',
             ],
+            'payout_reference' => [
+                Rule::requiredIf(
+                    fn (): bool => $this->input('status') === ReferralStatus::Paid->value,
+                ),
+                'nullable',
+                'string',
+                'min:3',
+                'max:180',
+                'regex:/^[A-Za-z0-9][A-Za-z0-9._:\/-]*$/',
+            ],
         ];
     }
 }

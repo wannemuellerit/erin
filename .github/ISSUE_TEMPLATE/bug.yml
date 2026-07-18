@@ -1,0 +1,43 @@
+name: Fehlerbericht
+description: Reproduzierbarer Fehler in Erin
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Beobachtetes Verhalten
+      description: Was ist passiert?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Erwartetes Verhalten
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduktion
+      description: Rolle, Route, Eingaben und genaue Schritte ohne Geheimnisse angeben.
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Auswirkung
+      options:
+        - Einzelne Funktion eingeschränkt
+        - Kernprozess blockiert
+        - Sicherheits- oder Datenschutzrisiko
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Datenschutz
+      options:
+        - label: Der Bericht enthält keine Passwörter, Tokens oder personenbezogenen Dokumente.
+          required: true
