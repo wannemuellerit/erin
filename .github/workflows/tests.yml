@@ -106,6 +106,9 @@ jobs:
       - name: Run PHPStan Level 7
         run: composer types:check
 
+      - name: Build production assets
+        run: npm run build
+
       - name: Run Pest
         run: php vendor/bin/pest --colors=always
 
@@ -120,9 +123,6 @@ jobs:
 
       - name: Check Vue and TypeScript
         run: npm run types:check
-
-      - name: Build production assets
-        run: npm run build
 
   production-image:
     name: Production image

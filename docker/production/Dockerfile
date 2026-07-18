@@ -9,6 +9,7 @@ ENV COMPOSER_ALLOW_SUPERUSER=1 \
     PATH="/app/vendor/bin:${PATH}"
 
 RUN apt-get update \
+    && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends \
         $PHPIZE_DEPS \
         git \
