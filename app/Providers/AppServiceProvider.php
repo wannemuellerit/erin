@@ -18,8 +18,13 @@ use App\Services\Ticketing\NullTicketingProvider;
 use App\Services\Ticketing\ZammadTicketingProvider;
 use App\Services\Video\LiveKitVideoProvider;
 use Carbon\CarbonImmutable;
+use Illuminate\Queue\Events\JobExceptionOccurred;
+use Illuminate\Queue\Events\JobProcessed;
+use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Cashier\Cashier;
@@ -66,6 +71,28 @@ class AppServiceProvider extends ServiceProvider
         Stripe::setMaxNetworkRetries(
             (int) config('cashier.network_retries', 2),
         );
+        Queue::before(static function (JobProcessing $event): void {
+            Log::withContext([
+                'queue_connection' => $event->connectionName,
+                'queue_name' => $event->job->getQueue(),
+                'job_uuid' => $event->job->uuid(),
+            ])->info('queue.job.processing');
+        });
+        Queue::after(static function (JobProcessed $event): void {
+            Log::info('queue.job.processed', [
+                'queue_connection' => $event->connectionName,
+                'queue_name' => $event->job->getQueue(),
+                'job_uuid' => $event->job->uuid(),
+            ]);
+        });
+        Queue::exceptionOccurred(static function (JobExceptionOccurred $event): void {
+            Log::error('queue.job.failed', [
+                'queue_connection' => $event->connectionName,
+                'queue_name' => $event->job->getQueue(),
+                'job_uuid' => $event->job->uuid(),
+                'exception_class' => $event->exception::class,
+            ]);
+        });
 
         $this->configureDefaults();
     }

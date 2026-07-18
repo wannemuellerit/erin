@@ -121,6 +121,9 @@ class ReferralController extends AdminController
         if (filled($validated['reason'] ?? null)) {
             $metadata['admin_reason'] = $validated['reason'];
         }
+        if ($nextStatus === ReferralStatus::Paid) {
+            $metadata['payout_reference'] = $validated['payout_reference'];
+        }
 
         $referral->update([
             'status' => $nextStatus,

@@ -124,6 +124,17 @@ export default {
         madeInGermany: 'Made in Germany',
         privacy: 'Datenschutz',
         imprint: 'Impressum',
+        bootstrapAdmin: {
+            metaTitle: 'Superadmin sicher einrichten',
+            title: 'Superadmin-Zugang aktivieren',
+            description:
+                'Lege ein einmaliges Startpasswort fest. Danach sind ein erneuter Passwortwechsel und Zwei-Faktor-Authentifizierung verpflichtend.',
+            secureTitle: 'Einmalige, kurzlebige Einladung',
+            expires:
+                'Dieser Link läuft am {date} ab und kann nur einmal verwendet werden.',
+            password: 'Sicheres Startpasswort',
+            submit: 'Superadmin-Zugang aktivieren',
+        },
     },
     public: {
         common: {

@@ -130,9 +130,12 @@ Vite service or public development server in this stack.
 
 Use [`docker/production/env.example`](docker/production/env.example) as the
 variable inventory and provide the real values through the deployment secret
-manager. Keep the production file separate from the local `.env`; Compose reads
-the selected file during interpolation, including build arguments. Then build
-and run the one-shot migration before starting the services:
+manager. `ERIN_RUNTIME_ENV_SECRET_FILE` points to a root-readable runtime
+secret file mounted through Docker Secrets; it is loaded only by the
+entrypoint and must never enter an image layer or repository. Keep the
+production file separate from the local `.env`; Compose reads the selected file
+during interpolation, including build arguments. Then build and run the
+one-shot migration before starting the services:
 
 ```bash
 cp docker/production/env.example .env.production
@@ -154,10 +157,27 @@ MySQL, Redis, Meilisearch, MinIO initialization and ClamAV are ready. The
 service worker is always served with explicit no-cache headers so browser-push
 updates are not pinned behind an immutable asset cache.
 
-`TRUSTED_PROXIES=*` is appropriate for the supplied topology because PHP-FPM
-has no published port and only accepts requests from the internal Nginx
-service. Restrict it to the concrete proxy CIDRs if the deployment exposes
-PHP-FPM through another network path.
+Wildcard proxy trust is rejected. `TRUSTED_PROXIES` must contain only the
+explicit internal Docker CIDR and any separately reviewed ingress proxy CIDRs.
+
+## Release, Betrieb und Wiederherstellung
+
+Die Workflows sind bewusst in getrennte, diagnostizierbare Gates aufgeteilt:
+
+- `tests`: Pint, PHPStan Level 7, Pest, Vue-Typecheck, ESLint, Prettier,
+  i18n und Vite-Build.
+- `security`: Composer-/npm-Audit, PHPStan, CodeQL, Gitleaks, Trivy und SPDX-SBOM.
+- `release-images`: SHA-getaggte Images, Provenienz und keyless Cosign-Signatur.
+- `deploy`: Attestierungsprüfung, Readiness, gesperrte Migration, Smoke-Test und
+  automatischer App-Rollback.
+- `encrypted-backup`: alle sechs Stunden verschlüsseltes MySQL-/MinIO-Backup
+  in ein getrenntes Restic-Ziel mit Check und Retention.
+
+Die ausführbaren Abläufe und Entscheidungspunkte stehen in
+[`docs/operations/deployment-runbook.md`](docs/operations/deployment-runbook.md),
+[`docs/operations/backup-restore-drill.md`](docs/operations/backup-restore-drill.md)
+und
+[`docs/operations/incident-runbooks.md`](docs/operations/incident-runbooks.md).
 
 ## Billing and external services
 

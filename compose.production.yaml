@@ -3,7 +3,8 @@ name: erin-production
 x-app-environment: &app-environment
   APP_NAME: ${APP_NAME:-Erin}
   APP_ENV: production
-  APP_KEY: ${APP_KEY:?APP_KEY must be set}
+  APP_KEY: ${APP_KEY:-}
+  ERIN_RUNTIME_ENV_FILE: /run/secrets/erin_runtime_env
   APP_DEBUG: "false"
   APP_URL: ${APP_URL:?APP_URL must be set}
   APP_DEMO_MODE: "false"
@@ -226,7 +227,14 @@ x-app-service: &app-service
   environment: *app-environment
   volumes:
     - app-runtime:/app/storage
+    - app-cache:/app/bootstrap/cache
+  read_only: true
+  tmpfs:
+    - /tmp:size=128m,mode=1777
   secrets:
+    - source: erin_runtime_env
+      target: erin_runtime_env
+      mode: 0400
     - source: erin_governance_attestation
       target: erin_governance_attestation
       mode: 0444
@@ -249,7 +257,7 @@ x-app-service: &app-service
 
 services:
   mysql:
-    image: mysql:8.4
+    image: mysql:8.4@sha256:c592c15aaf4a1961e15d82eb31ea5987dda862d1c4b1e93424438c0e91dc1f8d
     restart: unless-stopped
     environment:
       MYSQL_DATABASE: ${DB_DATABASE:-erin}
@@ -270,7 +278,7 @@ services:
       start_period: 30s
 
   redis:
-    image: redis:7.4-alpine
+    image: redis:7.4-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
     command:
       - /bin/sh
       - -ec
@@ -295,7 +303,7 @@ services:
       retries: 20
 
   meilisearch:
-    image: getmeili/meilisearch:v1.16.0
+    image: getmeili/meilisearch:v1.16.0@sha256:c0c45cb82a96221d7c855d1cc36ca04ff4b3ce6330fbd8df5ba82e86e632a053
     restart: unless-stopped
     environment:
       MEILI_ENV: production
@@ -310,7 +318,7 @@ services:
       retries: 20
 
   minio:
-    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
     command: ["server", "/data", "--console-address", ":9001"]
     restart: unless-stopped
     environment:
@@ -325,7 +333,7 @@ services:
       retries: 20
 
   minio-init:
-    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
     restart: "no"
     depends_on:
       minio:
@@ -355,7 +363,7 @@ services:
         rm -f /tmp/erin-app-bucket-policy.json
 
   clamav:
-    image: clamav/clamav:1.4
+    image: clamav/clamav:1.4@sha256:e7ead98e7e07231b151bce988e0cfb0a3b46e6e7046d9dd44fd838c0df724a03
     restart: unless-stopped
     volumes:
       - clamav-data:/var/lib/clamav
@@ -399,15 +407,22 @@ services:
         VITE_REVERB_SCHEME: ${VITE_REVERB_SCHEME:-https}
         VITE_LIVEKIT_URL: ${LIVEKIT_URL:-}
     restart: unless-stopped
+    read_only: true
+    user: "101:101"
+    entrypoint: ["nginx", "-g", "daemon off;"]
+    tmpfs:
+      - /var/cache/nginx:size=64m,mode=0755,uid=101,gid=101
+      - /var/run:size=8m,mode=0755,uid=101,gid=101
+      - /tmp:size=16m,mode=1777
     ports:
-      - "${HTTP_PORT:-80}:80"
+      - "${HTTP_PORT:-80}:8080"
     depends_on:
       php-fpm:
         condition: service_healthy
       reverb:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/up"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8080/up"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -447,6 +462,8 @@ services:
     command: ["php", "artisan", "migrate", "--force", "--isolated"]
 
 secrets:
+  erin_runtime_env:
+    file: ${ERIN_RUNTIME_ENV_SECRET_FILE:?ERIN_RUNTIME_ENV_SECRET_FILE must be set}
   erin_governance_attestation:
     file: ${ERIN_GOVERNANCE_ATTESTATION_FILE:?ERIN_GOVERNANCE_ATTESTATION_FILE must be set}
   erin_governance_trust_root:
@@ -454,6 +471,7 @@ secrets:
 
 volumes:
   app-runtime:
+  app-cache:
   mysql-data:
   redis-data:
   meilisearch-data:

@@ -19,6 +19,12 @@ class RecordAuthenticationHistory
         if ($email === null) {
             return;
         }
+        if ($user === null && $event instanceof Failed) {
+            $user = User::query()
+                ->select(['id', 'email'])
+                ->whereRaw('LOWER(email) = ?', [$email])
+                ->first();
+        }
 
         LoginHistory::query()->create([
             'user_id' => $user?->getKey(),

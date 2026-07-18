@@ -6,6 +6,7 @@ use App\Enums\ReferralStatus;
 use App\Enums\UserRole;
 use App\Models\Referral;
 use App\Models\ReferralCode;
+use App\Services\Platform\PlatformSettings;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
@@ -56,8 +57,10 @@ class ReferralController extends Controller
         );
     }
 
-    public function create(Request $request): RedirectResponse
-    {
+    public function create(
+        Request $request,
+        PlatformSettings $settings,
+    ): RedirectResponse {
         $user = $request->user();
         abort_if($user === null, 401);
 
@@ -65,7 +68,10 @@ class ReferralController extends Controller
             ['is_active' => true],
             [
                 'code' => $this->uniqueCode(),
-                'commission_cents' => 0,
+                'commission_cents' => max(
+                    0,
+                    (int) $settings->get('referrals.default_commission_cents', 0),
+                ),
                 'currency' => 'EUR',
             ],
         );

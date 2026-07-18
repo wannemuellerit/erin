@@ -61,7 +61,6 @@ it('covers every static backend translation key in matching German and English c
     $literalKeys = backendTranslationLiteralKeys();
     $german = backendTranslationJson('de');
     $english = backendTranslationJson('en');
-
     expect(array_keys($german))
         ->toEqualCanonicalizing(array_keys($english))
         ->and(array_diff($literalKeys, array_keys($german)))

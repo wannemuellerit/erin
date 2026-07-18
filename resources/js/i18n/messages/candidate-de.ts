@@ -56,6 +56,20 @@ export default {
             permanent: 'Unbefristet',
         },
     },
+    jobDetail: {
+        back: 'Zurück zu den Jobs',
+        overview: 'Stelle im Überblick',
+        location: 'Arbeitsort',
+        hours: 'Stunden pro Woche',
+        experience: 'Erwartete Erfahrung',
+        years: '{count} Jahre',
+        languages: 'Sprachanforderungen',
+        languageOpen: 'Keine besonderen Sprachanforderungen angegeben',
+        media: 'Geprüfte Dokumente und Medien',
+        company: 'Unternehmen',
+        companyProfile: 'Unternehmensprofil ansehen',
+        application: 'Bewerbung',
+    },
     companies: {
         metaTitle: 'Unternehmen',
         eyebrow: 'Arbeitgeber entdecken',
@@ -81,6 +95,23 @@ export default {
             work_clothes: 'Arbeitskleidung',
             company_vehicle: 'Firmenfahrzeug',
         },
+    },
+    companyDetail: {
+        back: 'Zurück zu den Unternehmen',
+        descriptionMissing:
+            'Dieses Unternehmen hat noch keine Beschreibung veröffentlicht.',
+        topCompany: 'Top Unternehmen',
+        trust: 'Vertrauenskennzahlen',
+        responseRate: 'Antwortquote',
+        interviewAttendance: 'Interview-Teilnahme',
+        contractCompliance: 'Vertragstreue',
+        trustThreshold:
+            'Kennzahlen werden zum Schutz aller Beteiligten erst ab fünf qualifizierten Fällen veröffentlicht.',
+        jobs: 'Passende aktive Stellen',
+        media: 'Einblicke in das Unternehmen',
+        facts: 'Unternehmensdaten',
+        benefits: 'Benefits',
+        locations: 'Standorte',
     },
     interviews: {
         metaTitle: 'Interviews',
@@ -188,6 +219,16 @@ export default {
         completeness: 'Profil vollständig',
         stopPublishing: 'Veröffentlichung stoppen',
         publish: 'Profil veröffentlichen',
+        photo: {
+            title: 'Profilbild',
+            description:
+                'Das Bild bleibt privat, wird auf Schadsoftware geprüft und erscheint nie in anonymisierten Suchkarten.',
+            choose: 'JPG oder PNG auswählen',
+            upload: 'Profilbild sicher hochladen',
+            delete: 'Profilbild löschen',
+            pending: 'Sicherheitsprüfung läuft',
+            failed: 'Das Bild konnte nicht sicher verarbeitet werden. Bitte lade es erneut hoch.',
+        },
         tabs: {
             personal: 'Persönliche Daten',
             profession: 'Beruf & Mobilität',

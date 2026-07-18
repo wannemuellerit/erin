@@ -8,6 +8,7 @@ use App\Services\Ticketing\SupportWebhookOutboxDispatcher;
 use App\Services\Ticketing\SupportZammadWebhookInboxDispatcher;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schedule;
 
@@ -50,6 +51,13 @@ Schedule::command('erin:reminders:send-due')
 
 Schedule::command('erin:ops:queue-health --json')
     ->everyFiveMinutes()
+    ->onOneServer()
+    ->withoutOverlapping();
+
+Schedule::call(
+    fn (): bool => Cache::put('erin:ops:scheduler-heartbeat', now()->toIso8601String(), now()->addMinutes(3)),
+)->name('erin:ops:scheduler-heartbeat')
+    ->everyMinute()
     ->onOneServer()
     ->withoutOverlapping();
 

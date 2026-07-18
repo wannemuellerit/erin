@@ -351,6 +351,8 @@ export default {
         holdUntil: 'Holding period until {date}',
         approve: 'Approve',
         markPaid: 'Mark as paid',
+        payoutReferencePrompt:
+            'Enter the external payout or receipt reference.',
         reject: 'Reject',
         codeRate: 'Code rate: {amount}',
         clickedAt: 'Click {date}',
@@ -629,6 +631,11 @@ export default {
             dueAt: 'Deadline',
             saveStatus: 'Save status',
             saveRequest: 'Save request',
+            legalHold: 'Legal hold',
+            legalHoldHint:
+                'Blocks deletion runs while a documented retention obligation applies.',
+            legalHoldReason: 'Legal hold reason',
+            downloadExport: 'Download encrypted export once',
         },
         access: {
             title: 'Blocklist & allowlist',

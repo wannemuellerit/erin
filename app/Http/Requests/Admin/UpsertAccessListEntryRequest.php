@@ -4,6 +4,8 @@ namespace App\Http\Requests\Admin;
 
 use App\Enums\UserRole;
 use App\Models\AccessListEntry;
+use App\Models\User;
+use App\Services\Access\AccessListResolver;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -63,6 +65,17 @@ class UpsertAccessListEntryRequest extends FormRequest
                     __('Der Wert passt nicht zum gewählten Eintragstyp.'),
                 );
             }
+
+            if (
+                $valid
+                && $this->string('list_type')->toString() === 'blacklist'
+                && $this->wouldBlockEverySuperAdmin()
+            ) {
+                $validator->errors()->add(
+                    'value',
+                    __('Diese Regel würde den letzten erreichbaren Superadmin aussperren.'),
+                );
+            }
         });
     }
 
@@ -80,10 +93,37 @@ class UpsertAccessListEntryRequest extends FormRequest
             $value = rtrim($value, '.');
         }
 
+        if ($subjectType === 'ip') {
+            $value = app(AccessListResolver::class)->normalizeIp($value) ?? $value;
+        }
+
         $this->merge([
             'list_type' => $listType,
             'subject_type' => $subjectType,
             'value' => $value,
         ]);
+    }
+
+    private function wouldBlockEverySuperAdmin(): bool
+    {
+        $resolver = app(AccessListResolver::class);
+        $subjectType = $this->string('subject_type')->toString();
+        $value = $this->string('value')->toString();
+        $admins = User::query()->where('role', UserRole::SuperAdmin->value)->get(['email']);
+
+        if ($admins->isEmpty() || $subjectType === 'ip') {
+            return false;
+        }
+
+        return $admins->every(function (User $admin) use ($resolver, $subjectType, $value): bool {
+            if ($subjectType === 'email') {
+                return $resolver->normalizeEmail($admin->email) === $value;
+            }
+
+            $domain = strrchr($resolver->normalizeEmail($admin->email) ?? '', '@');
+            $domain = $resolver->normalizeDomain($domain === false ? null : substr($domain, 1));
+
+            return $domain === $value || ($domain !== null && str_ends_with($domain, '.'.$value));
+        });
     }
 }

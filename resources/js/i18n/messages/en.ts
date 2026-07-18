@@ -122,6 +122,16 @@ export default {
         madeInGermany: 'Made in Germany',
         privacy: 'Privacy',
         imprint: 'Legal notice',
+        bootstrapAdmin: {
+            metaTitle: 'Securely set up super admin',
+            title: 'Activate super admin access',
+            description:
+                'Set a one-time initial password. A second password change and two-factor authentication are required afterwards.',
+            secureTitle: 'Single-use, short-lived invitation',
+            expires: 'This link expires on {date} and can only be used once.',
+            password: 'Secure initial password',
+            submit: 'Activate super admin access',
+        },
     },
     public: {
         common: {

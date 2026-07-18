@@ -72,6 +72,9 @@ Route::middleware(['auth', 'verified', 'role:super_admin,support', 'staff.2fa'])
                 ->name('gdpr-requests.store');
             Route::patch('system/gdpr-requests/{gdprRequest}', [GdprRequestController::class, 'update'])
                 ->name('gdpr-requests.update');
+            Route::get('system/gdpr-requests/{gdprRequest}/download', [GdprRequestController::class, 'download'])
+                ->middleware(['signed', 'throttle:10,1'])
+                ->name('gdpr-requests.download');
             Route::post('system/access-list', [AccessListEntryController::class, 'store'])
                 ->name('access-list.store');
             Route::patch('system/access-list/{accessListEntry}', [AccessListEntryController::class, 'update'])

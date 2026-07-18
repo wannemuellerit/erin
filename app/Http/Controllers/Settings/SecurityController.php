@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Settings;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\PasswordUpdateRequest;
 use App\Http\Requests\Settings\TwoFactorAuthenticationRequest;
+use App\Services\Audit\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
@@ -59,11 +60,23 @@ class SecurityController extends Controller
     /**
      * Update the user's password.
      */
-    public function update(PasswordUpdateRequest $request): RedirectResponse
-    {
+    public function update(
+        PasswordUpdateRequest $request,
+        AuditLogger $audit,
+    ): RedirectResponse {
+        $requiredAt = $request->user()->password_change_required_at;
         $request->user()->update([
             'password' => $request->password,
+            'password_change_required_at' => null,
         ]);
+
+        $audit->record(
+            'security.password_updated',
+            $request->user(),
+            before: ['password_change_required_at' => $requiredAt?->toIso8601String()],
+            after: ['password_change_required_at' => null],
+            metadata: ['bootstrap_requirement_completed' => $requiredAt !== null],
+        );
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Password updated.')]);
 

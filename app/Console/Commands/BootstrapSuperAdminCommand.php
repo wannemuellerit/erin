@@ -2,60 +2,43 @@
 
 namespace App\Console\Commands;
 
-use App\Enums\UserRole;
-use App\Enums\UserStatus;
+use App\Models\AdminBootstrapInvitation;
 use App\Models\User;
+use App\Services\Audit\AuditLogger;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rules\Password;
+use Illuminate\Support\Str;
 
 class BootstrapSuperAdminCommand extends Command
 {
     protected $signature = 'erin:bootstrap-admin
         {--email= : E-Mail-Adresse des Superadmins}
         {--name= : Anzeigename des Superadmins}
-        {--password= : Starkes initiales Passwort; bevorzugt interaktiv oder per Secret-Umgebungsvariable}
+        {--expires=30 : Gültigkeit der einmaligen Einladung in Minuten}
         {--force : Eine bestehende Identität bewusst zum Superadmin hochstufen}';
 
-    protected $description = 'Erstellt den ersten verifizierten Erin-Superadmin ohne Demo-Zugangsdaten.';
+    protected $description = 'Erzeugt eine kurzlebige, einmalig verwendbare Einladung für den ersten Erin-Superadmin.';
 
-    public function handle(): int
+    public function handle(AuditLogger $audit): int
     {
         $email = trim((string) ($this->option('email') ?: config('erin.bootstrap_admin.email')));
         $name = trim((string) ($this->option('name') ?: config('erin.bootstrap_admin.name', 'Erin Superadmin')));
-        $password = (string) ($this->option('password') ?: config('erin.bootstrap_admin.password'));
+        $expires = (int) $this->option('expires');
+        $allowRoleChange = (bool) $this->option('force');
 
         if ($email === '' && $this->input->isInteractive()) {
             $email = trim((string) $this->ask('E-Mail-Adresse'));
         }
 
-        if ($password === '' && $this->input->isInteractive()) {
-            $password = (string) $this->secret('Initiales Passwort (mindestens 16 Zeichen)');
-        }
-
         $validator = Validator::make([
             'email' => $email,
             'name' => $name,
-            'password' => $password,
+            'expires' => $expires,
         ], [
             'email' => ['required', 'email:rfc', 'max:255'],
             'name' => ['required', 'string', 'max:120'],
-            'password' => [
-                'required',
-                'string',
-                Password::min(16)->mixedCase()->letters()->numbers()->symbols(),
-                function (string $attribute, mixed $value, \Closure $fail): void {
-                    if (is_string($value) && in_array(mb_strtolower($value), [
-                        'password',
-                        'password123!',
-                        'admin',
-                        'admin123!',
-                    ], true)) {
-                        $fail('Das initiale Passwort darf kein bekanntes Demo- oder Standardpasswort sein.');
-                    }
-                },
-            ],
+            'expires' => ['required', 'integer', 'min:5', 'max:120'],
         ]);
 
         if ($validator->fails()) {
@@ -74,25 +57,54 @@ class BootstrapSuperAdminCommand extends Command
             return self::FAILURE;
         }
 
-        $user = DB::transaction(function () use ($existing, $email, $name, $password): User {
-            $user = $existing ?? new User;
-            $user->forceFill([
-                'name' => $name,
+        if ($existing !== null && $existing->isSuperAdmin() && ! $this->option('force')) {
+            $this->error('Für diese E-Mail existiert bereits ein Superadmin. Nutze --force nur für eine bewusst geprüfte Wiederherstellung.');
+
+            return self::FAILURE;
+        }
+
+        $plainToken = Str::random(64);
+        $invitation = DB::transaction(function () use (
+            $audit,
+            $email,
+            $expires,
+            $name,
+            $plainToken,
+            $allowRoleChange,
+        ): AdminBootstrapInvitation {
+            AdminBootstrapInvitation::query()
+                ->where('email', $email)
+                ->whereNull('used_at')
+                ->update(['used_at' => now()]);
+
+            $invitation = AdminBootstrapInvitation::query()->create([
                 'email' => $email,
-                'email_verified_at' => $user->email_verified_at ?? now(),
-                'password' => $password,
-                'role' => UserRole::SuperAdmin,
-                'status' => UserStatus::Active,
-                'locale' => 'de',
-                'timezone' => 'Europe/Berlin',
-                'onboarding_completed_at' => $user->onboarding_completed_at ?? now(),
-            ])->save();
+                'name' => $name,
+                'token_hash' => hash('sha256', $plainToken),
+                'allow_role_change' => $allowRoleChange,
+                'expires_at' => now()->addMinutes($expires),
+            ]);
 
-            return $user;
-        });
+            $audit->record(
+                'admin.bootstrap.invitation_created',
+                $invitation,
+                after: [
+                    'email' => $email,
+                    'expires_at' => $invitation->expires_at->toIso8601String(),
+                    'allow_role_change' => $invitation->allow_role_change,
+                ],
+            );
 
-        $this->info(sprintf('Superadmin %s wurde sicher bereitgestellt.', $user->email));
-        $this->warn('Aktiviere nach dem ersten Login sofort die Zwei-Faktor-Authentifizierung.');
+            return $invitation;
+        }, 3);
+
+        $this->info(sprintf(
+            'Einmalige Superadmin-Einladung für %s wurde erstellt und läuft %s ab.',
+            $email,
+            $invitation->expires_at->toIso8601String(),
+        ));
+        $this->warn('Der folgende Link wird nur einmal ausgegeben. Behandle ihn wie ein Passwort:');
+        $this->line(route('admin-bootstrap.show', ['token' => $plainToken]));
 
         return self::SUCCESS;
     }

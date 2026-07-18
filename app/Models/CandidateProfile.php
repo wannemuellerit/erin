@@ -24,6 +24,10 @@ use Laravel\Scout\Searchable;
  * @property Carbon|null $available_from
  * @property int $completeness
  * @property Carbon|null $published_at
+ * @property string|null $profile_photo_path
+ * @property string|null $profile_photo_quarantine_path
+ * @property string|null $profile_photo_disk
+ * @property string|null $profile_photo_scan_result
  */
 class CandidateProfile extends Model
 {
@@ -43,6 +47,7 @@ class CandidateProfile extends Model
             'available_from' => 'date',
             'requires_visa' => 'boolean',
             'has_work_permit' => 'boolean',
+            'profile_photo_scan_completed_at' => 'datetime',
             'published_at' => 'datetime',
         ];
     }

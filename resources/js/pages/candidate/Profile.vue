@@ -5,10 +5,12 @@ import {
     BriefcaseBusiness,
     Download,
     FileText,
+    ImagePlus,
     Languages as LanguagesIcon,
     LockKeyhole,
     Save,
     ShieldCheck,
+    Trash2,
     Upload,
     UserRound,
 } from '@lucide/vue';
@@ -18,6 +20,7 @@ import PageHeader from '@/components/product/PageHeader.vue';
 import ProgressBar from '@/components/product/ProgressBar.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
+import { Button } from '@/components/ui/button';
 import { useLocalizedField } from '@/composables/useLocalizedField';
 import { useStatusLabels } from '@/composables/useStatusLabels';
 import { documents, publish, update } from '@/routes/candidate/profile';
@@ -126,6 +129,8 @@ type Profile = {
     requires_visa?: boolean;
     has_work_permit?: boolean;
     published_at?: string | null;
+    profile_photo_url?: string | null;
+    profile_photo_scan_result?: string | null;
     occupation?: NamedOption | null;
     skills?: Array<
         NamedOption & {
@@ -278,6 +283,9 @@ const documentForm = useForm({
     file: null as File | null,
     expires_at: '',
 });
+const photoForm = useForm({
+    photo: null as File | null,
+});
 const name = computed(
     () =>
         [props.profile?.first_name, props.profile?.last_name]
@@ -330,6 +338,19 @@ const documentTypeLabel = (type: string) => {
 
     return te(key) ? t(key) : type.replaceAll('_', ' ');
 };
+const submitPhoto = () => {
+    if (!photoForm.photo) {
+        return;
+    }
+
+    photoForm.post('/candidate/profile/photo', {
+        forceFormData: true,
+        preserveScroll: true,
+        onSuccess: () => photoForm.reset(),
+    });
+};
+const deletePhoto = () =>
+    router.delete('/candidate/profile/photo', { preserveScroll: true });
 </script>
 
 <template>
@@ -371,7 +392,14 @@ const documentTypeLabel = (type: string) => {
         <template v-else>
             <section class="erin-panel p-5">
                 <div class="flex flex-col gap-5 sm:flex-row sm:items-center">
+                    <img
+                        v-if="profile.profile_photo_url"
+                        :src="profile.profile_photo_url"
+                        :alt="name"
+                        class="size-20 shrink-0 rounded-2xl object-cover"
+                    />
                     <div
+                        v-else
                         class="grid size-20 shrink-0 place-items-center rounded-2xl bg-blue-50 text-xl font-extrabold text-[var(--erin-primary)]"
                     >
                         {{
@@ -548,6 +576,79 @@ const documentTypeLabel = (type: string) => {
                     </label>
                 </SectionCard>
                 <aside class="space-y-4">
+                    <SectionCard
+                        :title="t('candidate.profile.photo.title')"
+                        :description="t('candidate.profile.photo.description')"
+                    >
+                        <label
+                            class="erin-focus flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 px-4 py-4 text-sm font-bold text-slate-600 hover:border-blue-400 hover:text-blue-700"
+                        >
+                            <ImagePlus class="size-4" />
+                            {{
+                                photoForm.photo?.name ||
+                                t('candidate.profile.photo.choose')
+                            }}
+                            <input
+                                type="file"
+                                class="sr-only"
+                                accept="image/jpeg,image/png"
+                                @change="
+                                    photoForm.photo =
+                                        ($event.target as HTMLInputElement)
+                                            .files?.[0] ?? null
+                                "
+                            />
+                        </label>
+                        <p
+                            v-if="
+                                profile.profile_photo_scan_result === 'pending'
+                            "
+                            class="mt-3 text-xs font-bold text-orange-700"
+                        >
+                            {{ t('candidate.profile.photo.pending') }}
+                        </p>
+                        <p
+                            v-else-if="
+                                ['infected', 'scan_failed'].includes(
+                                    profile.profile_photo_scan_result ?? '',
+                                )
+                            "
+                            class="mt-3 text-xs font-bold text-red-700"
+                        >
+                            {{ t('candidate.profile.photo.failed') }}
+                        </p>
+                        <div class="mt-3 grid gap-2">
+                            <Button
+                                type="button"
+                                :disabled="
+                                    !photoForm.photo || photoForm.processing
+                                "
+                                @click="submitPhoto"
+                            >
+                                <Upload class="size-4" />
+                                {{ t('candidate.profile.photo.upload') }}
+                            </Button>
+                            <Button
+                                v-if="
+                                    profile.profile_photo_url ||
+                                    profile.profile_photo_scan_result ===
+                                        'pending'
+                                "
+                                type="button"
+                                variant="outline"
+                                @click="deletePhoto"
+                            >
+                                <Trash2 class="size-4" />
+                                {{ t('candidate.profile.photo.delete') }}
+                            </Button>
+                        </div>
+                        <p
+                            v-if="photoForm.errors.photo"
+                            class="mt-2 text-xs font-bold text-red-600"
+                        >
+                            {{ photoForm.errors.photo }}
+                        </p>
+                    </SectionCard>
                     <SectionCard :title="t('candidate.profile.privacy.title')"
                         ><div
                             class="space-y-3 text-xs leading-5 text-slate-500"

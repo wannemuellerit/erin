@@ -202,5 +202,18 @@
     "Dieser manuelle Prüffall wurde bereits aufgelöst oder besitzt keinen sicheren Firmen-Lock.": "This manual review case has already been resolved or no longer has a safe company lock.",
     "Die verantwortliche Person konnte nicht sicher ermittelt werden.": "The responsible user could not be identified safely.",
     "Der Tarifwechsel wurde für einen sicheren erneuten Stripe-Abgleich freigegeben.": "The plan change has been released for another safe Stripe reconciliation.",
-    "Der Tarifwechsel wurde ohne lokale Tarifänderung geschlossen.": "The plan change was closed without changing the local plan."
+    "Der Tarifwechsel wurde ohne lokale Tarifänderung geschlossen.": "The plan change was closed without changing the local plan.",
+    "Das Profilbild konnte nicht privat gespeichert werden.": "The profile picture could not be stored privately.",
+    "Dein Profilbild wird sicher geprüft.": "Your profile picture is being scanned securely.",
+    "Dein Profilbild wurde gelöscht.": "Your profile picture has been deleted.",
+    "Die Löschung ist durch einen aktiven Legal Hold gesperrt.": "Deletion is blocked by an active legal hold.",
+    "Die Registrierung konnte nicht abgeschlossen werden. Bitte prüfe deine Angaben oder kontaktiere den Support.": "Registration could not be completed. Check your details or contact support.",
+    "Diese Admin-Einladung ist abgelaufen oder wurde bereits verwendet.": "This administrator invitation has expired or has already been used.",
+    "Diese Regel würde den letzten erreichbaren Superadmin aussperren.": "This rule would lock out the last reachable super administrator.",
+    "Dieser DSGVO-Statusübergang ist nicht zulässig.": "This GDPR status transition is not allowed.",
+    "Dieses Paket enthält die in Erin gespeicherten personenbezogenen Daten und technischen Historien. Binäre Dokumentinhalte werden aus Sicherheitsgründen getrennt verwaltet.": "This package contains personal data and technical histories stored in Erin. Binary document contents are managed separately for security reasons.",
+    "Für diese E-Mail existiert bereits eine andere Rolle.": "A different role already exists for this email address.",
+    "Prüfung und Freigabe müssen durch zwei verschiedene Superadmins erfolgen.": "Verification and approval must be performed by two different super administrators.",
+    "Vor der weiteren Nutzung ist ein Passwortwechsel erforderlich.": "You must change your password before continuing.",
+    "Ändere jetzt dein Passwort erneut und richte anschließend Zwei-Faktor-Authentifizierung ein.": "Change your password again now, then set up two-factor authentication."
 }

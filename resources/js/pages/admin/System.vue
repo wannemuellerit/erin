@@ -3,6 +3,7 @@ import type { FormDataConvertible } from '@inertiajs/core';
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import {
     Activity,
+    Download,
     FileLock2,
     Flag,
     ListChecks,
@@ -71,9 +72,18 @@ type GdprRequestRow = {
     id: number;
     user_id: number;
     handled_by: number | null;
+    verified_by: number | null;
+    approved_by: number | null;
     type: 'export' | 'delete';
     status: string;
     reason: string | null;
+    legal_hold: boolean;
+    legal_hold_reason: string | null;
+    failed_at: string | null;
+    failure_reason: string | null;
+    export_expires_at: string | null;
+    downloaded_at: string | null;
+    download_url: string | null;
     verified_at: string | null;
     due_at: string | null;
     completed_at: string | null;
@@ -87,6 +97,16 @@ type GdprRequestRow = {
         status: string;
     };
     handler: {
+        id: number;
+        name: string;
+        email: string;
+    } | null;
+    verifier: {
+        id: number;
+        name: string;
+        email: string;
+    } | null;
+    approver: {
         id: number;
         name: string;
         email: string;
@@ -192,6 +212,8 @@ const gdprCreateForm = useForm({
     type: 'export' as 'export' | 'delete',
     reason: '',
     due_at: '',
+    legal_hold: false,
+    legal_hold_reason: '',
 });
 
 const gdprUpdateForm = useForm({
@@ -199,6 +221,8 @@ const gdprUpdateForm = useForm({
     status: 'requested',
     reason: '',
     due_at: '',
+    legal_hold: false,
+    legal_hold_reason: '',
 });
 
 const firstGdprCreateError = computed(
@@ -207,6 +231,11 @@ const firstGdprCreateError = computed(
 const firstGdprUpdateError = computed(
     () => Object.values(gdprUpdateForm.errors)[0] as string | undefined,
 );
+const gdprTransitions: Record<string, string[]> = {
+    requested: ['verified', 'rejected'],
+    verified: ['processing', 'rejected'],
+    failed: ['processing'],
+};
 
 watch(
     selectedGdpr,
@@ -218,12 +247,22 @@ watch(
         }
 
         gdprUpdateForm.type = request.type;
-        gdprUpdateForm.status = request.status;
+        gdprUpdateForm.status =
+            gdprTransitions[request.status]?.[0] ?? request.status;
         gdprUpdateForm.reason = request.reason ?? '';
         gdprUpdateForm.due_at = toLocalDateTime(request.due_at);
+        gdprUpdateForm.legal_hold = request.legal_hold;
+        gdprUpdateForm.legal_hold_reason = request.legal_hold_reason ?? '';
     },
     { immediate: true },
 );
+const allowedGdprStatuses = computed(() => {
+    if (!selectedGdpr.value) {
+        return [];
+    }
+
+    return gdprTransitions[selectedGdpr.value.status] ?? [];
+});
 
 function createGdprRequest(): void {
     gdprCreateForm.post(adminGdprRequests.store.url(), {
@@ -802,6 +841,29 @@ function deleteFlag(flag: FeatureFlagRow): void {
                         >
                             {{ selectedGdpr.reason }}
                         </p>
+                        <div
+                            v-if="selectedGdpr.legal_hold"
+                            class="mt-4 rounded-xl border border-orange-200 bg-orange-50 p-3 text-sm text-orange-800"
+                        >
+                            <strong>{{ t('system.gdpr.legalHold') }}</strong>
+                            <p class="mt-1">
+                                {{ selectedGdpr.legal_hold_reason }}
+                            </p>
+                        </div>
+                        <p
+                            v-if="selectedGdpr.failure_reason"
+                            class="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+                        >
+                            {{ selectedGdpr.failure_reason }}
+                        </p>
+                        <a
+                            v-if="selectedGdpr.download_url"
+                            :href="selectedGdpr.download_url"
+                            class="erin-focus mt-4 inline-flex h-10 items-center gap-2 rounded-xl bg-teal-600 px-4 text-xs font-bold text-white"
+                        >
+                            <Download class="size-4" />
+                            {{ t('system.gdpr.downloadExport') }}
+                        </a>
                     </div>
 
                     <div v-if="isSuperAdmin" class="grid gap-6 2xl:grid-cols-2">
@@ -825,6 +887,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                     </span>
                                     <select
                                         v-model="gdprUpdateForm.type"
+                                        disabled
                                         class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
                                     >
                                         <option
@@ -847,7 +910,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                         class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
                                     >
                                         <option
-                                            v-for="status in gdpr_statuses"
+                                            v-for="status in allowedGdprStatuses"
                                             :key="status"
                                             :value="status"
                                         >
@@ -856,6 +919,40 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                     </select>
                                 </label>
                             </div>
+                            <label
+                                class="mt-3 flex items-start gap-3 rounded-xl border border-slate-200 p-3"
+                            >
+                                <input
+                                    v-model="gdprUpdateForm.legal_hold"
+                                    type="checkbox"
+                                    class="erin-focus mt-0.5 size-4"
+                                />
+                                <span>
+                                    <span
+                                        class="block text-xs font-bold text-slate-700"
+                                    >
+                                        {{ t('system.gdpr.legalHold') }}
+                                    </span>
+                                    <span
+                                        class="mt-1 block text-xs text-slate-500"
+                                    >
+                                        {{ t('system.gdpr.legalHoldHint') }}
+                                    </span>
+                                </span>
+                            </label>
+                            <label
+                                v-if="gdprUpdateForm.legal_hold"
+                                class="mt-3 block"
+                            >
+                                <span class="text-xs font-bold text-slate-600">
+                                    {{ t('system.gdpr.legalHoldReason') }}
+                                </span>
+                                <Textarea
+                                    v-model="gdprUpdateForm.legal_hold_reason"
+                                    rows="3"
+                                    class="mt-1.5"
+                                />
+                            </label>
                             <label class="mt-3 block">
                                 <span class="text-xs font-bold text-slate-600">
                                     {{ t('system.gdpr.dueAt') }}
@@ -884,7 +981,10 @@ function deleteFlag(flag: FeatureFlagRow): void {
                             </p>
                             <button
                                 type="submit"
-                                :disabled="gdprUpdateForm.processing"
+                                :disabled="
+                                    gdprUpdateForm.processing ||
+                                    allowedGdprStatuses.length === 0
+                                "
                                 class="erin-focus mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-xs font-bold text-white disabled:opacity-50"
                             >
                                 <Save class="size-4" />

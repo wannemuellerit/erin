@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AiController;
+use App\Http\Controllers\Auth\AdminBootstrapController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\Candidate\MarketplaceController;
 use App\Http\Controllers\Candidate\ProfileController as CandidateProfileController;
@@ -18,6 +19,8 @@ use App\Http\Controllers\Employer\JobController as EmployerJobController;
 use App\Http\Controllers\Employer\PortalController as EmployerPortalController;
 use App\Http\Controllers\Employer\ProductivityController as EmployerProductivityController;
 use App\Http\Controllers\Employer\ReminderController as EmployerReminderController;
+use App\Http\Controllers\HealthController;
+use App\Http\Controllers\HealthMetricsController;
 use App\Http\Controllers\Integrations\ZammadWebhookController;
 use App\Http\Controllers\InterviewController;
 use App\Http\Controllers\JobMediaController;
@@ -29,6 +32,12 @@ use App\Http\Controllers\SupportAttachmentController;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
+Route::get('health/ready', HealthController::class)
+    ->middleware('throttle:30,1')
+    ->name('health.ready');
+Route::get('health/metrics', HealthMetricsController::class)
+    ->middleware('throttle:60,1')
+    ->name('health.metrics');
 Route::get('pricing', [BillingController::class, 'pricing'])->name('pricing');
 Route::get('contact', [PublicPageController::class, 'contact'])->name('contact');
 Route::get('datenschutz', [PublicPageController::class, 'privacy'])->name('legal.privacy');
@@ -37,6 +46,13 @@ Route::get('agb', [PublicPageController::class, 'terms'])->name('legal.terms');
 Route::post('locale', [AccountController::class, 'locale'])
     ->middleware('throttle:20,1')
     ->name('locale.update');
+Route::middleware(['guest', 'throttle:10,1'])
+    ->prefix('bootstrap-admin')
+    ->name('admin-bootstrap.')
+    ->group(function (): void {
+        Route::get('{token}', [AdminBootstrapController::class, 'show'])->name('show');
+        Route::post('{token}', [AdminBootstrapController::class, 'store'])->name('store');
+    });
 Route::get('r/{code}', [ReferralController::class, 'track'])->name('referrals.track');
 Route::get('join/{token}', [EmployerPortalController::class, 'trackInvitation'])->name('company-invitations.track');
 Route::post('integrations/zammad/webhook', ZammadWebhookController::class)
@@ -206,10 +222,10 @@ Route::middleware(['auth', 'verified', 'role:candidate', 'onboarding.complete'])
     ->name('candidate.')
     ->group(function (): void {
         Route::get('jobs', [MarketplaceController::class, 'jobs'])->name('jobs');
-        Route::get('jobs/{job}', [MarketplaceController::class, 'jobs'])->name('jobs.show');
+        Route::get('jobs/{job}', [MarketplaceController::class, 'showJob'])->name('jobs.show');
         Route::post('jobs/{job}/apply', [MarketplaceController::class, 'apply'])->name('jobs.apply');
         Route::get('companies', [MarketplaceController::class, 'companies'])->name('companies');
-        Route::get('companies/{company}', [MarketplaceController::class, 'companies'])->name('companies.show');
+        Route::get('companies/{company}', [MarketplaceController::class, 'showCompany'])->name('companies.show');
         Route::get('applications', [MarketplaceController::class, 'applications'])->name('applications');
         Route::post('applications/{application}/withdraw', [MarketplaceController::class, 'withdraw'])
             ->name('applications.withdraw');
@@ -217,6 +233,13 @@ Route::middleware(['auth', 'verified', 'role:candidate', 'onboarding.complete'])
             ->name('invitations.respond');
         Route::get('profile', [CandidateProfileController::class, 'show'])->name('profile');
         Route::put('profile', [CandidateProfileController::class, 'update'])->name('profile.update');
+        Route::post('profile/photo', [CandidateProfileController::class, 'uploadPhoto'])
+            ->name('profile.photo.upload');
+        Route::delete('profile/photo', [CandidateProfileController::class, 'deletePhoto'])
+            ->name('profile.photo.delete');
+        Route::get('profile/photo', [CandidateProfileController::class, 'photo'])
+            ->middleware('signed')
+            ->name('profile.photo');
         Route::post('profile/documents', [CandidateProfileController::class, 'uploadDocument'])
             ->name('profile.documents');
         Route::post('profile/publish', [CandidateProfileController::class, 'publish'])->name('profile.publish');

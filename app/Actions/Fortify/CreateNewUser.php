@@ -15,12 +15,14 @@ use App\Models\CompanyInvitation;
 use App\Models\Plan;
 use App\Models\Referral;
 use App\Models\User;
+use App\Services\Access\AccessListResolver;
 use App\Services\Billing\EntitlementService;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
 
 class CreateNewUser implements CreatesNewUsers
@@ -29,6 +31,7 @@ class CreateNewUser implements CreatesNewUsers
 
     public function __construct(
         private readonly EntitlementService $entitlements,
+        private readonly AccessListResolver $accessList,
     ) {}
 
     /**
@@ -38,6 +41,16 @@ class CreateNewUser implements CreatesNewUsers
      */
     public function create(array $input): User
     {
+        $access = $this->accessList->decide(
+            $input['email'] ?? null,
+            request()->ip(),
+        );
+        if ($access->blocked()) {
+            throw ValidationException::withMessages([
+                'email' => __('Die Registrierung konnte nicht abgeschlossen werden. Bitte prüfe deine Angaben oder kontaktiere den Support.'),
+            ]);
+        }
+
         $invitationToken = request()->cookie('erin_company_invitation');
         /** @var CompanyInvitation|null $invitation */
         $invitation = is_string($invitationToken)

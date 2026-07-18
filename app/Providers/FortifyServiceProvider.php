@@ -7,8 +7,13 @@ namespace App\Providers;
 use App\Actions\Fortify\CreateNewUser;
 /* @end-chisel-registration */
 use App\Actions\Fortify\ResetUserPassword;
+use App\Enums\UserStatus;
+use App\Models\User;
+use App\Services\Access\AccessListResolver;
+use App\Services\Audit\AuditLogger;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
@@ -33,8 +38,43 @@ class FortifyServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureActions();
+        $this->configureAuthentication();
         $this->configureViews();
         $this->configureRateLimiting();
+    }
+
+    private function configureAuthentication(): void
+    {
+        Fortify::authenticateUsing(function (Request $request): ?User {
+            $email = mb_strtolower(trim((string) $request->input(Fortify::username())));
+            $access = app(AccessListResolver::class)->decide($email, $request->ip());
+
+            if ($access->blocked()) {
+                app(AuditLogger::class)->record(
+                    'access.blocked.login',
+                    metadata: [
+                        'access_list_entry_id' => $access->matchedEntry?->getKey(),
+                        'subject_type' => $access->matchedEntry?->subject_type,
+                        'email_hash' => hash('sha256', $email),
+                    ],
+                    request: $request,
+                );
+
+                return null;
+            }
+
+            $user = User::query()->whereRaw('LOWER(email) = ?', [$email])->first();
+
+            if (
+                $user === null
+                || in_array($user->status, [UserStatus::Suspended, UserStatus::Blocked], true)
+                || ! Hash::check((string) $request->input('password'), $user->password)
+            ) {
+                return null;
+            }
+
+            return $user;
+        });
     }
 
     /**

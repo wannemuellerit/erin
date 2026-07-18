@@ -23,6 +23,14 @@ class StoreGdprRequestRequest extends FormRequest
             'type' => ['required', Rule::in(['export', 'delete'])],
             'reason' => ['nullable', 'string', 'max:2000'],
             'due_at' => ['nullable', 'date'],
+            'legal_hold' => ['sometimes', 'boolean'],
+            'legal_hold_reason' => [
+                Rule::requiredIf(fn (): bool => $this->boolean('legal_hold')),
+                'nullable',
+                'string',
+                'min:10',
+                'max:2000',
+            ],
         ];
     }
 }

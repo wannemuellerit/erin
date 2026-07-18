@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Middleware\AttachCorrelationId;
 use App\Http\Middleware\BlockSupportWrites;
 use App\Http\Middleware\EnsureCompanyMember;
 use App\Http\Middleware\EnsureOnboardingComplete;
+use App\Http\Middleware\EnsurePasswordChangeCompleted;
 use App\Http\Middleware\EnsurePlatformAccess;
 use App\Http\Middleware\EnsureRole;
 use App\Http\Middleware\EnsureStaffTwoFactor;
@@ -44,10 +46,12 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->web(append: [
+            AttachCorrelationId::class,
             HandleAppearance::class,
             SetLocale::class,
             HandleInertiaRequests::class,
             EnsurePlatformAccess::class,
+            EnsurePasswordChangeCompleted::class,
             BlockSupportWrites::class,
             TrackLastActivity::class,
             AddLinkHeadersForPreloadedAssets::class,
