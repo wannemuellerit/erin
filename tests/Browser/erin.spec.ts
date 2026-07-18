@@ -568,6 +568,27 @@ test.describe('Onboarding und Abrechnung', () => {
 });
 
 test.describe('Support und Mandantentrennung', () => {
+    test('zeigt Superadmins die Trust- und Moderationszentrale', async ({
+        page,
+    }) => {
+        await logIn(page, accounts.admin.email);
+        await page.goto('/admin/support');
+
+        await expect(
+            page.getByRole('heading', {
+                level: 2,
+                name: 'Trust- und Moderationszentrale',
+            }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole('heading', {
+                level: 3,
+                name: 'Ausstehendes Feedback',
+            }),
+        ).toBeVisible();
+        await expectNoSeriousAccessibilityViolations(page);
+    });
+
     test('zeigt die Supportansicht dauerhaft schreibgeschützt', async ({
         page,
     }) => {

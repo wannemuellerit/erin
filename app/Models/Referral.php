@@ -3,9 +3,13 @@
 namespace App\Models;
 
 use App\Enums\ReferralStatus;
+use App\Observers\ReferralObserver;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
+#[ObservedBy([ReferralObserver::class])]
 class Referral extends Model
 {
     protected $guarded = ['id'];
@@ -18,6 +22,7 @@ class Referral extends Model
             'registered_at' => 'datetime',
             'hired_at' => 'datetime',
             'hold_until' => 'datetime',
+            'approval_notified_at' => 'datetime',
             'approved_at' => 'datetime',
             'paid_at' => 'datetime',
             'metadata' => 'array',
@@ -46,5 +51,13 @@ class Referral extends Model
     public function application(): BelongsTo
     {
         return $this->belongsTo(JobApplication::class, 'application_id');
+    }
+
+    /**
+     * @return HasMany<ReferralStatusHistory, $this>
+     */
+    public function statusHistory(): HasMany
+    {
+        return $this->hasMany(ReferralStatusHistory::class)->oldest('created_at');
     }
 }

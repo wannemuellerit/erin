@@ -53,6 +53,11 @@ Schedule::command('erin:reminders:send-due')
     ->onOneServer()
     ->withoutOverlapping();
 
+Schedule::command('erin:referrals:notify-eligible')
+    ->hourly()
+    ->onOneServer()
+    ->withoutOverlapping();
+
 Schedule::command('erin:ops:queue-health --json')
     ->everyFiveMinutes()
     ->onOneServer()

@@ -66,6 +66,33 @@ type SupportFilters = {
     assigned_to?: number | string;
 };
 
+type ModerationFeedbackRow = {
+    id: number;
+    sentiment: string;
+    reason_code: string;
+    comment: string | null;
+    created_at: string;
+    author: { id: number; name: string; email: string };
+    subject_user: { id: number; name: string; email: string } | null;
+    subject_company: { id: number; name: string } | null;
+    application: {
+        id: number;
+        job_posting: { id: number; title: string };
+    } | null;
+};
+
+type ModerationCaseRow = {
+    id: number;
+    reason: string;
+    severity: string;
+    priority: string;
+    status: string;
+    created_at: string;
+    subject_user: { id: number; name: string; email: string } | null;
+    subject_company: { id: number; name: string } | null;
+    assignee: { id: number; name: string; email: string } | null;
+};
+
 const props = defineProps<{
     tickets: AdminPaginator<SupportTicketRow>;
     filters: SupportFilters;
@@ -74,6 +101,8 @@ const props = defineProps<{
     moderation: {
         open_cases: number;
         pending_feedback: number;
+        cases: ModerationCaseRow[];
+        feedback: ModerationFeedbackRow[];
     };
     attachmentLimits: {
         maxFiles: number;
@@ -83,6 +112,12 @@ const props = defineProps<{
 }>();
 const page = usePage();
 const currentUserId = computed(() => Number(page.props.auth?.user?.id ?? 0));
+const isSuperAdmin = computed(
+    () => page.props.auth?.user?.role === 'super_admin',
+);
+const feedbackReasons = reactive<Record<number, string>>({});
+const caseResolutions = reactive<Record<number, string>>({});
+const casePriorities = reactive<Record<number, string>>({});
 
 const priorities = ['low', 'normal', 'high', 'urgent'];
 
@@ -172,6 +207,37 @@ function startImpersonation(): void {
         adminSupport.impersonation.start.url(selectedTicket.value.requester.id),
     );
 }
+
+function reviewFeedback(
+    feedback: ModerationFeedbackRow,
+    decision: 'approved' | 'rejected',
+): void {
+    router.patch(
+        `/admin/moderation/feedback/${feedback.id}`,
+        {
+            decision,
+            reason: feedbackReasons[feedback.id] ?? '',
+        },
+        { preserveScroll: true },
+    );
+}
+
+function updateModerationCase(
+    moderationCase: ModerationCaseRow,
+    action: 'assign' | 'escalate' | 'resolve' | 'dismiss' | 'block',
+): void {
+    router.patch(
+        `/admin/moderation/cases/${moderationCase.id}`,
+        {
+            action,
+            assigned_to: action === 'assign' ? currentUserId.value : undefined,
+            priority:
+                casePriorities[moderationCase.id] ?? moderationCase.priority,
+            resolution: caseResolutions[moderationCase.id] ?? '',
+        },
+        { preserveScroll: true },
+    );
+}
 </script>
 
 <template>
@@ -201,6 +267,244 @@ function startImpersonation(): void {
                 tone="violet"
             />
         </div>
+
+        <SectionCard
+            :title="t('support.moderationTitle')"
+            :description="t('support.moderationDescription')"
+        >
+            <div class="grid gap-6 xl:grid-cols-2">
+                <section>
+                    <h3 class="text-sm font-bold text-slate-900">
+                        {{ t('support.pendingFeedbackTitle') }}
+                    </h3>
+                    <div
+                        v-if="moderation.feedback.length"
+                        class="mt-3 space-y-3"
+                    >
+                        <article
+                            v-for="feedback in moderation.feedback"
+                            :key="feedback.id"
+                            class="rounded-2xl border border-slate-200 p-4"
+                        >
+                            <div
+                                class="flex flex-wrap items-center justify-between gap-2"
+                            >
+                                <div>
+                                    <p class="text-sm font-bold text-slate-900">
+                                        {{ feedback.author.name }} →
+                                        {{
+                                            feedback.subject_user?.name ??
+                                            feedback.subject_company?.name
+                                        }}
+                                    </p>
+                                    <p class="mt-1 text-xs text-slate-500">
+                                        {{
+                                            feedback.application?.job_posting
+                                                .title
+                                        }}
+                                        · {{ formatDate(feedback.created_at) }}
+                                    </p>
+                                </div>
+                                <StatusBadge
+                                    :label="humanize(feedback.sentiment)"
+                                    :tone="
+                                        feedback.sentiment === 'negative'
+                                            ? 'red'
+                                            : 'green'
+                                    "
+                                />
+                            </div>
+                            <p class="mt-3 text-sm text-slate-700">
+                                {{ humanize(feedback.reason_code) }}
+                                <span v-if="feedback.comment">
+                                    · {{ feedback.comment }}
+                                </span>
+                            </p>
+                            <template v-if="isSuperAdmin">
+                                <Textarea
+                                    v-model="feedbackReasons[feedback.id]"
+                                    rows="2"
+                                    :placeholder="
+                                        t('support.moderationReasonPlaceholder')
+                                    "
+                                    class="mt-3 text-xs"
+                                />
+                                <div class="mt-3 flex gap-2">
+                                    <button
+                                        type="button"
+                                        class="erin-focus rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white"
+                                        @click="
+                                            reviewFeedback(feedback, 'approved')
+                                        "
+                                    >
+                                        {{ t('support.approveFeedback') }}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="erin-focus rounded-xl bg-red-600 px-3 py-2 text-xs font-bold text-white"
+                                        @click="
+                                            reviewFeedback(feedback, 'rejected')
+                                        "
+                                    >
+                                        {{ t('support.rejectFeedback') }}
+                                    </button>
+                                </div>
+                            </template>
+                        </article>
+                    </div>
+                    <p v-else class="mt-3 text-sm text-slate-500">
+                        {{ t('support.noPendingFeedback') }}
+                    </p>
+                </section>
+
+                <section>
+                    <h3 class="text-sm font-bold text-slate-900">
+                        {{ t('support.moderationCasesTitle') }}
+                    </h3>
+                    <div v-if="moderation.cases.length" class="mt-3 space-y-3">
+                        <article
+                            v-for="moderationCase in moderation.cases"
+                            :key="moderationCase.id"
+                            class="rounded-2xl border border-slate-200 p-4"
+                        >
+                            <div
+                                class="flex flex-wrap items-center justify-between gap-2"
+                            >
+                                <div>
+                                    <p class="text-sm font-bold text-slate-900">
+                                        {{
+                                            moderationCase.subject_user?.name ??
+                                            moderationCase.subject_company?.name
+                                        }}
+                                    </p>
+                                    <p class="mt-1 text-xs text-slate-500">
+                                        {{ humanize(moderationCase.reason) }} ·
+                                        {{
+                                            formatDate(
+                                                moderationCase.created_at,
+                                            )
+                                        }}
+                                    </p>
+                                </div>
+                                <StatusBadge
+                                    :label="humanize(moderationCase.status)"
+                                    :tone="statusTone(moderationCase.status)"
+                                />
+                            </div>
+                            <p class="mt-2 text-xs text-slate-600">
+                                {{
+                                    t('support.caseAssignment', {
+                                        name:
+                                            moderationCase.assignee?.name ??
+                                            t('common.notAssigned'),
+                                    })
+                                }}
+                            </p>
+                            <template v-if="isSuperAdmin">
+                                <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                                    <select
+                                        v-model="
+                                            casePriorities[moderationCase.id]
+                                        "
+                                        class="erin-focus h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs"
+                                    >
+                                        <option value="">
+                                            {{
+                                                humanize(
+                                                    moderationCase.priority,
+                                                )
+                                            }}
+                                        </option>
+                                        <option value="normal">
+                                            {{ humanize('normal') }}
+                                        </option>
+                                        <option value="high">
+                                            {{ humanize('high') }}
+                                        </option>
+                                        <option value="urgent">
+                                            {{ humanize('urgent') }}
+                                        </option>
+                                    </select>
+                                    <button
+                                        type="button"
+                                        class="erin-focus rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700"
+                                        @click="
+                                            updateModerationCase(
+                                                moderationCase,
+                                                'assign',
+                                            )
+                                        "
+                                    >
+                                        {{ t('support.assignToMe') }}
+                                    </button>
+                                </div>
+                                <Textarea
+                                    v-model="caseResolutions[moderationCase.id]"
+                                    rows="2"
+                                    :placeholder="
+                                        t('support.resolutionPlaceholder')
+                                    "
+                                    class="mt-2 text-xs"
+                                />
+                                <div class="mt-3 flex flex-wrap gap-2">
+                                    <button
+                                        type="button"
+                                        class="erin-focus rounded-xl bg-amber-500 px-3 py-2 text-xs font-bold text-white"
+                                        @click="
+                                            updateModerationCase(
+                                                moderationCase,
+                                                'escalate',
+                                            )
+                                        "
+                                    >
+                                        {{ t('support.escalateCase') }}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="erin-focus rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white"
+                                        @click="
+                                            updateModerationCase(
+                                                moderationCase,
+                                                'resolve',
+                                            )
+                                        "
+                                    >
+                                        {{ t('support.resolveCase') }}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="erin-focus rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700"
+                                        @click="
+                                            updateModerationCase(
+                                                moderationCase,
+                                                'dismiss',
+                                            )
+                                        "
+                                    >
+                                        {{ t('support.dismissCase') }}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="erin-focus rounded-xl bg-red-700 px-3 py-2 text-xs font-bold text-white"
+                                        @click="
+                                            updateModerationCase(
+                                                moderationCase,
+                                                'block',
+                                            )
+                                        "
+                                    >
+                                        {{ t('support.blockSubject') }}
+                                    </button>
+                                </div>
+                            </template>
+                        </article>
+                    </div>
+                    <p v-else class="mt-3 text-sm text-slate-500">
+                        {{ t('support.noModerationCases') }}
+                    </p>
+                </section>
+            </div>
+        </SectionCard>
 
         <SectionCard flush>
             <form

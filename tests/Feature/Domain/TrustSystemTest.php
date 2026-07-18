@@ -4,6 +4,8 @@ use App\Enums\ApplicationStatus;
 use App\Enums\CompanyMemberRole;
 use App\Enums\InterviewStatus;
 use App\Enums\UserRole;
+use App\Enums\UserStatus;
+use App\Models\AuditLog;
 use App\Models\CandidateInternalReview;
 use App\Models\CandidateProfile;
 use App\Models\Company;
@@ -16,8 +18,10 @@ use App\Models\JobPosting;
 use App\Models\ModerationCase;
 use App\Models\Occupation;
 use App\Models\User;
+use App\Notifications\ActivityNotification;
 use App\Services\Trust\CompanyTrustMetricService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia as Assert;
 
 uses(RefreshDatabase::class);
@@ -91,7 +95,7 @@ it('calculates traceable trust rates but keeps them private below five distinct 
         'sentiment' => 'negative',
         'reason_code' => 'contract_not_honored',
         'metrics' => ['contract_honored' => false],
-        'status' => 'pending',
+        'status' => 'approved',
     ]);
 
     $service = app(CompanyTrustMetricService::class);
@@ -159,25 +163,148 @@ it('marks exactly the best five percent of sufficiently rated companies as top c
             ]);
 });
 
-it('recalculates company trust after candidate feedback without changing moderation state', function () {
+it('keeps pending company feedback out of public trust metrics and prevents duplicates', function () {
     [$owner, $company] = erinTrustEmployer();
     $application = erinTrustApplication($company, $owner, ApplicationStatus::Accepted);
+    $candidate = $application->candidateProfile->user;
+    $payload = [
+        'sentiment' => 'positive',
+        'reason_code' => 'reliable',
+        'metrics' => ['company_responded' => true],
+    ];
 
-    $this->actingAs($application->candidateProfile->user)
+    $this->actingAs($candidate)
         ->from(route('candidate.applications'))
-        ->post(route('feedback.store', $application), [
-            'sentiment' => 'positive',
-            'reason_code' => 'reliable',
-            'metrics' => ['company_responded' => true],
-        ])
+        ->post(route('feedback.store', $application), $payload)
         ->assertRedirect(route('candidate.applications'));
+    $this->actingAs($candidate)
+        ->from(route('candidate.applications'))
+        ->post(route('feedback.store', $application), $payload)
+        ->assertRedirect(route('candidate.applications'))
+        ->assertSessionHasErrors('feedback');
 
     $feedback = Feedback::query()->sole();
 
     expect($feedback->status)->toBe('pending')
         ->and(ModerationCase::query()->count())->toBe(0)
+        ->and($company->trustMetric()->exists())->toBeFalse();
+});
+
+it('lets only superadmins approve feedback and recalculates trust after review', function () {
+    Notification::fake();
+    [$owner, $company] = erinTrustEmployer();
+    $application = erinTrustApplication($company, $owner, ApplicationStatus::Accepted);
+    $candidate = $application->candidateProfile->user;
+
+    $this->actingAs($candidate)->post(route('feedback.store', $application), [
+        'sentiment' => 'positive',
+        'reason_code' => 'reliable',
+        'metrics' => ['company_responded' => true],
+    ])->assertRedirect();
+    $feedback = Feedback::query()->sole();
+
+    $support = User::factory()->create(['role' => UserRole::Support]);
+    $this->actingAs($support)
+        ->patch(route('admin.moderation.feedback.review', $feedback), [
+            'decision' => 'approved',
+            'reason' => 'Plausible und sachlich geprüft.',
+        ])
+        ->assertForbidden();
+
+    $admin = User::factory()->create(['role' => UserRole::SuperAdmin]);
+    $this->actingAs($admin)
+        ->patch(route('admin.moderation.feedback.review', $feedback), [
+            'decision' => 'approved',
+            'reason' => 'Plausible und sachlich geprüft.',
+        ])
+        ->assertRedirect();
+
+    expect($feedback->refresh()->status)->toBe('approved')
+        ->and($feedback->reviewed_by)->toBe($admin->getKey())
         ->and($company->trustMetric()->sole()->cases_count)->toBe(1)
-        ->and($company->trustMetric()->sole()->publicPayload())->toBeNull();
+        ->and(AuditLog::query()->where('event', 'admin.feedback.reviewed')->exists())->toBeTrue();
+    Notification::assertSentTo($candidate, ActivityNotification::class);
+
+    $this->actingAs($admin)
+        ->patch(route('admin.moderation.feedback.review', $feedback), [
+            'decision' => 'rejected',
+            'reason' => 'Zweiter widersprüchlicher Prüfversuch.',
+        ])
+        ->assertSessionHasErrors('decision');
+});
+
+it('audits moderation escalation and can block the affected account only once', function () {
+    Notification::fake();
+    $candidate = CandidateProfile::factory()->create()->user;
+    $case = ModerationCase::query()->create([
+        'subject_user_id' => $candidate->getKey(),
+        'reason' => 'feedback_threshold',
+        'severity' => 'high',
+        'priority' => 'high',
+        'status' => 'open',
+    ]);
+    $admin = User::factory()->create(['role' => UserRole::SuperAdmin]);
+
+    $this->actingAs($admin)
+        ->patch(route('admin.moderation.cases.update', $case), [
+            'action' => 'escalate',
+            'priority' => 'urgent',
+        ])
+        ->assertRedirect();
+
+    expect($case->refresh()->status)->toBe('escalated')
+        ->and($case->priority)->toBe('urgent')
+        ->and($case->escalated_at)->not->toBeNull();
+
+    $this->actingAs($admin)
+        ->patch(route('admin.moderation.cases.update', $case), [
+            'action' => 'block',
+            'resolution' => 'Mehrere bestätigte schwere Verstöße.',
+        ])
+        ->assertRedirect();
+
+    expect($case->refresh()->status)->toBe('resolved')
+        ->and($candidate->refresh()->status)->toBe(UserStatus::Blocked)
+        ->and(AuditLog::query()->where('event', 'admin.moderation_case.escalate')->exists())->toBeTrue()
+        ->and(AuditLog::query()->where('event', 'admin.moderation_case.block')->exists())->toBeTrue();
+    Notification::assertSentTo($candidate, ActivityNotification::class);
+
+    $this->actingAs($admin)
+        ->patch(route('admin.moderation.cases.update', $case), [
+            'action' => 'block',
+            'resolution' => 'Unzulässiger zweiter Abschluss.',
+        ])
+        ->assertSessionHasErrors('action');
+});
+
+it('opens one moderation case at three negative reports and raises its severity at five', function () {
+    $company = Company::factory()->create();
+
+    foreach (range(1, 5) as $index) {
+        $candidate = CandidateProfile::factory()->create();
+        $owner = User::factory()->create(['role' => UserRole::Company]);
+        $application = erinTrustApplication(
+            $company,
+            $owner,
+            ApplicationStatus::Accepted,
+            $candidate,
+        );
+
+        $this->actingAs($candidate->user)
+            ->post(route('feedback.store', $application), [
+                'sentiment' => 'negative',
+                'reason_code' => 'untrustworthy',
+                'comment' => "Sachlicher Prüfhinweis {$index}.",
+                'metrics' => [],
+            ])
+            ->assertRedirect();
+    }
+
+    $case = ModerationCase::query()->sole();
+    expect($case->status)->toBe('open')
+        ->and($case->severity)->toBe('high')
+        ->and($case->priority)->toBe('high')
+        ->and(Feedback::query()->where('status', 'pending')->count())->toBe(5);
 });
 
 it('only exposes company trust metrics in the candidate marketplace after five cases', function () {

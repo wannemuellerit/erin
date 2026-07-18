@@ -223,5 +223,11 @@
     "Das Anzeigenmotiv wurde aktualisiert.": "The advertisement artwork has been updated.",
     "Das Anzeigenmotiv wurde entfernt.": "The advertisement artwork has been removed.",
     "Das persönliche Speicherlimit wurde aktualisiert.": "The individual storage limit has been updated.",
-    "Der Sicherheitsalarm wurde als geprüft markiert.": "The security alert has been marked as reviewed."
+    "Der Sicherheitsalarm wurde als geprüft markiert.": "The security alert has been marked as reviewed.",
+    "Du hast diese Person oder Firma für diese Bewerbung bereits bewertet.": "You have already reviewed this person or company for this application.",
+    "Dieses Feedback wurde bereits geprüft.": "This feedback has already been reviewed.",
+    "Das Feedback wurde geprüft.": "The feedback has been reviewed.",
+    "Moderationsfälle können nur Plattformmitarbeitenden zugewiesen werden.": "Moderation cases can only be assigned to platform staff.",
+    "Dieser Moderationsfall ist bereits abgeschlossen.": "This moderation case has already been closed.",
+    "Der Moderationsfall wurde aktualisiert.": "The moderation case has been updated."
 }

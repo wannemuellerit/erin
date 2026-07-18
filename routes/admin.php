@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\DocumentController;
 use App\Http\Controllers\Admin\EmailTemplateController;
 use App\Http\Controllers\Admin\FeatureFlagController;
 use App\Http\Controllers\Admin\GdprRequestController;
+use App\Http\Controllers\Admin\ModerationController;
 use App\Http\Controllers\Admin\ReferralController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\SupportController;
@@ -65,6 +66,10 @@ Route::middleware(['auth', 'verified', 'role:super_admin,support', 'staff.2fa'])
             )->name('billing.manual-reviews.resolve');
             Route::patch('referrals/{referral}', [ReferralController::class, 'update'])
                 ->name('referrals.update');
+            Route::patch('moderation/feedback/{feedback}', [ModerationController::class, 'reviewFeedback'])
+                ->name('moderation.feedback.review');
+            Route::patch('moderation/cases/{case}', [ModerationController::class, 'updateCase'])
+                ->name('moderation.cases.update');
             Route::patch('settings/theme', [SettingController::class, 'updateTheme'])
                 ->name('settings.theme.update');
             Route::patch('settings/platform', [SettingController::class, 'update'])
