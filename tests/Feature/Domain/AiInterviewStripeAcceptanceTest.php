@@ -3,6 +3,7 @@
 namespace Tests\Feature\Domain;
 
 use App\Contracts\AiProvider;
+use App\Contracts\StripeSubscriptionGateway;
 use App\Contracts\VideoProvider;
 use App\Enums\AiRunStatus;
 use App\Enums\ApplicationStatus;
@@ -11,7 +12,6 @@ use App\Enums\CompanyStatus;
 use App\Enums\InterviewStatus;
 use App\Enums\UserRole;
 use App\Listeners\SyncStripePurchase;
-use App\Listeners\SyncStripeSubscription;
 use App\Models\AiRun;
 use App\Models\CandidateProfile;
 use App\Models\Company;
@@ -26,14 +26,16 @@ use App\Models\JobPosting;
 use App\Models\Plan;
 use App\Models\User;
 use App\Services\Billing\EntitlementService;
+use App\Services\Billing\StripeSubscriptionSynchronizer;
+use App\Services\Billing\StripeWebhookEventProcessor;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\URL;
-use Laravel\Cashier\Events\WebhookHandled;
 use Laravel\Cashier\Events\WebhookReceived;
 use Tests\Support\ErinAcceptanceAiProvider;
 use Tests\Support\ErinAcceptanceVideoProvider;
+use Tests\Support\ErinStripeSubscriptionGateway;
 
 uses(RefreshDatabase::class);
 
@@ -82,6 +84,30 @@ function erinIntegrationInterviewParticipants(): array
     ]);
 
     return [$owner, $company, $profile->user, $application];
+}
+
+/**
+ * @param  array<string, mixed>  $payload
+ */
+function erinProcessCanonicalStripeSubscription(array $payload): void
+{
+    $gateway = app(StripeSubscriptionGateway::class);
+    if (! $gateway instanceof ErinStripeSubscriptionGateway) {
+        $gateway = new ErinStripeSubscriptionGateway;
+        app()->instance(StripeSubscriptionGateway::class, $gateway);
+    }
+    $snapshot = $payload['data']['object'] ?? null;
+    if (! is_array($snapshot)) {
+        throw new RuntimeException('Stripe-Testereignis ohne Subscription-Snapshot.');
+    }
+    $gateway->put($snapshot);
+
+    app(StripeWebhookEventProcessor::class)->once(
+        $payload,
+        function (array $event): void {
+            app(StripeSubscriptionSynchronizer::class)->synchronize($event);
+        },
+    );
 }
 
 it('records a fake AI result, consumes one company credit, and never changes the application status', function () {
@@ -309,14 +335,16 @@ it('issues video access only inside the interview window and only to participant
 
 it('handles duplicate Stripe subscription events once and preserves active and past due access', function () {
     $this->travelTo(Carbon::parse('2026-08-03 09:00:00', 'Europe/Berlin'));
-    $plan = Plan::factory()->create(['stripe_price_id' => 'price_business_acceptance']);
+    $plan = Plan::factory()->create([
+        'stripe_product_id' => 'prod_business_acceptance',
+        'stripe_price_id' => 'price_business_acceptance',
+    ]);
     $company = Company::factory()->create([
         'current_plan_id' => null,
         'stripe_id' => 'cus_subscription_acceptance',
         'status' => CompanyStatus::Pending,
         'subscription_status' => 'incomplete',
     ]);
-    $listener = app(SyncStripeSubscription::class);
     $entitlements = app(EntitlementService::class);
     $periodStart = now()->startOfDay();
     $periodEnd = $periodStart->copy()->addMonths(4);
@@ -326,22 +354,33 @@ it('handles duplicate Stripe subscription events once and preserves active and p
         'type' => 'customer.subscription.updated',
         'data' => ['object' => [
             'id' => 'sub_acceptance',
+            'created' => now()->getTimestamp(),
             'customer' => $company->stripe_id,
             'status' => 'past_due',
+            'metadata' => [
+                'type' => 'default',
+                'company_id' => (string) $company->getKey(),
+                'erin_subscription_generation' => '0',
+            ],
             'cancel_at_period_end' => false,
             'current_period_start' => $periodStart->getTimestamp(),
             'current_period_end' => $periodEnd->getTimestamp(),
             'items' => ['data' => [[
-                'price' => ['id' => $plan->stripe_price_id],
+                'id' => 'si_acceptance',
+                'quantity' => 1,
+                'price' => [
+                    'id' => $plan->stripe_price_id,
+                    'product' => $plan->stripe_product_id,
+                ],
             ]]],
         ]],
     ];
 
-    $listener->handle(new WebhookHandled($pastDuePayload));
+    erinProcessCanonicalStripeSubscription($pastDuePayload);
     $receipt = IntegrationReceipt::query()->sole();
     $firstProcessedAt = $receipt->processed_at?->getTimestamp();
     $this->travelTo(now()->addMinutes(5));
-    $listener->handle(new WebhookHandled($pastDuePayload));
+    erinProcessCanonicalStripeSubscription($pastDuePayload);
     $company->refresh();
 
     expect(IntegrationReceipt::query()->count())->toBe(1)
@@ -355,8 +394,8 @@ it('handles duplicate Stripe subscription events once and preserves active and p
     $activePayload['id'] = 'evt_subscription_active_acceptance';
     $activePayload['data']['object']['status'] = 'active';
 
-    $listener->handle(new WebhookHandled($activePayload));
-    $listener->handle(new WebhookHandled($activePayload));
+    erinProcessCanonicalStripeSubscription($activePayload);
+    erinProcessCanonicalStripeSubscription($activePayload);
     $company->refresh();
 
     expect(IntegrationReceipt::query()->count())->toBe(2)
@@ -369,31 +408,53 @@ it('handles duplicate Stripe subscription events once and preserves active and p
 });
 
 it('identifies the base plan beside seat add-ons and never reactivates an administratively blocked company', function () {
-    $plan = Plan::factory()->create(['stripe_price_id' => 'price_base_business']);
+    $plan = Plan::factory()->create([
+        'stripe_product_id' => 'prod_base_business',
+        'stripe_price_id' => 'price_base_business',
+    ]);
     $company = Company::factory()->create([
         'current_plan_id' => null,
         'stripe_id' => 'cus_blocked_subscription',
         'status' => CompanyStatus::Blocked,
         'subscription_status' => 'past_due',
     ]);
-    $listener = app(SyncStripeSubscription::class);
     $payload = [
         'id' => 'evt_blocked_with_seat_addon',
         'type' => 'customer.subscription.updated',
         'data' => ['object' => [
             'id' => 'sub_blocked_with_seat_addon',
+            'created' => now()->getTimestamp(),
             'customer' => $company->stripe_id,
             'status' => 'active',
+            'metadata' => [
+                'type' => 'default',
+                'company_id' => (string) $company->getKey(),
+                'erin_subscription_generation' => '0',
+            ],
             'current_period_start' => now()->getTimestamp(),
             'current_period_end' => now()->addMonths(4)->getTimestamp(),
             'items' => ['data' => [
-                ['price' => ['id' => 'price_recruiter_seat'], 'quantity' => 3],
-                ['price' => ['id' => $plan->stripe_price_id], 'quantity' => 1],
+                [
+                    'id' => 'si_recruiter_seat',
+                    'price' => [
+                        'id' => 'price_recruiter_seat',
+                        'product' => 'prod_recruiter_seat',
+                    ],
+                    'quantity' => 3,
+                ],
+                [
+                    'id' => 'si_base_business',
+                    'price' => [
+                        'id' => $plan->stripe_price_id,
+                        'product' => $plan->stripe_product_id,
+                    ],
+                    'quantity' => 1,
+                ],
             ]],
         ]],
     ];
 
-    $listener->handle(new WebhookHandled($payload));
+    erinProcessCanonicalStripeSubscription($payload);
     $company->refresh();
 
     expect($company->current_plan_id)->toBe($plan->getKey())

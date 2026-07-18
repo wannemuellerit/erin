@@ -45,7 +45,7 @@ watchEffect(() => {
                     name="email"
                     autocomplete="off"
                     autofocus
-                    placeholder="name@example.com"
+                    :placeholder="t('auth.emailPlaceholder')"
                 />
                 <InputError :message="errors.email" />
             </div>

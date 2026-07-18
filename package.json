@@ -11,12 +11,15 @@
         "dev": "vite",
         "format": "prettier --write resources/",
         "format:check": "prettier --check resources/",
+        "i18n:check": "node scripts/check-i18n.mjs",
         "lint": "eslint . --fix",
         "lint:check": "eslint .",
         "test:e2e": "playwright test",
         "types:check": "vue-tsc --noEmit"
     },
     "devDependencies": {
+        "@intlify/message-compiler": "^11.4.6",
+        "@axe-core/playwright": "^4.12.1",
         "@eslint/js": "^9.19.0",
         "@laravel/echo-vue": "^2.4.0",
         "@laravel/vite-plugin-wayfinder": "^0.1.3",
@@ -25,6 +28,7 @@
         "@tailwindcss/vite": "^4.1.11",
         "@types/node": "^22.13.5",
         "@vitejs/plugin-vue": "^6.0.0",
+        "@vue/compiler-sfc": "^3.5.13",
         "@vue/eslint-config-typescript": "^14.3.0",
         "concurrently": "^9.0.1",
         "eslint": "^9.17.0",

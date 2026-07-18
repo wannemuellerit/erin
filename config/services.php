@@ -68,6 +68,15 @@ return [
         'region' => env('LIVEKIT_REGION', 'eu'),
     ],
 
+    'zammad' => [
+        'enabled' => (bool) env('ZAMMAD_ENABLED', false),
+        'url' => env('ZAMMAD_URL'),
+        'token' => env('ZAMMAD_TOKEN'),
+        'group' => env('ZAMMAD_GROUP', 'Users'),
+        'webhook_secret' => env('ZAMMAD_WEBHOOK_SECRET'),
+        'timeout' => (int) env('ZAMMAD_TIMEOUT', 10),
+    ],
+
     'clamav' => [
         'host' => env('CLAMAV_HOST', 'clamav'),
         'port' => (int) env('CLAMAV_PORT', 3310),

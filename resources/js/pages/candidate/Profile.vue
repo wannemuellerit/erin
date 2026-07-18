@@ -13,10 +13,12 @@ import {
     UserRound,
 } from '@lucide/vue';
 import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import PageHeader from '@/components/product/PageHeader.vue';
 import ProgressBar from '@/components/product/ProgressBar.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
+import { useLocalizedField } from '@/composables/useLocalizedField';
 import { useStatusLabels } from '@/composables/useStatusLabels';
 import { documents, publish, update } from '@/routes/candidate/profile';
 import type { StatusTone } from '@/types';
@@ -179,14 +181,32 @@ const props = withDefaults(
         document_types: () => [],
     },
 );
+const { t, te } = useI18n();
+const { localizedField } = useLocalizedField();
 const { statusLabel } = useStatusLabels();
 const active = ref('personal');
-const tabs = [
-    { key: 'personal', label: 'Persönliche Daten', icon: UserRound },
-    { key: 'profession', label: 'Beruf & Mobilität', icon: BriefcaseBusiness },
-    { key: 'skills', label: 'Skills & Sprachen', icon: LanguagesIcon },
-    { key: 'documents', label: 'Dokumente', icon: FileText },
-];
+const tabs = computed(() => [
+    {
+        key: 'personal',
+        label: t('candidate.profile.tabs.personal'),
+        icon: UserRound,
+    },
+    {
+        key: 'profession',
+        label: t('candidate.profile.tabs.profession'),
+        icon: BriefcaseBusiness,
+    },
+    {
+        key: 'skills',
+        label: t('candidate.profile.tabs.skills'),
+        icon: LanguagesIcon,
+    },
+    {
+        key: 'documents',
+        label: t('candidate.profile.tabs.documents'),
+        icon: FileText,
+    },
+]);
 const form = useForm<ProfileFormData>({
     first_name: props.profile?.first_name ?? '',
     last_name: props.profile?.last_name ?? '',
@@ -262,7 +282,7 @@ const name = computed(
     () =>
         [props.profile?.first_name, props.profile?.last_name]
             .filter(Boolean)
-            .join(' ') || 'Profil einrichten',
+            .join(' ') || t('candidate.profile.setupFallback'),
 );
 const input =
     'erin-focus mt-1.5 h-11 w-full rounded-xl border border-slate-200 px-3.5 text-sm';
@@ -300,15 +320,25 @@ const submitDocument = () =>
         preserveScroll: true,
         onSuccess: () => documentForm.reset(),
     });
+const missingLabel = (missing: string) => {
+    const key = `candidate.profile.missing.${missing}`;
+
+    return te(key) ? t(key) : missing.replaceAll('_', ' ');
+};
+const documentTypeLabel = (type: string) => {
+    const key = `candidate.profile.documents.types.${type}`;
+
+    return te(key) ? t(key) : type.replaceAll('_', ' ');
+};
 </script>
 
 <template>
-    <Head title="Mein Profil" />
+    <Head :title="t('candidate.profile.metaTitle')" />
     <div class="erin-page">
         <PageHeader
-            eyebrow="Kandidatenprofil"
-            title="Mein Profil"
-            description="Vollständige und verifizierte Profile erhalten mehr passende Einladungen."
+            :eyebrow="t('candidate.profile.eyebrow')"
+            :title="t('candidate.profile.title')"
+            :description="t('candidate.profile.description')"
             :icon="UserRound"
         >
             <template #actions>
@@ -317,7 +347,8 @@ const submitDocument = () =>
                     class="inline-flex h-10 items-center gap-2 rounded-xl bg-[var(--erin-primary)] px-4 text-sm font-bold text-white disabled:opacity-50"
                     @click="form.put(update.url(), { preserveScroll: true })"
                 >
-                    <Save class="size-4" /> Speichern
+                    <Save class="size-4" />
+                    {{ t('candidate.profile.save') }}
                 </button>
             </template>
         </PageHeader>
@@ -328,9 +359,11 @@ const submitDocument = () =>
         >
             <div>
                 <UserRound class="mx-auto size-9 text-slate-300" />
-                <h2 class="mt-4 font-bold">Profil wird vorbereitet</h2>
+                <h2 class="mt-4 font-bold">
+                    {{ t('candidate.profile.preparingTitle') }}
+                </h2>
                 <p class="mt-2 text-sm text-slate-500">
-                    Für dieses Konto ist noch kein Kandidatenprofil verfügbar.
+                    {{ t('candidate.profile.preparingDescription') }}
                 </p>
             </div>
         </div>
@@ -360,8 +393,8 @@ const submitDocument = () =>
                             /><StatusBadge
                                 :label="
                                     profile.published_at
-                                        ? 'Veröffentlicht'
-                                        : 'Nicht veröffentlicht'
+                                        ? t('candidate.profile.published')
+                                        : t('candidate.profile.unpublished')
                                 "
                                 :tone="profile.published_at ? 'green' : 'slate'"
                             />
@@ -370,7 +403,7 @@ const submitDocument = () =>
                             {{
                                 profile.desired_position ||
                                 profile.current_position ||
-                                'Wunschposition ergänzen'
+                                t('candidate.profile.desiredPositionMissing')
                             }}<template v-if="profile.current_country_code">
                                 · {{ profile.current_country_code }}</template
                             >
@@ -378,7 +411,7 @@ const submitDocument = () =>
                         <div class="mt-3 max-w-xl">
                             <ProgressBar
                                 :value="profile_status.percentage"
-                                label="Profil vollständig"
+                                :label="t('candidate.profile.completeness')"
                                 tone="teal"
                             />
                         </div>
@@ -389,8 +422,8 @@ const submitDocument = () =>
                     >
                         {{
                             profile.published_at
-                                ? 'Veröffentlichung stoppen'
-                                : 'Profil veröffentlichen'
+                                ? t('candidate.profile.stopPublishing')
+                                : t('candidate.profile.publish')
                         }}
                     </button>
                 </div>
@@ -421,50 +454,56 @@ const submitDocument = () =>
                 class="grid gap-6 xl:grid-cols-[1fr_20rem]"
             >
                 <SectionCard
-                    title="Persönliche Daten"
-                    description="Diese Angaben werden erst nach deiner Freigabe sichtbar"
+                    :title="t('candidate.profile.personal.title')"
+                    :description="t('candidate.profile.personal.description')"
                 >
                     <div class="grid gap-5 sm:grid-cols-2">
                         <label
-                            ><span class="text-sm font-bold text-slate-700"
-                                >Vorname *</span
+                            ><span class="text-sm font-bold text-slate-700">{{
+                                t('candidate.profile.personal.firstName')
+                            }}</span
                             ><input
                                 v-model="form.first_name"
                                 required
                                 :class="input"
                         /></label>
                         <label
-                            ><span class="text-sm font-bold text-slate-700"
-                                >Nachname *</span
+                            ><span class="text-sm font-bold text-slate-700">{{
+                                t('candidate.profile.personal.lastName')
+                            }}</span
                             ><input
                                 v-model="form.last_name"
                                 required
                                 :class="input"
                         /></label>
                         <label
-                            ><span class="text-sm font-bold text-slate-700"
-                                >Geburtsdatum</span
+                            ><span class="text-sm font-bold text-slate-700">{{
+                                t('candidate.profile.personal.birthDate')
+                            }}</span
                             ><input
                                 v-model="form.birth_date"
                                 type="date"
                                 :class="input"
                         /></label>
                         <label
-                            ><span class="text-sm font-bold text-slate-700"
-                                >Geschlecht</span
+                            ><span class="text-sm font-bold text-slate-700">{{
+                                t('candidate.profile.personal.gender')
+                            }}</span
                             ><input v-model="form.gender" :class="input"
                         /></label>
                         <label
-                            ><span class="text-sm font-bold text-slate-700"
-                                >Staatsangehörigkeit (ISO)</span
+                            ><span class="text-sm font-bold text-slate-700">{{
+                                t('candidate.profile.personal.nationality')
+                            }}</span
                             ><input
                                 v-model="form.nationality_country_code"
                                 maxlength="2"
                                 :class="input"
                         /></label>
                         <label
-                            ><span class="text-sm font-bold text-slate-700"
-                                >Aktuelles Land (ISO) *</span
+                            ><span class="text-sm font-bold text-slate-700">{{
+                                t('candidate.profile.personal.currentCountry')
+                            }}</span
                             ><input
                                 v-model="form.current_country_code"
                                 required
@@ -472,30 +511,34 @@ const submitDocument = () =>
                                 :class="input"
                         /></label>
                         <label
-                            ><span class="text-sm font-bold text-slate-700"
-                                >Aktuelle Stadt *</span
+                            ><span class="text-sm font-bold text-slate-700">{{
+                                t('candidate.profile.personal.currentCity')
+                            }}</span
                             ><input
                                 v-model="form.current_city"
                                 required
                                 :class="input"
                         /></label>
                         <label
-                            ><span class="text-sm font-bold text-slate-700"
-                                >Telefonnummer *</span
+                            ><span class="text-sm font-bold text-slate-700">{{
+                                t('candidate.profile.personal.phone')
+                            }}</span
                             ><input
                                 v-model="form.phone"
                                 required
                                 :class="input"
                         /></label>
                         <label
-                            ><span class="text-sm font-bold text-slate-700"
-                                >WhatsApp</span
+                            ><span class="text-sm font-bold text-slate-700">{{
+                                t('candidate.profile.personal.whatsapp')
+                            }}</span
                             ><input v-model="form.whatsapp" :class="input"
                         /></label>
                     </div>
                     <label class="mt-5 block"
-                        ><span class="text-sm font-bold text-slate-700"
-                            >Kurztext über dich *</span
+                        ><span class="text-sm font-bold text-slate-700">{{
+                            t('candidate.profile.personal.summary')
+                        }}</span
                         ><textarea
                             v-model="form.summary"
                             required
@@ -505,7 +548,7 @@ const submitDocument = () =>
                     </label>
                 </SectionCard>
                 <aside class="space-y-4">
-                    <SectionCard title="Datenschutz"
+                    <SectionCard :title="t('candidate.profile.privacy.title')"
                         ><div
                             class="space-y-3 text-xs leading-5 text-slate-500"
                         >
@@ -513,18 +556,17 @@ const submitDocument = () =>
                                 <ShieldCheck
                                     class="size-4 shrink-0 text-[var(--erin-secondary)]"
                                 />
-                                Unternehmen sehen dein Profil zunächst anonym.
+                                {{ t('candidate.profile.privacy.anonymous') }}
                             </p>
                             <p class="flex gap-2">
                                 <LockKeyhole
                                     class="size-4 shrink-0 text-[var(--erin-primary)]"
                                 />
-                                Kontaktdaten nur nach Bewerbung oder
-                                angenommener Einladung.
+                                {{ t('candidate.profile.privacy.contact') }}
                             </p>
                         </div></SectionCard
                     >
-                    <SectionCard title="Noch offen"
+                    <SectionCard :title="t('candidate.profile.missing.title')"
                         ><div
                             v-if="profile_status.missing.length"
                             class="space-y-2"
@@ -534,11 +576,11 @@ const submitDocument = () =>
                                 :key="missing"
                                 class="rounded-lg bg-orange-50 p-2.5 text-xs font-bold text-orange-700"
                             >
-                                {{ missing }}
+                                {{ missingLabel(missing) }}
                             </div>
                         </div>
                         <p v-else class="text-xs text-teal-600">
-                            Alle Profilbereiche vollständig.
+                            {{ t('candidate.profile.missing.complete') }}
                         </p></SectionCard
                     >
                 </aside>
@@ -546,43 +588,49 @@ const submitDocument = () =>
 
             <SectionCard
                 v-else-if="active === 'profession'"
-                title="Beruf & Mobilität"
+                :title="t('candidate.profile.profession.title')"
             >
                 <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                     <label
-                        ><span class="text-sm font-bold text-slate-700"
-                            >Berufsfeld *</span
+                        ><span class="text-sm font-bold text-slate-700">{{
+                            t('candidate.profile.profession.occupation')
+                        }}</span
                         ><select
                             v-model="form.occupation_id"
                             required
                             :class="input"
                         >
-                            <option :value="null">Bitte wählen</option>
+                            <option :value="null">
+                                {{ t('candidate.profile.profession.choose') }}
+                            </option>
                             <option
                                 v-for="occupation in occupations"
                                 :key="occupation.id"
                                 :value="occupation.id"
                             >
-                                {{ occupation.name_de ?? occupation.name_en }}
+                                {{ localizedField(occupation) }}
                             </option>
                         </select></label
                     >
                     <label
-                        ><span class="text-sm font-bold text-slate-700"
-                            >Aktuelle Position</span
+                        ><span class="text-sm font-bold text-slate-700">{{
+                            t('candidate.profile.profession.currentPosition')
+                        }}</span
                         ><input v-model="form.current_position" :class="input"
                     /></label>
                     <label
-                        ><span class="text-sm font-bold text-slate-700"
-                            >Wunschposition *</span
+                        ><span class="text-sm font-bold text-slate-700">{{
+                            t('candidate.profile.profession.desiredPosition')
+                        }}</span
                         ><input
                             v-model="form.desired_position"
                             required
                             :class="input"
                     /></label>
                     <label
-                        ><span class="text-sm font-bold text-slate-700"
-                            >Berufserfahrung *</span
+                        ><span class="text-sm font-bold text-slate-700">{{
+                            t('candidate.profile.profession.experience')
+                        }}</span
                         ><input
                             v-model.number="form.experience_years"
                             required
@@ -592,23 +640,26 @@ const submitDocument = () =>
                             :class="input"
                     /></label>
                     <label
-                        ><span class="text-sm font-bold text-slate-700"
-                            >Höchster Abschluss</span
+                        ><span class="text-sm font-bold text-slate-700">{{
+                            t('candidate.profile.profession.qualification')
+                        }}</span
                         ><input
                             v-model="form.highest_qualification"
                             :class="input"
                     /></label>
                     <label
-                        ><span class="text-sm font-bold text-slate-700"
-                            >Frühester Eintritt</span
+                        ><span class="text-sm font-bold text-slate-700">{{
+                            t('candidate.profile.profession.availableFrom')
+                        }}</span
                         ><input
                             v-model="form.available_from"
                             type="date"
                             :class="input"
                     /></label>
                     <label
-                        ><span class="text-sm font-bold text-slate-700"
-                            >Gehaltsvorstellung (Cent)</span
+                        ><span class="text-sm font-bold text-slate-700">{{
+                            t('candidate.profile.profession.salary')
+                        }}</span
                         ><input
                             v-model.number="form.salary_expectation_cents"
                             min="0"
@@ -616,8 +667,9 @@ const submitDocument = () =>
                             :class="input"
                     /></label>
                     <label
-                        ><span class="text-sm font-bold text-slate-700"
-                            >Wochenstunden</span
+                        ><span class="text-sm font-bold text-slate-700">{{
+                            t('candidate.profile.profession.weeklyHours')
+                        }}</span
                         ><input
                             v-model.number="form.weekly_hours"
                             min="1"
@@ -630,7 +682,9 @@ const submitDocument = () =>
                     <label
                         class="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-sm"
                         ><input v-model="form.travel_ready" type="checkbox" />
-                        Reisebereit</label
+                        {{
+                            t('candidate.profile.profession.travelReady')
+                        }}</label
                     >
                     <label
                         class="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-sm"
@@ -638,12 +692,16 @@ const submitDocument = () =>
                             v-model="form.relocation_ready"
                             type="checkbox"
                         />
-                        Umzugsbereit</label
+                        {{
+                            t('candidate.profile.profession.relocationReady')
+                        }}</label
                     >
                     <label
                         class="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-sm"
                         ><input v-model="form.requires_visa" type="checkbox" />
-                        Visum benötigt</label
+                        {{
+                            t('candidate.profile.profession.requiresVisa')
+                        }}</label
                     >
                     <label
                         class="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-sm"
@@ -651,7 +709,9 @@ const submitDocument = () =>
                             v-model="form.has_work_permit"
                             type="checkbox"
                         />
-                        Arbeitserlaubnis</label
+                        {{
+                            t('candidate.profile.profession.workPermit')
+                        }}</label
                     >
                 </div>
             </SectionCard>
@@ -660,7 +720,7 @@ const submitDocument = () =>
                 v-else-if="active === 'skills'"
                 class="grid gap-6 lg:grid-cols-2"
             >
-                <SectionCard title="Skills"
+                <SectionCard :title="t('candidate.profile.skills.title')"
                     ><div v-if="skills.length" class="flex flex-wrap gap-2">
                         <button
                             v-for="skill in skills"
@@ -674,14 +734,15 @@ const submitDocument = () =>
                             "
                             @click="toggleSkill(skill.id)"
                         >
-                            {{ skill.name_de ?? skill.name_en }}
+                            {{ localizedField(skill) }}
                         </button>
                     </div>
                     <p v-else class="text-sm text-slate-400">
-                        Keine Skills konfiguriert.
+                        {{ t('candidate.profile.skills.empty') }}
                     </p></SectionCard
                 >
-                <SectionCard title="Sprachen"
+                <SectionCard
+                    :title="t('candidate.profile.skills.languagesTitle')"
                     ><div v-if="languages.length" class="space-y-2">
                         <div
                             v-for="language in languages"
@@ -693,9 +754,7 @@ const submitDocument = () =>
                                 type="checkbox"
                                 @change="toggleLanguage(language.id)"
                             /><span class="flex-1 text-sm font-bold">{{
-                                language.name_de ??
-                                language.name_en ??
-                                language.code
+                                localizedField(language, 'name', language.code)
                             }}</span
                             ><select
                                 v-if="hasLanguage(language.id)"
@@ -726,15 +785,15 @@ const submitDocument = () =>
                         </div>
                     </div>
                     <p v-else class="text-sm text-slate-400">
-                        Keine Sprachen konfiguriert.
+                        {{ t('candidate.profile.skills.languagesEmpty') }}
                     </p></SectionCard
                 >
             </div>
 
             <div v-else class="space-y-6">
                 <SectionCard
-                    title="Dokumente"
-                    description="Private, verschlüsselte Ablage mit separater Freigabe"
+                    :title="t('candidate.profile.documents.title')"
+                    :description="t('candidate.profile.documents.description')"
                 >
                     <div
                         v-if="profile.documents?.length"
@@ -772,23 +831,31 @@ const submitDocument = () =>
                             <a
                                 v-if="document.download_url"
                                 :href="document.download_url"
+                                :aria-label="
+                                    t('candidate.profile.documents.download', {
+                                        title: document.title,
+                                    })
+                                "
                                 class="grid size-8 place-items-center rounded-lg text-slate-400 hover:bg-slate-100"
                                 ><Download class="size-4"
                             /></a>
                         </article>
                     </div>
                     <p v-else class="py-6 text-center text-sm text-slate-400">
-                        Noch keine Dokumente hochgeladen.
+                        {{ t('candidate.profile.documents.empty') }}
                     </p>
                 </SectionCard>
-                <SectionCard title="Dokument hochladen">
+                <SectionCard
+                    :title="t('candidate.profile.documents.uploadTitle')"
+                >
                     <form
                         class="grid gap-4 sm:grid-cols-2"
                         @submit.prevent="submitDocument"
                     >
                         <label
-                            ><span class="text-xs font-bold text-slate-600"
-                                >Dokumenttyp</span
+                            ><span class="text-xs font-bold text-slate-600">{{
+                                t('candidate.profile.documents.type')
+                            }}</span
                             ><select
                                 v-model="documentForm.type"
                                 required
@@ -799,21 +866,23 @@ const submitDocument = () =>
                                     :key="type"
                                     :value="type"
                                 >
-                                    {{ type.replaceAll('_', ' ') }}
+                                    {{ documentTypeLabel(type) }}
                                 </option>
                             </select></label
                         >
                         <label
-                            ><span class="text-xs font-bold text-slate-600"
-                                >Titel</span
+                            ><span class="text-xs font-bold text-slate-600">{{
+                                t('candidate.profile.documents.documentTitle')
+                            }}</span
                             ><input
                                 v-model="documentForm.title"
                                 required
                                 :class="input"
                         /></label>
                         <label class="sm:col-span-2"
-                            ><span class="text-xs font-bold text-slate-600"
-                                >Datei</span
+                            ><span class="text-xs font-bold text-slate-600">{{
+                                t('candidate.profile.documents.file')
+                            }}</span
                             ><input
                                 required
                                 type="file"
@@ -829,7 +898,8 @@ const submitDocument = () =>
                             :disabled="documentForm.processing"
                             class="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[var(--erin-primary)] text-xs font-bold text-white disabled:opacity-50 sm:col-span-2"
                         >
-                            <Upload class="size-4" /> Sicher hochladen
+                            <Upload class="size-4" />
+                            {{ t('candidate.profile.documents.upload') }}
                         </button>
                     </form>
                 </SectionCard>

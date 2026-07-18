@@ -9,8 +9,11 @@ import {
     WandSparkles,
 } from '@lucide/vue';
 import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import PageHeader from '@/components/product/PageHeader.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
+import Textarea from '@/components/product/Textarea.vue';
+import { useLocalizedField } from '@/composables/useLocalizedField';
 import { useStatusLabels } from '@/composables/useStatusLabels';
 import { run as runAi } from '@/routes/ai';
 import { index as jobsIndex, store, update } from '@/routes/employer/jobs';
@@ -76,8 +79,20 @@ const props = withDefaults(
         locations: () => [],
     },
 );
+const { t } = useI18n();
+const { localizedField } = useLocalizedField();
 const { statusLabel } = useStatusLabels();
 const mode = computed(() => (props.job ? 'edit' : 'create'));
+const pageTitle = computed(() =>
+    mode.value === 'edit'
+        ? t('employer.jobForm.editMetaTitle')
+        : t('employer.jobForm.createMetaTitle'),
+);
+const headerTitle = computed(() =>
+    mode.value === 'edit'
+        ? t('employer.jobForm.editTitle')
+        : t('employer.jobForm.createTitle'),
+);
 const screeningQuestions = ref(
     props.job?.screening_questions?.map((question) => ({
         question: question.question ?? '',
@@ -198,7 +213,7 @@ const useAi = async (task: 'job_create' | 'job_improve') => {
             throw new Error(
                 payload.message ??
                     Object.values(payload.errors ?? {})[0]?.[0] ??
-                    'Die KI-Anfrage konnte nicht abgeschlossen werden.',
+                    t('employer.jobForm.aiError'),
             );
         }
 
@@ -215,7 +230,7 @@ const useAi = async (task: 'job_create' | 'job_improve') => {
         aiError.value =
             exception instanceof Error
                 ? exception.message
-                : 'Die KI-Anfrage konnte nicht abgeschlossen werden.';
+                : t('employer.jobForm.aiError');
     } finally {
         aiRunning.value = null;
     }
@@ -225,27 +240,18 @@ const fieldClass =
 </script>
 
 <template>
-    <Head
-        :title="
-            mode === 'edit'
-                ? 'Stellenanzeige bearbeiten'
-                : 'Stellenanzeige erstellen'
-        "
-    />
+    <Head :title="pageTitle" />
     <div class="erin-page">
         <Link
             :href="jobsIndex()"
             class="inline-flex w-fit items-center gap-2 text-xs font-bold text-slate-500 hover:text-[var(--erin-primary)]"
-            ><ArrowLeft class="size-4" /> Zurück zu Stellenanzeigen</Link
+            ><ArrowLeft class="size-4" />
+            {{ t('employer.jobForm.backToJobs') }}</Link
         >
         <PageHeader
-            eyebrow="Stellenanzeige"
-            :title="
-                mode === 'edit'
-                    ? 'Stellenanzeige bearbeiten'
-                    : 'Neue Stellenanzeige erstellen'
-            "
-            description="Beschreiben Sie die Position möglichst konkret – Erin übernimmt den Rest."
+            :eyebrow="t('employer.jobForm.eyebrow')"
+            :title="headerTitle"
+            :description="t('employer.jobForm.description')"
         >
             <template #actions
                 ><button
@@ -257,8 +263,8 @@ const fieldClass =
                     <WandSparkles class="size-4" />
                     {{
                         aiRunning === 'job_create'
-                            ? 'KI arbeitet …'
-                            : 'Mit KI erstellen'
+                            ? t('employer.jobForm.aiWorking')
+                            : t('employer.jobForm.createWithAi')
                     }}
                 </button></template
             >
@@ -269,18 +275,23 @@ const fieldClass =
         >
             <div class="space-y-6">
                 <SectionCard
-                    title="Grundinformationen"
-                    description="Die wichtigsten Eckdaten zur offenen Position"
+                    :title="t('employer.jobForm.basicsTitle')"
+                    :description="t('employer.jobForm.basicsDescription')"
                 >
                     <div class="grid gap-5 sm:grid-cols-2">
                         <label class="sm:col-span-2"
                             ><span class="text-sm font-bold text-slate-700"
-                                >Titel der Stellenanzeige *</span
+                                >{{
+                                    t('employer.jobForm.fields.title')
+                                }}
+                                *</span
                             ><input
                                 v-model="form.title"
                                 required
                                 :class="fieldClass"
-                                placeholder="z. B. Elektroniker Betriebstechnik"
+                                :placeholder="
+                                    t('employer.jobForm.placeholders.title')
+                                "
                             /><span
                                 v-if="form.errors.title"
                                 class="mt-1 block text-xs text-red-600"
@@ -289,35 +300,48 @@ const fieldClass =
                         >
                         <label
                             ><span class="text-sm font-bold text-slate-700"
-                                >Position *</span
+                                >{{
+                                    t('employer.jobForm.fields.position')
+                                }}
+                                *</span
                             ><input
                                 v-model="form.position"
                                 required
                                 :class="fieldClass"
-                                placeholder="z. B. Elektroniker"
+                                :placeholder="
+                                    t('employer.jobForm.placeholders.position')
+                                "
                         /></label>
                         <label
-                            ><span class="text-sm font-bold text-slate-700"
-                                >Berufsfeld</span
+                            ><span class="text-sm font-bold text-slate-700">{{
+                                t('employer.jobForm.fields.occupation')
+                            }}</span
                             ><select
                                 v-model="form.occupation_id"
                                 :class="fieldClass"
                             >
-                                <option :value="null">Bitte wählen</option>
+                                <option :value="null">
+                                    {{ t('employer.jobForm.selectOption') }}
+                                </option>
                                 <option
                                     v-for="occupation in occupations"
                                     :key="occupation.id"
                                     :value="occupation.id"
                                 >
                                     {{
-                                        occupation.name_de ?? occupation.name_en
+                                        localizedField(
+                                            occupation,
+                                            'name',
+                                            occupation.name ?? '',
+                                        )
                                     }}
                                 </option>
                             </select></label
                         >
                         <label
-                            ><span class="text-sm font-bold text-slate-700"
-                                >Erwartete Erfahrung (Jahre)</span
+                            ><span class="text-sm font-bold text-slate-700">{{
+                                t('employer.jobForm.fields.expectedExperience')
+                            }}</span
                             ><input
                                 v-model.number="form.expected_experience_years"
                                 :class="fieldClass"
@@ -326,16 +350,20 @@ const fieldClass =
                                 max="60"
                         /></label>
                         <label
-                            ><span class="text-sm font-bold text-slate-700"
-                                >Sprachanforderung</span
+                            ><span class="text-sm font-bold text-slate-700">{{
+                                t('employer.jobForm.fields.languageRequirement')
+                            }}</span
                             ><input
                                 v-model="form.language_notes"
                                 :class="fieldClass"
-                                placeholder="z. B. Deutsch B1"
+                                :placeholder="
+                                    t('employer.jobForm.placeholders.language')
+                                "
                         /></label>
                         <label
-                            ><span class="text-sm font-bold text-slate-700"
-                                >Stunden von</span
+                            ><span class="text-sm font-bold text-slate-700">{{
+                                t('employer.jobForm.fields.hoursFrom')
+                            }}</span
                             ><input
                                 v-model.number="form.hours_min"
                                 :class="fieldClass"
@@ -344,8 +372,9 @@ const fieldClass =
                                 max="80"
                         /></label>
                         <label
-                            ><span class="text-sm font-bold text-slate-700"
-                                >Stunden bis</span
+                            ><span class="text-sm font-bold text-slate-700">{{
+                                t('employer.jobForm.fields.hoursTo')
+                            }}</span
                             ><input
                                 v-model.number="form.hours_max"
                                 :class="fieldClass"
@@ -354,26 +383,54 @@ const fieldClass =
                                 max="80"
                         /></label>
                         <label
-                            ><span class="text-sm font-bold text-slate-700"
-                                >Anstellungsart</span
+                            ><span class="text-sm font-bold text-slate-700">{{
+                                t('employer.jobForm.fields.employmentType')
+                            }}</span
                             ><select
                                 v-model="form.employment_type"
                                 :class="fieldClass"
                             >
-                                <option value="full_time">Vollzeit</option>
-                                <option value="part_time">Teilzeit</option>
-                                <option value="temporary">Befristet</option>
-                                <option value="permanent">Unbefristet</option>
+                                <option value="full_time">
+                                    {{
+                                        t(
+                                            'employer.common.employmentTypes.full_time',
+                                        )
+                                    }}
+                                </option>
+                                <option value="part_time">
+                                    {{
+                                        t(
+                                            'employer.common.employmentTypes.part_time',
+                                        )
+                                    }}
+                                </option>
+                                <option value="temporary">
+                                    {{
+                                        t(
+                                            'employer.common.employmentTypes.temporary',
+                                        )
+                                    }}
+                                </option>
+                                <option value="permanent">
+                                    {{
+                                        t(
+                                            'employer.common.employmentTypes.permanent',
+                                        )
+                                    }}
+                                </option>
                             </select></label
                         >
                         <label
-                            ><span class="text-sm font-bold text-slate-700"
-                                >Standort</span
+                            ><span class="text-sm font-bold text-slate-700">{{
+                                t('employer.jobForm.fields.location')
+                            }}</span
                             ><select
                                 v-model="form.location_id"
                                 :class="fieldClass"
                             >
-                                <option :value="null">Kein Standort</option>
+                                <option :value="null">
+                                    {{ t('employer.jobForm.noLocation') }}
+                                </option>
                                 <option
                                     v-for="location in locations"
                                     :key="location.id"
@@ -387,8 +444,9 @@ const fieldClass =
                             </select></label
                         >
                         <label
-                            ><span class="text-sm font-bold text-slate-700"
-                                >Vergütung von (Cent)</span
+                            ><span class="text-sm font-bold text-slate-700">{{
+                                t('employer.jobForm.fields.compensationFrom')
+                            }}</span
                             ><input
                                 v-model.number="form.compensation_min_cents"
                                 :class="fieldClass"
@@ -396,8 +454,9 @@ const fieldClass =
                                 min="0"
                         /></label>
                         <label
-                            ><span class="text-sm font-bold text-slate-700"
-                                >Vergütung bis (Cent)</span
+                            ><span class="text-sm font-bold text-slate-700">{{
+                                t('employer.jobForm.fields.compensationTo')
+                            }}</span
                             ><input
                                 v-model.number="form.compensation_max_cents"
                                 :class="fieldClass"
@@ -407,8 +466,10 @@ const fieldClass =
                     </div>
                 </SectionCard>
                 <SectionCard
-                    title="Beschreibung"
-                    description="Aufgaben, Anforderungen und was Ihr Unternehmen bietet"
+                    :title="t('employer.jobForm.jobDescriptionTitle')"
+                    :description="
+                        t('employer.jobForm.jobDescriptionDescription')
+                    "
                 >
                     <div class="rounded-xl border border-slate-200">
                         <div
@@ -426,17 +487,19 @@ const fieldClass =
                                 <Sparkles class="size-3" />
                                 {{
                                     aiRunning === 'job_improve'
-                                        ? 'KI arbeitet …'
-                                        : 'Mit KI verbessern'
+                                        ? t('employer.jobForm.aiWorking')
+                                        : t('employer.jobForm.improveWithAi')
                                 }}
                             </button>
                         </div>
-                        <textarea
+                        <Textarea
                             v-model="form.description"
                             required
                             rows="10"
-                            class="erin-focus w-full resize-y border-0 p-4 text-sm leading-6 outline-none"
-                            placeholder="Beschreiben Sie die Position …"
+                            class="resize-y rounded-none border-0 p-4 outline-none"
+                            :placeholder="
+                                t('employer.jobForm.placeholders.description')
+                            "
                         />
                     </div>
                     <p
@@ -450,7 +513,7 @@ const fieldClass =
                         class="mt-3 rounded-xl border border-violet-100 bg-violet-50 p-4"
                     >
                         <p class="text-xs font-bold text-violet-900">
-                            Hinweise für Ihre Prüfung
+                            {{ t('employer.jobForm.aiReviewHints') }}
                         </p>
                         <ul
                             class="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-violet-800"
@@ -465,8 +528,13 @@ const fieldClass =
                     </div>
                 </SectionCard>
                 <SectionCard
-                    title="Screening-Fragen"
-                    :description="`${screeningQuestions.length} von maximal 5 Fragen`"
+                    :title="t('employer.jobForm.screeningTitle')"
+                    :description="
+                        t('employer.jobForm.screeningDescription', {
+                            count: screeningQuestions.length,
+                            max: 5,
+                        })
+                    "
                 >
                     <div class="space-y-3">
                         <div
@@ -485,15 +553,31 @@ const fieldClass =
                                 v-model="question.type"
                                 class="h-10 rounded-xl border border-slate-200 px-2 text-xs"
                             >
-                                <option value="text">Text</option>
-                                <option value="yes_no">Ja/Nein</option>
-                                <option value="choice">Auswahl</option></select
+                                <option value="text">
+                                    {{
+                                        t('employer.jobForm.questionTypes.text')
+                                    }}
+                                </option>
+                                <option value="yes_no">
+                                    {{
+                                        t(
+                                            'employer.jobForm.questionTypes.yesNo',
+                                        )
+                                    }}
+                                </option>
+                                <option value="choice">
+                                    {{
+                                        t(
+                                            'employer.jobForm.questionTypes.choice',
+                                        )
+                                    }}
+                                </option></select
                             ><button
                                 type="button"
                                 class="text-xs font-bold text-red-500"
                                 @click="screeningQuestions.splice(index, 1)"
                             >
-                                Entfernen
+                                {{ t('employer.jobForm.remove') }}
                             </button>
                         </div>
                     </div>
@@ -503,19 +587,20 @@ const fieldClass =
                         class="mt-4 inline-flex h-9 items-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 text-xs font-bold text-slate-600 hover:bg-slate-50"
                         @click="addQuestion"
                     >
-                        <FilePlus2 class="size-4" /> Frage hinzufügen
+                        <FilePlus2 class="size-4" />
+                        {{ t('employer.jobForm.addQuestion') }}
                     </button>
                 </SectionCard>
-                <SectionCard title="Medien & Dokumente">
+                <SectionCard :title="t('employer.jobForm.mediaTitle')">
                     <label
                         class="flex min-h-32 w-full cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 text-center hover:border-blue-300 hover:bg-blue-50/40"
                         ><ImagePlus
                             class="size-6 text-[var(--erin-primary)]" /><span
                             class="mt-2 text-sm font-bold text-slate-700"
-                            >Dateien hier auswählen</span
-                        ><span class="mt-1 text-xs text-slate-400"
-                            >JPG, PNG, GIF, PDF, DOC oder DOCX · max. 10
-                            MB</span
+                            >{{ t('employer.jobForm.chooseFiles') }}</span
+                        ><span class="mt-1 text-xs text-slate-400">{{
+                            t('employer.jobForm.fileRequirements')
+                        }}</span
                         ><input
                             class="sr-only"
                             type="file"
@@ -526,10 +611,12 @@ const fieldClass =
                 </SectionCard>
             </div>
             <aside class="space-y-4 xl:sticky xl:top-24 xl:self-start">
-                <SectionCard title="Veröffentlichung">
+                <SectionCard :title="t('employer.jobForm.publishingTitle')">
                     <div class="space-y-3 text-xs">
                         <div class="flex justify-between">
-                            <span class="text-slate-500">Status</span
+                            <span class="text-slate-500">{{
+                                t('employer.jobForm.status')
+                            }}</span
                             ><span class="font-bold text-slate-700">{{
                                 statusLabel('job', job?.status ?? 'draft')
                             }}</span>
@@ -544,18 +631,18 @@ const fieldClass =
                             <Save class="size-4" />
                             {{
                                 mode === 'edit'
-                                    ? 'Änderungen speichern'
-                                    : 'Als Entwurf speichern'
+                                    ? t('employer.jobForm.saveChanges')
+                                    : t('employer.jobForm.saveDraft')
                             }}
                         </button>
                         <Link
                             :href="jobsIndex()"
                             class="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 text-xs font-bold text-slate-600"
-                            >Abbrechen</Link
+                            >{{ t('employer.jobForm.cancel') }}</Link
                         >
                     </div>
                 </SectionCard>
-                <SectionCard title="Visumspaket">
+                <SectionCard :title="t('employer.jobForm.visaPackageTitle')">
                     <label class="flex cursor-pointer items-start gap-3"
                         ><input
                             v-model="form.visa_package_available"
@@ -564,11 +651,14 @@ const fieldClass =
                         /><span
                             ><span
                                 class="block text-sm font-bold text-slate-700"
-                                >Visa-Unterstützung anbieten</span
+                                >{{
+                                    t('employer.jobForm.offerVisaSupport')
+                                }}</span
                             ><span
                                 class="mt-1 block text-xs leading-5 text-slate-500"
-                                >Fachkräfte sehen, dass Sie den Prozess
-                                unterstützen.</span
+                                >{{
+                                    t('employer.jobForm.visaSupportDescription')
+                                }}</span
                             ></span
                         ></label
                     >

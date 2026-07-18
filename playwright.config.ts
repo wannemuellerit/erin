@@ -13,13 +13,25 @@ export default defineConfig({
     expect: {
         timeout: 7_500,
     },
-    reporter: [['list']],
+    reporter: process.env.CI
+        ? [
+              ['line'],
+              [
+                  'html',
+                  {
+                      outputFolder:
+                          './storage/framework/testing/playwright-report',
+                      open: 'never',
+                  },
+              ],
+          ]
+        : [['list']],
     use: {
         baseURL,
         testIdAttribute: 'data-test',
         locale: 'de-DE',
         timezoneId: 'Europe/Berlin',
-        trace: 'retain-on-failure',
+        trace: process.env.CI ? 'on-first-retry' : 'retain-on-failure',
         screenshot: 'only-on-failure',
         video: 'retain-on-failure',
     },

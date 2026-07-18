@@ -9,10 +9,16 @@ use App\Http\Controllers\CommunicationController;
 use App\Http\Controllers\CompanyMediaController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\Employer\AnalyticsController as EmployerAnalyticsController;
 use App\Http\Controllers\Employer\ApplicationController as EmployerApplicationController;
+use App\Http\Controllers\Employer\BulkCandidateController as EmployerBulkCandidateController;
 use App\Http\Controllers\Employer\CandidateController as EmployerCandidateController;
+use App\Http\Controllers\Employer\CandidateImportController as EmployerCandidateImportController;
 use App\Http\Controllers\Employer\JobController as EmployerJobController;
 use App\Http\Controllers\Employer\PortalController as EmployerPortalController;
+use App\Http\Controllers\Employer\ProductivityController as EmployerProductivityController;
+use App\Http\Controllers\Employer\ReminderController as EmployerReminderController;
+use App\Http\Controllers\Integrations\ZammadWebhookController;
 use App\Http\Controllers\InterviewController;
 use App\Http\Controllers\JobMediaController;
 use App\Http\Controllers\OnboardingController;
@@ -32,6 +38,9 @@ Route::post('locale', [AccountController::class, 'locale'])
     ->name('locale.update');
 Route::get('r/{code}', [ReferralController::class, 'track'])->name('referrals.track');
 Route::get('join/{token}', [EmployerPortalController::class, 'trackInvitation'])->name('company-invitations.track');
+Route::post('integrations/zammad/webhook', ZammadWebhookController::class)
+    ->middleware('throttle:120,1')
+    ->name('integrations.zammad.webhook');
 
 Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::get('onboarding', [OnboardingController::class, 'show'])->name('onboarding.show');
@@ -86,6 +95,7 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::post('documents/{document}/applications/{application}/grant', [DocumentController::class, 'grant'])
         ->name('documents.grant');
 
+    Route::get('support', [SupportActionController::class, 'index'])->name('support.index');
     Route::post('support/tickets', [SupportActionController::class, 'createTicket'])
         ->name('support.tickets.store');
     Route::post('support/tickets/{ticket}/reply', [SupportActionController::class, 'replyTicket'])
@@ -121,11 +131,31 @@ Route::middleware(['auth', 'verified', 'role:company', 'company.member', 'onboar
 
         Route::middleware('company.subscribed')->group(function (): void {
             Route::get('candidates', [EmployerCandidateController::class, 'index'])->name('candidates.index');
+            Route::post('candidates/bulk/invite', [EmployerBulkCandidateController::class, 'invite'])
+                ->name('candidates.bulk.invite');
+            Route::post('candidates/bulk/message', [EmployerBulkCandidateController::class, 'message'])
+                ->name('candidates.bulk.message');
             Route::get('candidates/{candidate}', [EmployerCandidateController::class, 'show'])->name('candidates.show');
             Route::post('candidates/{candidate}/invite', [EmployerCandidateController::class, 'invite'])
                 ->name('candidates.invite');
             Route::post('candidates/{candidate}/talent-list', [EmployerCandidateController::class, 'saveToTalentList'])
                 ->name('candidates.talent-list');
+
+            Route::get('productivity', EmployerProductivityController::class)->name('productivity');
+            Route::post('reminders', [EmployerReminderController::class, 'store'])->name('reminders.store');
+            Route::patch('reminders/{reminder}', [EmployerReminderController::class, 'update'])
+                ->name('reminders.update');
+            Route::delete('reminders/{reminder}', [EmployerReminderController::class, 'destroy'])
+                ->name('reminders.destroy');
+            Route::post('candidate-imports', [EmployerCandidateImportController::class, 'store'])
+                ->name('candidate-imports.store');
+            Route::patch('candidate-imports/{candidateImport}/mapping', [EmployerCandidateImportController::class, 'map'])
+                ->name('candidate-imports.map');
+            Route::delete('candidate-imports/{candidateImport}', [EmployerCandidateImportController::class, 'destroy'])
+                ->name('candidate-imports.destroy');
+            Route::get('candidate-imports/template.csv', [EmployerCandidateImportController::class, 'template'])
+                ->name('candidate-imports.template');
+            Route::get('analytics', EmployerAnalyticsController::class)->name('analytics');
 
             Route::get('jobs', [EmployerJobController::class, 'index'])->name('jobs.index');
             Route::get('jobs/create', [EmployerJobController::class, 'create'])->name('jobs.create');

@@ -9,33 +9,36 @@ import {
     Plus,
     Video,
 } from '@lucide/vue';
+import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
+import EmptyState from '@/components/product/EmptyState.vue';
 import PageHeader from '@/components/product/PageHeader.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
 import { useStatusLabels } from '@/composables/useStatusLabels';
+import de from '@/i18n/messages/product-components-de';
+import en from '@/i18n/messages/product-components-en';
 import { update as updateAvailability } from '@/routes/availability';
 import { respond } from '@/routes/interviews';
 import type {
-    Availability,
     Interview,
+    InterviewCenterProps,
     InterviewProposal,
     StatusTone,
 } from '@/types';
 
-const props = withDefaults(
-    defineProps<{
-        perspective?: 'employer' | 'candidate';
-        interviews?: Interview[];
-        availability?: Availability[];
-        timezone?: string;
-    }>(),
-    {
-        perspective: 'employer',
-        interviews: () => [],
-        availability: () => [],
-        timezone: 'Europe/Berlin',
-    },
-);
+const props = withDefaults(defineProps<InterviewCenterProps>(), {
+    perspective: 'employer',
+    interviews: () => [],
+    availability: () => [],
+    timezone: 'Europe/Berlin',
+});
+
+const { locale, t } = useI18n({
+    useScope: 'local',
+    messages: { de, en },
+});
+
 const availabilityForm = useForm({
     slots: props.availability.map((slot) => ({
         weekday: slot.weekday,
@@ -57,15 +60,17 @@ const statusLabel = (status: string) =>
     translatedStatusLabel('interview', status);
 const person = (interview: Interview) =>
     props.perspective === 'candidate'
-        ? (interview.application?.job_posting?.company?.name ?? 'Unternehmen')
-        : (interview.application?.candidate_profile?.user?.name ?? 'Fachkraft');
+        ? (interview.application?.job_posting?.company?.name ??
+          t('interviewCenter.companyFallback'))
+        : (interview.application?.candidate_profile?.user?.name ??
+          t('interviewCenter.candidateFallback'));
 const formatDate = (value?: string | null) =>
     value
-        ? new Intl.DateTimeFormat('de-DE', {
+        ? new Intl.DateTimeFormat(locale.value, {
               dateStyle: 'full',
               timeStyle: 'short',
           }).format(new Date(value))
-        : 'Termin noch offen';
+        : t('interviewCenter.dateOpen');
 const accept = (interview: Interview, proposal: InterviewProposal) =>
     router.post(
         respond.url(interview.id),
@@ -75,7 +80,10 @@ const accept = (interview: Interview, proposal: InterviewProposal) =>
 const cancelInterview = (interview: Interview) =>
     router.post(
         respond.url(interview.id),
-        { response: 'cancel', note: 'Über die Plattform abgesagt' },
+        {
+            response: 'cancel',
+            note: t('interviewCenter.cancellationNote'),
+        },
         { preserveScroll: true },
     );
 const addSlot = () =>
@@ -85,20 +93,31 @@ const addSlot = () =>
         ends_at: '12:00',
         timezone: props.timezone,
     });
+const weekdays = computed(() => [
+    t('interviewCenter.weekdays.monday'),
+    t('interviewCenter.weekdays.tuesday'),
+    t('interviewCenter.weekdays.wednesday'),
+    t('interviewCenter.weekdays.thursday'),
+    t('interviewCenter.weekdays.friday'),
+    t('interviewCenter.weekdays.saturday'),
+    t('interviewCenter.weekdays.sunday'),
+]);
 </script>
 
 <template>
     <div class="erin-page">
         <PageHeader
-            eyebrow="Termine"
-            title="Interviews"
-            description="Gespräche, Terminvorschläge und Wochenverfügbarkeit an einem Ort."
+            :eyebrow="t('interviewCenter.eyebrow')"
+            :title="t('interviewCenter.title')"
+            :description="t('interviewCenter.description')"
             :icon="CalendarDays"
         />
         <div class="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
             <SectionCard
-                title="Interviews"
-                :description="`${interviews.length} Termine und Vorschläge`"
+                :title="t('interviewCenter.listTitle')"
+                :description="
+                    t('interviewCenter.listDescription', interviews.length)
+                "
             >
                 <div v-if="interviews.length" class="space-y-3">
                     <article
@@ -127,7 +146,8 @@ const addSlot = () =>
                                 <p class="mt-1 text-xs text-slate-500">
                                     {{
                                         interview.application?.job_posting
-                                            ?.title ?? 'Stelle nicht verfügbar'
+                                            ?.title ??
+                                        t('interviewCenter.jobUnavailable')
                                     }}
                                 </p>
                                 <p
@@ -143,7 +163,9 @@ const addSlot = () =>
                                     v-if="interview.ics_url"
                                     :href="interview.ics_url"
                                     class="grid size-10 place-items-center rounded-xl border border-slate-200 text-slate-500"
-                                    title="Kalenderdatei herunterladen"
+                                    :title="
+                                        t('interviewCenter.calendarDownload')
+                                    "
                                     ><FileDown class="size-4"
                                 /></a>
                                 <button
@@ -157,7 +179,7 @@ const addSlot = () =>
                                     class="h-10 rounded-xl border border-red-200 px-3 text-xs font-bold text-red-600"
                                     @click="cancelInterview(interview)"
                                 >
-                                    Absagen
+                                    {{ t('interviewCenter.cancel') }}
                                 </button>
                             </div>
                         </div>
@@ -187,23 +209,24 @@ const addSlot = () =>
                                 >
                                 <span
                                     class="text-[10px] font-bold text-[var(--erin-primary)]"
-                                    >Bestätigen</span
+                                    >{{ t('interviewCenter.confirm') }}</span
                                 >
                             </button>
                         </div>
                     </article>
                 </div>
-                <div v-else class="py-12 text-center">
-                    <Inbox class="mx-auto size-8 text-slate-300" />
-                    <p class="mt-3 text-sm text-slate-400">
-                        Noch keine Interviews geplant.
-                    </p>
-                </div>
+                <EmptyState
+                    v-else
+                    compact
+                    :icon="Inbox"
+                    :title="t('interviewCenter.emptyTitle')"
+                    :description="t('interviewCenter.emptyDescription')"
+                />
             </SectionCard>
 
             <SectionCard
-                title="Wochenverfügbarkeit"
-                description="Zeiten für neue Terminvorschläge"
+                :title="t('interviewCenter.availabilityTitle')"
+                :description="t('interviewCenter.availabilityDescription')"
             >
                 <form
                     class="space-y-3"
@@ -223,15 +246,7 @@ const addSlot = () =>
                             class="h-9 rounded-lg border border-slate-200 px-2 text-xs"
                         >
                             <option
-                                v-for="(day, dayIndex) in [
-                                    'Montag',
-                                    'Dienstag',
-                                    'Mittwoch',
-                                    'Donnerstag',
-                                    'Freitag',
-                                    'Samstag',
-                                    'Sonntag',
-                                ]"
+                                v-for="(day, dayIndex) in weekdays"
                                 :key="day"
                                 :value="dayIndex + 1"
                             >
@@ -251,6 +266,7 @@ const addSlot = () =>
                         <button
                             type="button"
                             class="text-xs font-bold text-red-500"
+                            :aria-label="t('interviewCenter.removePeriod')"
                             @click="availabilityForm.slots.splice(index, 1)"
                         >
                             ×
@@ -261,14 +277,15 @@ const addSlot = () =>
                         class="inline-flex h-9 items-center gap-2 text-xs font-bold text-[var(--erin-primary)]"
                         @click="addSlot"
                     >
-                        <Plus class="size-4" /> Zeitraum hinzufügen
+                        <Plus class="size-4" />
+                        {{ t('interviewCenter.addPeriod') }}
                     </button>
                     <button
                         type="submit"
                         :disabled="availabilityForm.processing"
                         class="h-10 w-full rounded-xl bg-[var(--erin-primary)] text-xs font-bold text-white disabled:opacity-50"
                     >
-                        Verfügbarkeit speichern
+                        {{ t('interviewCenter.saveAvailability') }}
                     </button>
                 </form>
             </SectionCard>
@@ -281,11 +298,10 @@ const addSlot = () =>
                 /></span>
                 <div class="flex-1">
                     <h2 class="font-extrabold">
-                        Sichere Interviews direkt in Erin
+                        {{ t('interviewCenter.securityTitle') }}
                     </h2>
                     <p class="mt-1 text-sm leading-6 text-slate-300">
-                        Videoräume werden erst für bestätigte Termine
-                        freigeschaltet; Aufzeichnungen sind deaktiviert.
+                        {{ t('interviewCenter.securityDescription') }}
                     </p>
                 </div>
             </div>

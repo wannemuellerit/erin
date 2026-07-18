@@ -17,7 +17,8 @@ class SupportTicketPolicy
     public function reply(User $user, SupportTicket $supportTicket): bool
     {
         return $supportTicket->requester_id === $user->id
-            || $user->isPlatformStaff();
+            || $user->isPlatformStaff()
+            || ($supportTicket->company_id !== null && $user->belongsToCompany($supportTicket->company_id));
     }
 
     public function assign(User $user): bool

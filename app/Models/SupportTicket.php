@@ -7,6 +7,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property SupportTicketStatus $status
+ */
 class SupportTicket extends Model
 {
     protected $guarded = ['id'];
@@ -17,6 +20,7 @@ class SupportTicket extends Model
             'status' => SupportTicketStatus::class,
             'last_reply_at' => 'datetime',
             'resolved_at' => 'datetime',
+            'last_synced_at' => 'datetime',
         ];
     }
 

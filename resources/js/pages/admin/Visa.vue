@@ -2,14 +2,15 @@
 import { Head, router } from '@inertiajs/vue3';
 import { AlertTriangle, Plane, Search, X } from '@lucide/vue';
 import { reactive } from 'vue';
+import EmptyState from '@/components/product/EmptyState.vue';
 import PageHeader from '@/components/product/PageHeader.vue';
 import ProgressBar from '@/components/product/ProgressBar.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
 import adminVisa from '@/routes/admin/visa';
-import AdminEmptyState from './_components/AdminEmptyState.vue';
 import AdminPagination from './_components/AdminPagination.vue';
-import { cleanFilters, formatDate, humanize, statusTone } from './_shared';
+import { useAdminI18n } from './_i18n';
+import { cleanFilters, statusTone } from './_shared';
 import type { AdminPaginator } from './_shared';
 
 type VisaCaseRow = {
@@ -77,6 +78,8 @@ const filters = reactive({
     assignee_id: props.filters.assignee_id?.toString() ?? '',
 });
 
+const { t, formatDate, humanize } = useAdminI18n();
+
 function applyFilters(): void {
     router.get(adminVisa.index.url(), cleanFilters(filters), {
         preserveState: true,
@@ -90,13 +93,13 @@ function resetFilters(): void {
 </script>
 
 <template>
-    <Head title="Visa-Fälle" />
+    <Head :title="t('visa.metaTitle')" />
 
     <div class="erin-page">
         <PageHeader
-            eyebrow="Relocation Operations"
-            title="Visa-Fälle"
-            :description="`${cases.total} Fälle mit realem Fortschritt, Verantwortlichen und Fristen.`"
+            :eyebrow="t('visa.eyebrow')"
+            :title="t('visa.title')"
+            :description="t('visa.description', { count: cases.total })"
             :icon="Plane"
         />
 
@@ -106,23 +109,23 @@ function resetFilters(): void {
                 @submit.prevent="applyFilters"
             >
                 <label class="relative">
-                    <span class="sr-only">Visa-Fälle suchen</span>
+                    <span class="sr-only">{{ t('visa.searchLabel') }}</span>
                     <Search
                         class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-slate-400"
                     />
                     <input
                         v-model="filters.search"
                         type="search"
-                        placeholder="Fachkraft oder Unternehmen …"
+                        :placeholder="t('visa.searchPlaceholder')"
                         class="erin-focus h-11 w-full rounded-xl border border-slate-200 pr-3 pl-10 text-sm"
                     />
                 </label>
                 <select
                     v-model="filters.status"
-                    aria-label="Visa-Status"
+                    :aria-label="t('visa.status')"
                     class="erin-focus h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
                 >
-                    <option value="">Alle Status</option>
+                    <option value="">{{ t('common.allStatuses') }}</option>
                     <option
                         v-for="status in statuses"
                         :key="status"
@@ -135,16 +138,16 @@ function resetFilters(): void {
                     v-model="filters.company_id"
                     type="number"
                     min="1"
-                    placeholder="Firma-ID"
-                    aria-label="Firma-ID"
+                    :placeholder="t('common.companyId')"
+                    :aria-label="t('common.companyId')"
                     class="erin-focus h-11 rounded-xl border border-slate-200 px-3 text-sm"
                 />
                 <input
                     v-model="filters.assignee_id"
                     type="number"
                     min="1"
-                    placeholder="Zuständig-ID"
-                    aria-label="Zuständig-ID"
+                    :placeholder="t('common.assigneeId')"
+                    :aria-label="t('common.assigneeId')"
                     class="erin-focus h-11 rounded-xl border border-slate-200 px-3 text-sm"
                 />
                 <div class="flex gap-2">
@@ -152,11 +155,11 @@ function resetFilters(): void {
                         type="submit"
                         class="erin-focus h-11 rounded-xl bg-blue-600 px-4 text-sm font-bold text-white"
                     >
-                        Filtern
+                        {{ t('common.filter') }}
                     </button>
                     <button
                         type="button"
-                        aria-label="Filter zurücksetzen"
+                        :aria-label="t('common.resetFilters')"
                         class="erin-focus grid size-11 place-items-center rounded-xl border border-slate-200 text-slate-500"
                         @click="resetFilters"
                     >
@@ -171,11 +174,21 @@ function resetFilters(): void {
                         <tr
                             class="text-[11px] font-bold tracking-wide text-slate-500 uppercase"
                         >
-                            <th class="px-5 py-3">Fall</th>
-                            <th class="px-5 py-3">Stelle & Firma</th>
-                            <th class="px-5 py-3">Fortschritt</th>
-                            <th class="px-5 py-3">Zuständigkeit</th>
-                            <th class="px-5 py-3">Status & Frist</th>
+                            <th class="px-5 py-3">
+                                {{ t('visa.columns.case') }}
+                            </th>
+                            <th class="px-5 py-3">
+                                {{ t('visa.columns.jobCompany') }}
+                            </th>
+                            <th class="px-5 py-3">
+                                {{ t('visa.columns.progress') }}
+                            </th>
+                            <th class="px-5 py-3">
+                                {{ t('visa.columns.responsibility') }}
+                            </th>
+                            <th class="px-5 py-3">
+                                {{ t('visa.columns.statusDeadline') }}
+                            </th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
@@ -192,12 +205,16 @@ function resetFilters(): void {
                                     {{
                                         visaCase.candidate_profile
                                             .current_position ??
-                                        'Position nicht hinterlegt'
+                                        t('visa.positionMissing')
                                     }}
                                 </p>
-                                <p class="mt-2 text-[11px] text-slate-400">
-                                    Visa-Fall #{{ visaCase.id }} · Bewerbung #{{
-                                        visaCase.application.id
+                                <p class="mt-2 text-[11px] text-slate-600">
+                                    {{
+                                        t('visa.caseReference', {
+                                            caseId: visaCase.id,
+                                            applicationId:
+                                                visaCase.application.id,
+                                        })
                                     }}
                                 </p>
                             </td>
@@ -221,7 +238,13 @@ function resetFilters(): void {
                             <td class="min-w-56 px-5 py-4">
                                 <ProgressBar
                                     :value="visaCase.progress"
-                                    :label="`${visaCase.completed_steps_count} von ${visaCase.steps_count} Schritten`"
+                                    :label="
+                                        t('visa.steps', {
+                                            completed:
+                                                visaCase.completed_steps_count,
+                                            total: visaCase.steps_count,
+                                        })
+                                    "
                                     tone="teal"
                                 />
                                 <p
@@ -229,25 +252,34 @@ function resetFilters(): void {
                                     class="mt-2 flex items-center gap-1 text-xs font-semibold text-red-600"
                                 >
                                     <AlertTriangle class="size-3.5" />
-                                    {{ visaCase.overdue_steps_count }}
-                                    überfällig
+                                    {{
+                                        t('visa.overdue', {
+                                            count: visaCase.overdue_steps_count,
+                                        })
+                                    }}
                                 </p>
                             </td>
                             <td class="px-5 py-4 text-xs text-slate-600">
                                 <p class="font-semibold text-slate-800">
                                     {{
                                         visaCase.assignee?.name ??
-                                        'Nicht zugewiesen'
+                                        t('common.notAssigned')
                                     }}
                                 </p>
                                 <p
                                     v-if="visaCase.assignee"
-                                    class="mt-1 text-slate-400"
+                                    class="mt-1 text-slate-600"
                                 >
                                     {{ visaCase.assignee.email }}
                                 </p>
-                                <p class="mt-2 text-slate-400">
-                                    Start {{ formatDate(visaCase.started_at) }}
+                                <p class="mt-2 text-slate-600">
+                                    {{
+                                        t('visa.start', {
+                                            date: formatDate(
+                                                visaCase.started_at,
+                                            ),
+                                        })
+                                    }}
                                 </p>
                             </td>
                             <td class="px-5 py-4">
@@ -258,15 +290,24 @@ function resetFilters(): void {
                                 <p
                                     class="mt-2 text-xs whitespace-nowrap text-slate-500"
                                 >
-                                    Arbeitsstart
-                                    {{ formatDate(visaCase.target_start_date) }}
+                                    {{
+                                        t('visa.workStart', {
+                                            date: formatDate(
+                                                visaCase.target_start_date,
+                                            ),
+                                        })
+                                    }}
                                 </p>
                             </td>
                         </tr>
                     </tbody>
                 </table>
             </div>
-            <AdminEmptyState v-else />
+            <EmptyState
+                v-else
+                :title="t('common.emptyTitle')"
+                :description="t('common.emptyDescription')"
+            />
             <AdminPagination :paginator="cases" />
         </SectionCard>
     </div>

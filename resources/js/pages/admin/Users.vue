@@ -2,13 +2,14 @@
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { Search, ShieldAlert, Users as UsersIcon, X } from '@lucide/vue';
 import { reactive } from 'vue';
+import EmptyState from '@/components/product/EmptyState.vue';
 import PageHeader from '@/components/product/PageHeader.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
 import adminUsers from '@/routes/admin/users';
-import AdminEmptyState from './_components/AdminEmptyState.vue';
 import AdminPagination from './_components/AdminPagination.vue';
-import { cleanFilters, formatDate, humanize, statusTone } from './_shared';
+import { useAdminI18n } from './_i18n';
+import { cleanFilters, statusTone } from './_shared';
 import type { AdminPaginator } from './_shared';
 
 type UserRow = {
@@ -65,6 +66,8 @@ const roleForm = useForm({
     role: '',
 });
 
+const { t, formatDate, humanize } = useAdminI18n();
+
 function applyFilters(): void {
     router.get(adminUsers.index.url(), cleanFilters(filters), {
         preserveState: true,
@@ -87,9 +90,7 @@ function updateStatus(user: UserRow, event: Event): void {
     let reason = '';
 
     if (['suspended', 'blocked'].includes(nextStatus)) {
-        const input = window.prompt(
-            'Bitte gib einen nachvollziehbaren Grund an (mindestens 5 Zeichen):',
-        );
+        const input = window.prompt(t('common.reasonPrompt'));
 
         if (input === null || input.trim().length < 5) {
             select.value = user.status;
@@ -121,7 +122,10 @@ function updateRole(user: UserRow, event: Event): void {
 
     if (
         !window.confirm(
-            `Plattformrolle von ${user.name} wirklich auf „${humanize(nextRole)}“ ändern?`,
+            t('users.roleConfirm', {
+                name: user.name,
+                role: humanize(nextRole),
+            }),
         )
     ) {
         select.value = user.role;
@@ -141,13 +145,13 @@ function updateRole(user: UserRow, event: Event): void {
 </script>
 
 <template>
-    <Head title="Benutzerverwaltung" />
+    <Head :title="t('users.metaTitle')" />
 
     <div class="erin-page">
         <PageHeader
-            eyebrow="Identity & Access"
-            title="Benutzerverwaltung"
-            :description="`${users.total} Konten mit realen Rollen-, Status- und Profildaten.`"
+            :eyebrow="t('users.eyebrow')"
+            :title="t('users.title')"
+            :description="t('users.description', { count: users.total })"
             :icon="UsersIcon"
         />
 
@@ -157,33 +161,33 @@ function updateRole(user: UserRow, event: Event): void {
                 @submit.prevent="applyFilters"
             >
                 <label class="relative">
-                    <span class="sr-only">Nutzer suchen</span>
+                    <span class="sr-only">{{ t('users.searchLabel') }}</span>
                     <Search
                         class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-slate-400"
                     />
                     <input
                         v-model="filters.search"
                         type="search"
-                        placeholder="Name oder E-Mail suchen …"
+                        :placeholder="t('users.searchPlaceholder')"
                         class="erin-focus h-11 w-full rounded-xl border border-slate-200 bg-white pr-3 pl-10 text-sm"
                     />
                 </label>
                 <select
                     v-model="filters.role"
-                    aria-label="Rolle filtern"
+                    :aria-label="t('users.roleFilter')"
                     class="erin-focus h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
                 >
-                    <option value="">Alle Rollen</option>
+                    <option value="">{{ t('common.allRoles') }}</option>
                     <option v-for="role in roles" :key="role" :value="role">
                         {{ humanize(role) }}
                     </option>
                 </select>
                 <select
                     v-model="filters.status"
-                    aria-label="Status filtern"
+                    :aria-label="t('users.statusFilter')"
                     class="erin-focus h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
                 >
-                    <option value="">Alle Status</option>
+                    <option value="">{{ t('common.allStatuses') }}</option>
                     <option
                         v-for="status in statuses"
                         :key="status"
@@ -194,23 +198,25 @@ function updateRole(user: UserRow, event: Event): void {
                 </select>
                 <select
                     v-model="filters.sort"
-                    aria-label="Sortierung"
+                    :aria-label="t('users.sorting')"
                     class="erin-focus h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
                 >
-                    <option value="newest">Neueste zuerst</option>
-                    <option value="oldest">Älteste zuerst</option>
-                    <option value="last_active">Zuletzt aktiv</option>
+                    <option value="newest">{{ t('users.newest') }}</option>
+                    <option value="oldest">{{ t('users.oldest') }}</option>
+                    <option value="last_active">
+                        {{ t('users.lastActive') }}
+                    </option>
                 </select>
                 <div class="flex gap-2">
                     <button
                         type="submit"
                         class="erin-focus h-11 rounded-xl bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700"
                     >
-                        Filtern
+                        {{ t('common.filter') }}
                     </button>
                     <button
                         type="button"
-                        aria-label="Filter zurücksetzen"
+                        :aria-label="t('common.resetFilters')"
                         class="erin-focus grid size-11 place-items-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50"
                         @click="resetFilters"
                     >
@@ -225,11 +231,21 @@ function updateRole(user: UserRow, event: Event): void {
                         <tr
                             class="text-[11px] font-bold tracking-wide text-slate-500 uppercase"
                         >
-                            <th class="px-5 py-3">Nutzer</th>
-                            <th class="px-5 py-3">Profil</th>
-                            <th class="px-5 py-3">Aktivität</th>
-                            <th class="px-5 py-3">Rolle</th>
-                            <th class="px-5 py-3">Status</th>
+                            <th class="px-5 py-3">
+                                {{ t('users.columns.user') }}
+                            </th>
+                            <th class="px-5 py-3">
+                                {{ t('users.columns.profile') }}
+                            </th>
+                            <th class="px-5 py-3">
+                                {{ t('users.columns.activity') }}
+                            </th>
+                            <th class="px-5 py-3">
+                                {{ t('users.columns.role') }}
+                            </th>
+                            <th class="px-5 py-3">
+                                {{ t('users.columns.status') }}
+                            </th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
@@ -249,8 +265,8 @@ function updateRole(user: UserRow, event: Event): void {
                                     <StatusBadge
                                         :label="
                                             user.email_verified_at
-                                                ? 'E-Mail verifiziert'
-                                                : 'E-Mail offen'
+                                                ? t('users.emailVerified')
+                                                : t('users.emailOpen')
                                         "
                                         :tone="
                                             user.email_verified_at
@@ -258,7 +274,7 @@ function updateRole(user: UserRow, event: Event): void {
                                                 : 'yellow'
                                         "
                                     />
-                                    <span class="text-[11px] text-slate-400">
+                                    <span class="text-[11px] text-slate-600">
                                         #{{ user.id }} ·
                                         {{ user.locale.toUpperCase() }}
                                     </span>
@@ -272,14 +288,16 @@ function updateRole(user: UserRow, event: Event): void {
                                                 .current_position ??
                                             user.candidate_profile
                                                 .desired_position ??
-                                            'Berufsprofil offen'
+                                            t('users.professionOpen')
                                         }}
                                     </p>
                                     <p class="mt-1">
                                         {{
-                                            user.candidate_profile.completeness
+                                            t('users.completeness', {
+                                                value: user.candidate_profile
+                                                    .completeness,
+                                            })
                                         }}
-                                        % vollständig
                                         <span
                                             v-if="
                                                 user.candidate_profile
@@ -295,23 +313,35 @@ function updateRole(user: UserRow, event: Event): void {
                                     </p>
                                 </template>
                                 <template v-else>
-                                    {{ user.company_memberships_count }}
-                                    Firmenmitgliedschaft(en)
+                                    {{
+                                        t(
+                                            'users.companyMemberships',
+                                            user.company_memberships_count,
+                                        )
+                                    }}
                                 </template>
                             </td>
                             <td
                                 class="px-5 py-4 text-xs whitespace-nowrap text-slate-500"
                             >
                                 <p>{{ formatDate(user.last_active_at) }}</p>
-                                <p class="mt-1 text-slate-400">
-                                    Erstellt {{ formatDate(user.created_at) }}
+                                <p class="mt-1 text-slate-600">
+                                    {{
+                                        t('users.createdAt', {
+                                            date: formatDate(user.created_at),
+                                        })
+                                    }}
                                 </p>
                             </td>
                             <td class="px-5 py-4">
                                 <select
                                     :value="user.role"
                                     :disabled="roleForm.processing"
-                                    :aria-label="`Rolle von ${user.name}`"
+                                    :aria-label="
+                                        t('common.roleFor', {
+                                            name: user.name,
+                                        })
+                                    "
                                     class="erin-focus h-9 min-w-36 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold disabled:opacity-60"
                                     @change="updateRole(user, $event)"
                                 >
@@ -338,7 +368,11 @@ function updateRole(user: UserRow, event: Event): void {
                                 <select
                                     :value="user.status"
                                     :disabled="statusForm.processing"
-                                    :aria-label="`Status von ${user.name}`"
+                                    :aria-label="
+                                        t('common.statusFor', {
+                                            name: user.name,
+                                        })
+                                    "
                                     class="erin-focus mt-2 block h-9 min-w-36 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold disabled:opacity-60"
                                     @change="updateStatus(user, $event)"
                                 >
@@ -374,7 +408,11 @@ function updateRole(user: UserRow, event: Event): void {
                     </tbody>
                 </table>
             </div>
-            <AdminEmptyState v-else />
+            <EmptyState
+                v-else
+                :title="t('common.emptyTitle')"
+                :description="t('common.emptyDescription')"
+            />
             <AdminPagination :paginator="users" />
         </SectionCard>
     </div>

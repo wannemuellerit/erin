@@ -1,4 +1,14 @@
 export default {
+    common: {
+        errorTitle: 'Etwas ist schiefgegangen.',
+        close: 'Schließen',
+        more: 'Mehr',
+        breadcrumb: 'Brotkrümelnavigation',
+        sidebar: 'Seitenleiste',
+        mobileSidebarDescription: 'Zeigt die mobile Seitenleiste an.',
+        toggleSidebar: 'Seitenleiste umschalten',
+        loading: 'Wird geladen',
+    },
     roles: {
         candidate: 'Fachkraft',
         employer: 'Unternehmen',
@@ -73,6 +83,7 @@ export default {
         signInTitle: 'Anmelden',
         demoAccess: 'Demo-Zugang',
         email: 'E-Mail-Adresse',
+        emailPlaceholder: "name{'@'}beispiel.de",
         password: 'Passwort',
         insert: 'Einsetzen',
         forgotPassword: 'Passwort vergessen?',
@@ -323,7 +334,174 @@ export default {
             backPricing: 'Zurück zu den Paketen',
         },
     },
+    onboarding: {
+        metaTitle: 'Konto einrichten',
+        eyebrow: 'Willkommen bei Erin',
+        progress: 'Einrichtung',
+        steps: {
+            account: {
+                label: '1 · Konto',
+                description: 'E-Mail bestätigt',
+            },
+            setup: {
+                label: '2 · Einrichtung',
+                description: 'Angaben vervollständigen',
+            },
+            start: {
+                label: '3 · Start',
+                companyDescription: 'Zahlung bestätigen',
+                candidateDescription: 'Profil ausbauen',
+            },
+        },
+        candidate: {
+            title: 'Fachkräfteprofil starten',
+            description:
+                'Mit diesen Angaben zeigen wir dir passende Stellen und Unternehmen.',
+            professionTitle: 'Beruf und Wunschposition',
+            professionDescription:
+                'Diese Informationen steuern deine passenden Stellen.',
+            occupation: 'Berufsfeld',
+            selectOccupation: 'Beruf auswählen',
+            desiredPosition: 'Wunschposition',
+            desiredPositionPlaceholder: 'z. B. Elektrikerin',
+            experienceYears: 'Jahre Berufserfahrung',
+            phone: 'Telefonnummer',
+            phonePlaceholder: '+48 …',
+            locationTitle: 'Wohnort und Wechselbereitschaft',
+            locationDescription:
+                'Herkunft und geschützte Merkmale werden nicht für das Matching gewichtet.',
+            currentCountry: 'Aktuelles Land (ISO)',
+            currentCountryPlaceholder: 'PL',
+            currentCity: 'Aktuelle Stadt',
+            currentCityPlaceholder: 'Wrocław',
+            relocationReady: 'Umzugsbereit',
+            requiresVisa: 'Visum benötigt',
+            hasWorkPermit: 'Arbeitserlaubnis vorhanden',
+            summaryTitle: 'Kurzprofil',
+            summaryDescription:
+                'Mindestens 80 Zeichen helfen Unternehmen, deine Erfahrung einzuordnen.',
+            summaryPlaceholder:
+                'Beschreibe deine Erfahrung, Stärken und gewünschte Tätigkeit.',
+            secureStartTitle: 'Sicherer Start',
+            anonymousProfileNotice:
+                'Dein Profil bleibt anonym, bis du es ausdrücklich veröffentlichst.',
+            nextProfileSteps:
+                'Nach diesem Schritt ergänzt du Skills, Sprachen und Dokumente.',
+            complete: 'Einrichtung abschließen',
+        },
+        company: {
+            title: 'Unternehmen einrichten',
+            description:
+                'Paket und Firmendaten bilden die Grundlage für die sichere Stripe-Freischaltung.',
+            planTitle: 'Paket auswählen',
+            planDescription:
+                'Die Zahlung erfolgt erst nach der Eingabe und Prüfung deiner Firmendaten.',
+            onRequest: 'Auf Anfrage',
+            termMonths: '{count} Monate Laufzeit',
+            unlimited: 'Unbegrenzt',
+            activeJobs: '{count} aktive Stellen',
+            recruiterSeats: '{count} Recruiter-Sitze',
+            aiCredits: '{count} KI-Credits',
+            billingDetailsTitle: 'Firmen- und Rechnungsdaten',
+            billingDetailsDescription:
+                'Stripe verwendet diese Angaben für Checkout, Steuerberechnung und Rechnungen.',
+            legalName: 'Rechtlicher Firmenname',
+            billingEmail: 'Rechnungs-E-Mail',
+            website: 'Webseite',
+            websitePlaceholder: 'https://…',
+            industry: 'Branche',
+            industryPlaceholder: 'Elektrotechnik',
+            employees: 'Mitarbeitende',
+            street: 'Straße',
+            postalCode: 'Postleitzahl',
+            city: 'Stadt',
+            country: 'Land (ISO)',
+            nextStepTitle: 'Nächster Schritt',
+            checkoutDescription:
+                'Nach dem Speichern prüfst du alle Daten auf der Abrechnungsseite und wirst anschließend zum sicheren Stripe Checkout weitergeleitet.',
+            webhookNotice:
+                'Das Firmenportal wird ausschließlich durch einen bestätigten Stripe-Webhook freigeschaltet.',
+            saveAndContinue: 'Speichern und weiter',
+        },
+    },
     settings: {
+        layout: {
+            title: 'Einstellungen',
+            description: 'Profil- und Kontoeinstellungen verwalten',
+            navigation: 'Einstellungsnavigation',
+            profile: 'Profil',
+            security: 'Sicherheit',
+            notifications: 'Benachrichtigungen',
+            appearance: 'Darstellung',
+        },
+        notifications: {
+            title: 'Benachrichtigungen',
+            description:
+                'Lege fest, wie Erin dich bei wichtigen Vorgängen erreichen darf.',
+            inApp: 'In-App',
+            email: 'E-Mail',
+            browserPush: 'Browser-Push',
+            sms: 'SMS',
+            whatsapp: 'WhatsApp',
+            comingLater: 'Später',
+            pushMissing:
+                'Browser-Push ist noch nicht serverseitig eingerichtet. Hinterlege zuerst die VAPID-Schlüssel.',
+            pushTitle: 'Browser-Push auf diesem Gerät',
+            pushDescription:
+                'Registriere diesen Browser, damit freigegebene Ereignisse auch bei geschlossenem Erin-Tab ankommen.',
+            pushActive: 'Auf diesem Gerät aktiv',
+            pushInactive: 'Auf diesem Gerät nicht aktiv',
+            pushUnsupported:
+                'Dieser Browser unterstützt keine Web-Push-Benachrichtigungen.',
+            pushDenied:
+                'Die Browser-Berechtigung wurde blockiert. Erlaube Benachrichtigungen in den Website-Einstellungen.',
+            pushEnable: 'Browser-Push aktivieren',
+            pushDisable: 'Auf diesem Gerät deaktivieren',
+            pushWorking: 'Wird eingerichtet …',
+            pushError:
+                'Browser-Push konnte nicht eingerichtet werden. Bitte versuche es erneut.',
+            registeredDevices: 'registrierte Geräte',
+            databaseHint:
+                'Wenn In-App deaktiviert ist, erscheint das Ereignis weder in der Glocke noch als Live-Hinweis.',
+            pushTest: 'Testbenachrichtigung senden',
+            pushTestProcessing: 'Test wird gesendet …',
+            pushTestSent: 'Die Testbenachrichtigung wurde versendet.',
+            pushTestError:
+                'Die Testbenachrichtigung konnte nicht versendet werden.',
+            save: 'Einstellungen speichern',
+            saved: 'Gespeichert',
+            events: {
+                application: {
+                    title: 'Bewerbungen',
+                    description:
+                        'Neue Bewerbungen und Änderungen am Bewerbungsstatus.',
+                },
+                interview: {
+                    title: 'Interviews',
+                    description:
+                        'Terminvorschläge, Gegenangebote und bestätigte Gespräche.',
+                },
+                message: {
+                    title: 'Nachrichten',
+                    description: 'Neue Nachrichten im Erin-Nachrichtencenter.',
+                },
+                reminder: {
+                    title: 'Erinnerungen',
+                    description:
+                        'Fällige Rückrufe, Dokumentanfragen und Interviewvorbereitungen.',
+                },
+                support: {
+                    title: 'Support',
+                    description:
+                        'Antworten und Statusänderungen bei Supporttickets.',
+                },
+                system: {
+                    title: 'System & Sonstiges',
+                    description:
+                        'Sicherheits-, Abrechnungs- und andere Plattformhinweise.',
+                },
+            },
+        },
         profile: {
             title: 'Profileinstellungen',
             heading: 'Profil',

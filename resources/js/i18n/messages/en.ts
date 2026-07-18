@@ -1,4 +1,14 @@
 export default {
+    common: {
+        errorTitle: 'Something went wrong.',
+        close: 'Close',
+        more: 'More',
+        breadcrumb: 'Breadcrumb',
+        sidebar: 'Sidebar',
+        mobileSidebarDescription: 'Displays the mobile sidebar.',
+        toggleSidebar: 'Toggle sidebar',
+        loading: 'Loading',
+    },
     roles: {
         candidate: 'Professional',
         employer: 'Company',
@@ -71,6 +81,7 @@ export default {
         signInTitle: 'Sign in',
         demoAccess: 'Demo access',
         email: 'Email address',
+        emailPlaceholder: "name{'@'}example.com",
         password: 'Password',
         insert: 'Insert',
         forgotPassword: 'Forgot password?',
@@ -321,7 +332,173 @@ export default {
             backPricing: 'Back to plans',
         },
     },
+    onboarding: {
+        metaTitle: 'Set up account',
+        eyebrow: 'Welcome to Erin',
+        progress: 'Setup',
+        steps: {
+            account: {
+                label: '1 · Account',
+                description: 'Email verified',
+            },
+            setup: {
+                label: '2 · Setup',
+                description: 'Complete your details',
+            },
+            start: {
+                label: '3 · Start',
+                companyDescription: 'Confirm payment',
+                candidateDescription: 'Build your profile',
+            },
+        },
+        candidate: {
+            title: 'Start your professional profile',
+            description:
+                'These details help us show you matching jobs and companies.',
+            professionTitle: 'Occupation and desired position',
+            professionDescription:
+                'This information determines which jobs match your profile.',
+            occupation: 'Occupation',
+            selectOccupation: 'Select an occupation',
+            desiredPosition: 'Desired position',
+            desiredPositionPlaceholder: 'e.g. electrician',
+            experienceYears: 'Years of work experience',
+            phone: 'Phone number',
+            phonePlaceholder: '+48 …',
+            locationTitle: 'Location and willingness to relocate',
+            locationDescription:
+                'Origin and protected characteristics are not weighted in matching.',
+            currentCountry: 'Current country (ISO)',
+            currentCountryPlaceholder: 'PL',
+            currentCity: 'Current city',
+            currentCityPlaceholder: 'Wrocław',
+            relocationReady: 'Willing to relocate',
+            requiresVisa: 'Visa required',
+            hasWorkPermit: 'Work permit available',
+            summaryTitle: 'Short profile',
+            summaryDescription:
+                'At least 80 characters help companies understand your experience.',
+            summaryPlaceholder:
+                'Describe your experience, strengths, and desired role.',
+            secureStartTitle: 'A secure start',
+            anonymousProfileNotice:
+                'Your profile remains anonymous until you explicitly publish it.',
+            nextProfileSteps:
+                'After this step, you can add skills, languages, and documents.',
+            complete: 'Complete setup',
+        },
+        company: {
+            title: 'Set up your company',
+            description:
+                'Your plan and company details provide the basis for secure Stripe activation.',
+            planTitle: 'Choose a plan',
+            planDescription:
+                'Payment is only initiated after you enter and review your company details.',
+            onRequest: 'On request',
+            termMonths: '{count}-month term',
+            unlimited: 'Unlimited',
+            activeJobs: '{count} active jobs',
+            recruiterSeats: '{count} recruiter seats',
+            aiCredits: '{count} AI credits',
+            billingDetailsTitle: 'Company and billing details',
+            billingDetailsDescription:
+                'Stripe uses these details for checkout, tax calculation, and invoices.',
+            legalName: 'Legal company name',
+            billingEmail: 'Billing email',
+            website: 'Website',
+            websitePlaceholder: 'https://…',
+            industry: 'Industry',
+            industryPlaceholder: 'Electrical engineering',
+            employees: 'Employees',
+            street: 'Street address',
+            postalCode: 'Postcode',
+            city: 'City',
+            country: 'Country (ISO)',
+            nextStepTitle: 'Next step',
+            checkoutDescription:
+                'After saving, you can review all details on the billing page before being redirected to secure Stripe Checkout.',
+            webhookNotice:
+                'The company portal is activated exclusively through a confirmed Stripe webhook.',
+            saveAndContinue: 'Save and continue',
+        },
+    },
     settings: {
+        layout: {
+            title: 'Settings',
+            description: 'Manage your profile and account settings',
+            navigation: 'Settings navigation',
+            profile: 'Profile',
+            security: 'Security',
+            notifications: 'Notifications',
+            appearance: 'Appearance',
+        },
+        notifications: {
+            title: 'Notifications',
+            description:
+                'Choose how Erin may contact you about important activity.',
+            inApp: 'In app',
+            email: 'Email',
+            browserPush: 'Browser push',
+            sms: 'SMS',
+            whatsapp: 'WhatsApp',
+            comingLater: 'Coming later',
+            pushMissing:
+                'Browser push is not configured on the server yet. Add the VAPID keys first.',
+            pushTitle: 'Browser push on this device',
+            pushDescription:
+                'Register this browser so enabled events can arrive while Erin is not open in a tab.',
+            pushActive: 'Active on this device',
+            pushInactive: 'Not active on this device',
+            pushUnsupported:
+                'This browser does not support web push notifications.',
+            pushDenied:
+                'Browser permission is blocked. Allow notifications in the site settings.',
+            pushEnable: 'Enable browser push',
+            pushDisable: 'Disable on this device',
+            pushWorking: 'Setting up …',
+            pushError:
+                'Browser push could not be configured. Please try again.',
+            registeredDevices: 'registered devices',
+            databaseHint:
+                'When in-app notifications are disabled, the event appears neither in the bell nor as a live update.',
+            pushTest: 'Send test notification',
+            pushTestProcessing: 'Sending test …',
+            pushTestSent: 'The test notification has been sent.',
+            pushTestError: 'The test notification could not be sent.',
+            save: 'Save settings',
+            saved: 'Saved',
+            events: {
+                application: {
+                    title: 'Applications',
+                    description:
+                        'New applications and changes to application statuses.',
+                },
+                interview: {
+                    title: 'Interviews',
+                    description:
+                        'Time suggestions, counterproposals and confirmed interviews.',
+                },
+                message: {
+                    title: 'Messages',
+                    description: 'New messages in the Erin message centre.',
+                },
+                reminder: {
+                    title: 'Reminders',
+                    description:
+                        'Due callbacks, document requests and interview preparation.',
+                },
+                support: {
+                    title: 'Support',
+                    description:
+                        'Replies and status changes for support tickets.',
+                },
+                system: {
+                    title: 'System & other',
+                    description:
+                        'Security, billing and other platform notifications.',
+                },
+            },
+        },
         profile: {
             title: 'Profile settings',
             heading: 'Profile',

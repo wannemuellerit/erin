@@ -21,7 +21,16 @@ return [
 
     'client_options' => [
         'timeout' => (int) env('WEBPUSH_TIMEOUT', 15),
+        'allow_redirects' => false,
     ],
+
+    'allowed_endpoint_hosts' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env(
+            'WEBPUSH_ALLOWED_ENDPOINT_HOSTS',
+            'fcm.googleapis.com,android.googleapis.com,updates.push.services.mozilla.com,push.services.mozilla.com,web.push.apple.com,notify.windows.com',
+        )),
+    ))),
 
     'automatic_padding' => (bool) env('WEBPUSH_AUTOMATIC_PADDING', true),
 ];

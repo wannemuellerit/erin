@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Laravel\Cashier\Billable;
+use Laravel\Cashier\Subscription;
 
 /**
  * @property int $id
@@ -24,6 +25,9 @@ use Laravel\Cashier\Billable;
  * @property string|null $legal_name
  * @property string|null $email
  * @property string|null $stripe_id
+ * @property string|null $stripe_subscription_id
+ * @property int $stripe_subscription_generation
+ * @property int $stripe_next_subscription_generation
  * @property CompanyStatus $status
  * @property string|null $subscription_status
  * @property Carbon|null $subscription_started_at
@@ -47,6 +51,8 @@ class Company extends Model
     {
         return [
             'status' => CompanyStatus::class,
+            'stripe_subscription_generation' => 'integer',
+            'stripe_next_subscription_generation' => 'integer',
             'benefits' => 'array',
             'branding' => 'array',
             'trial_ends_at' => 'datetime',
@@ -94,6 +100,20 @@ class Company extends Model
             'erin_company_id' => (string) $this->getKey(),
             'erin_company_slug' => $this->slug,
         ];
+    }
+
+    public function billingSubscription(): ?Subscription
+    {
+        if ($this->stripe_subscription_id !== null) {
+            /** @var Subscription|null $subscription */
+            $subscription = $this->subscriptions()
+                ->where('stripe_id', $this->stripe_subscription_id)
+                ->first();
+
+            return $subscription;
+        }
+
+        return $this->subscription('default');
     }
 
     /**
@@ -225,5 +245,29 @@ class Company extends Model
     public function aiRuns(): HasMany
     {
         return $this->hasMany(AiRun::class);
+    }
+
+    /**
+     * @return HasMany<RecruiterReminder, $this>
+     */
+    public function reminders(): HasMany
+    {
+        return $this->hasMany(RecruiterReminder::class);
+    }
+
+    /**
+     * @return HasMany<CandidateImport, $this>
+     */
+    public function candidateImports(): HasMany
+    {
+        return $this->hasMany(CandidateImport::class);
+    }
+
+    /**
+     * @return HasMany<ActivityEntry, $this>
+     */
+    public function activityEntries(): HasMany
+    {
+        return $this->hasMany(ActivityEntry::class);
     }
 }

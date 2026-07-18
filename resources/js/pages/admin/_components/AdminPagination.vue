@@ -1,27 +1,32 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
 import type { AdminPaginator } from '../_shared';
-import { formatNumber } from '../_shared';
+import { useAdminI18n } from '../_i18n';
 
 defineProps<{
     paginator: AdminPaginator<unknown>;
 }>();
+
+const { t, formatNumber } = useAdminI18n();
 </script>
 
 <template>
     <nav
         v-if="paginator.last_page > 1 || paginator.total > 0"
         class="flex flex-col gap-3 border-t border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
-        aria-label="Seitennavigation"
+        :aria-label="t('pagination.aria')"
     >
         <p class="text-xs text-slate-500">
             <template v-if="paginator.total > 0">
-                {{ formatNumber(paginator.from) }}–{{
-                    formatNumber(paginator.to)
+                {{
+                    t('pagination.summary', {
+                        from: formatNumber(paginator.from),
+                        to: formatNumber(paginator.to),
+                        total: formatNumber(paginator.total),
+                    })
                 }}
-                von {{ formatNumber(paginator.total) }}
             </template>
-            <template v-else>Keine Einträge</template>
+            <template v-else>{{ t('pagination.empty') }}</template>
         </p>
 
         <div

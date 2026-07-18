@@ -13,10 +13,12 @@ import {
     WandSparkles,
 } from '@lucide/vue';
 import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import PageHeader from '@/components/product/PageHeader.vue';
 import ProgressBar from '@/components/product/ProgressBar.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
+import { useFormatters } from '@/composables/useFormatters';
 import { run } from '@/routes/ai';
 import {
     destroy as withdrawConsent,
@@ -81,55 +83,56 @@ const props = withDefaults(
         document_ai_enabled: false,
     },
 );
+const { t, te } = useI18n();
+const { formatDate } = useFormatters();
 
-const toolDefinitions: ToolDefinition[] = [
+const toolDefinitions = computed<ToolDefinition[]>(() => [
     {
         task: 'cv_improve',
-        title: 'Lebenslauf verbessern',
-        text: 'Struktur und Formulierungen für deutsche Arbeitgeber verbessern.',
-        placeholder: 'Füge den Text deines Lebenslaufs ein …',
+        title: t('candidate.ai.tools.cv_improve.title'),
+        text: t('candidate.ai.tools.cv_improve.description'),
+        placeholder: t('candidate.ai.tools.cv_improve.placeholder'),
         icon: FileText,
         tone: 'bg-blue-50 text-blue-600',
         requiresConsent: true,
     },
     {
         task: 'cover_letter',
-        title: 'Anschreiben erstellen',
-        text: 'Einen individuellen Entwurf für eine konkrete Stelle erzeugen.',
-        placeholder:
-            'Beschreibe die Stelle und deine wichtigsten Qualifikationen …',
+        title: t('candidate.ai.tools.cover_letter.title'),
+        text: t('candidate.ai.tools.cover_letter.description'),
+        placeholder: t('candidate.ai.tools.cover_letter.placeholder'),
         icon: WandSparkles,
         tone: 'bg-violet-50 text-violet-600',
     },
     {
         task: 'profile_improve',
-        title: 'Profil optimieren',
-        text: 'Konkrete, nachvollziehbare Verbesserungsvorschläge erhalten.',
-        placeholder: 'Füge deinen Profiltext und deine Skills ein …',
+        title: t('candidate.ai.tools.profile_improve.title'),
+        text: t('candidate.ai.tools.profile_improve.description'),
+        placeholder: t('candidate.ai.tools.profile_improve.placeholder'),
         icon: Sparkles,
         tone: 'bg-teal-50 text-teal-600',
         requiresConsent: true,
     },
     {
         task: 'translate',
-        title: 'Texte übersetzen',
-        text: 'Texte vollständig und sinngemäß übersetzen.',
-        placeholder: 'Text und gewünschte Zielsprache eingeben …',
+        title: t('candidate.ai.tools.translate.title'),
+        text: t('candidate.ai.tools.translate.description'),
+        placeholder: t('candidate.ai.tools.translate.placeholder'),
         icon: Languages,
         tone: 'bg-orange-50 text-orange-600',
     },
     {
         task: 'interview_training',
-        title: 'Interviewtraining',
-        text: 'Realistische Fragen und Hinweise zur Vorbereitung erhalten.',
-        placeholder: 'Beschreibe Beruf, Stelle und Themen für das Training …',
+        title: t('candidate.ai.tools.interview_training.title'),
+        text: t('candidate.ai.tools.interview_training.description'),
+        placeholder: t('candidate.ai.tools.interview_training.placeholder'),
         icon: MessageCircleQuestion,
         tone: 'bg-rose-50 text-rose-600',
     },
-];
+]);
 
 const availableTools = computed(() =>
-    toolDefinitions.filter((tool) => props.tasks.includes(tool.task)),
+    toolDefinitions.value.filter((tool) => props.tasks.includes(tool.task)),
 );
 const normalizedRuns = computed<AiRun[]>(() => {
     if (props.runs.length) {
@@ -242,7 +245,7 @@ const runTask = async () => {
             throw new Error(
                 payload.message ??
                     Object.values(payload.errors ?? {})[0]?.[0] ??
-                    'Die KI-Anfrage konnte nicht abgeschlossen werden.',
+                    t('candidate.ai.requestFailed'),
             );
         }
 
@@ -253,27 +256,37 @@ const runTask = async () => {
         error.value =
             exception instanceof Error
                 ? exception.message
-                : 'Die KI-Anfrage konnte nicht abgeschlossen werden.';
+                : t('candidate.ai.requestFailed');
     } finally {
         running.value = false;
     }
 };
+const runStatusLabel = (status: string) => {
+    const key = `candidate.ai.runStatus.${status}`;
+
+    return te(key) ? t(key) : status.replaceAll('_', ' ');
+};
 </script>
 
 <template>
-    <Head title="KI Studio" />
+    <Head :title="t('candidate.ai.metaTitle')" />
     <div class="erin-page">
         <PageHeader
-            eyebrow="Dein persönlicher Assistent"
-            title="Erin KI Studio"
-            description="Verbessere dein Profil, deine Unterlagen und deine Interviewvorbereitung."
+            :eyebrow="t('candidate.ai.eyebrow')"
+            :title="t('candidate.ai.title')"
+            :description="t('candidate.ai.description')"
             :icon="Bot"
         >
             <template #actions>
                 <span
                     class="rounded-full bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700"
                 >
-                    {{ remainingCredits }} von {{ credits.limit }} Credits
+                    {{
+                        t('candidate.ai.creditsRemaining', {
+                            remaining: remainingCredits,
+                            limit: credits.limit,
+                        })
+                    }}
                 </span>
             </template>
         </PageHeader>
@@ -284,11 +297,11 @@ const runTask = async () => {
         >
             <ShieldCheck class="mt-0.5 size-5 shrink-0" />
             <div>
-                <p class="font-bold">Dokument-KI ist geschützt deaktiviert</p>
+                <p class="font-bold">
+                    {{ t('candidate.ai.documentAiDisabled') }}
+                </p>
                 <p class="mt-1 text-xs leading-5 text-amber-800">
-                    Direkte Dokumentverarbeitung bleibt gesperrt, bis
-                    EU-Endpunkt und Aufbewahrungskontrollen aktiviert sind.
-                    Texte können nur zweckgebunden verarbeitet werden.
+                    {{ t('candidate.ai.documentAiDisabledDescription') }}
                 </p>
             </div>
         </div>
@@ -320,7 +333,7 @@ const runTask = async () => {
                 <span
                     class="mt-5 flex h-10 items-center justify-between rounded-xl border border-slate-200 px-3 text-xs font-bold text-slate-700"
                 >
-                    <span>1 KI-Credit</span>
+                    <span>{{ t('candidate.ai.oneCredit') }}</span>
                     <ArrowRight class="size-4 text-violet-500" />
                 </span>
             </button>
@@ -332,10 +345,10 @@ const runTask = async () => {
             <div>
                 <Bot class="mx-auto size-9 text-slate-300" />
                 <h2 class="mt-4 font-bold">
-                    Keine KI-Werkzeuge freigeschaltet
+                    {{ t('candidate.ai.noToolsTitle') }}
                 </h2>
                 <p class="mt-2 text-sm text-slate-500">
-                    Verfügbare Werkzeuge werden hier automatisch angezeigt.
+                    {{ t('candidate.ai.noToolsDescription') }}
                 </p>
             </div>
         </div>
@@ -343,19 +356,17 @@ const runTask = async () => {
         <div v-if="selectedTool" class="grid gap-6 xl:grid-cols-[1fr_22rem]">
             <SectionCard
                 :title="selectedTool.title"
-                description="Das Ergebnis ist ein Vorschlag und erfordert immer deine Prüfung."
+                :description="t('candidate.ai.proposalDisclaimer')"
             >
                 <div
                     v-if="selectedTool.requiresConsent && !activeConsent"
                     class="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4"
                 >
                     <p class="text-xs font-bold text-amber-900">
-                        Zweckgebundene Einwilligung erforderlich
+                        {{ t('candidate.ai.consentRequired') }}
                     </p>
                     <p class="mt-1 text-xs leading-5 text-amber-800">
-                        Erin protokolliert Zweck, Datenkategorien, Promptversion
-                        und Ergebnis. Die Einwilligung kann jederzeit widerrufen
-                        werden.
+                        {{ t('candidate.ai.consentDescription') }}
                     </p>
                     <button
                         type="button"
@@ -363,7 +374,7 @@ const runTask = async () => {
                         class="mt-3 h-9 rounded-xl bg-amber-900 px-3 text-xs font-bold text-white disabled:opacity-50"
                         @click="requestConsent"
                     >
-                        Einwilligung erteilen
+                        {{ t('candidate.ai.grantConsent') }}
                     </button>
                 </div>
 
@@ -388,18 +399,22 @@ const runTask = async () => {
                     @click="runTask"
                 >
                     <Sparkles class="size-4" />
-                    {{ running ? 'KI arbeitet …' : 'Vorschlag erzeugen' }}
+                    {{
+                        running
+                            ? t('candidate.ai.working')
+                            : t('candidate.ai.createProposal')
+                    }}
                 </button>
             </SectionCard>
 
-            <SectionCard title="Credit-Verbrauch">
+            <SectionCard :title="t('candidate.ai.usageTitle')">
                 <div class="flex items-end justify-between">
                     <div>
                         <p class="text-2xl font-extrabold">
                             {{ usedCredits }} / {{ credits.limit }}
                         </p>
                         <p class="text-xs text-slate-400">
-                            Credits in diesem Monat verbraucht
+                            {{ t('candidate.ai.usageDescription') }}
                         </p>
                     </div>
                 </div>
@@ -410,20 +425,18 @@ const runTask = async () => {
                     tone="orange"
                 />
                 <p class="mt-4 text-xs leading-5 text-slate-500">
-                    Nicht verbrauchte Credits verfallen am Monatsende.
-                    KI-Ergebnisse werden nie automatisch an Unternehmen
-                    gesendet.
+                    {{ t('candidate.ai.expiryNotice') }}
                 </p>
                 <div v-if="activeConsent" class="mt-4 border-t pt-4">
                     <p class="text-xs font-bold text-slate-700">
-                        Aktive Einwilligung
+                        {{ t('candidate.ai.activeConsent') }}
                     </p>
                     <button
                         type="button"
                         class="mt-2 text-xs font-bold text-red-600"
                         @click="revokeConsent(activeConsent)"
                     >
-                        Einwilligung widerrufen
+                        {{ t('candidate.ai.revokeConsent') }}
                     </button>
                 </div>
             </SectionCard>
@@ -431,8 +444,8 @@ const runTask = async () => {
 
         <SectionCard
             v-if="result"
-            title="KI-Vorschlag"
-            description="Bitte vor jeder Verwendung fachlich und inhaltlich prüfen."
+            :title="t('candidate.ai.proposalTitle')"
+            :description="t('candidate.ai.proposalReview')"
         >
             <div class="flex flex-wrap items-center gap-2">
                 <CheckCircle2 class="size-5 text-teal-500" />
@@ -468,7 +481,7 @@ const runTask = async () => {
                     class="flex items-center gap-2 text-xs font-bold text-amber-900"
                 >
                     <AlertTriangle class="size-4" />
-                    Hinweise für die menschliche Prüfung
+                    {{ t('candidate.ai.humanReview') }}
                 </p>
                 <ul
                     class="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-amber-800"
@@ -481,8 +494,8 @@ const runTask = async () => {
         </SectionCard>
 
         <SectionCard
-            title="Letzte KI-Aktivitäten"
-            description="Auditierbare Historie deiner Verarbeitungsläufe"
+            :title="t('candidate.ai.activityTitle')"
+            :description="t('candidate.ai.activityDescription')"
         >
             <div v-if="normalizedRuns.length" class="space-y-3">
                 <article
@@ -504,15 +517,15 @@ const runTask = async () => {
                             class="mt-1 text-[10px] text-slate-400"
                         >
                             {{
-                                new Intl.DateTimeFormat('de-DE', {
+                                formatDate(aiRun.created_at, {
                                     dateStyle: 'medium',
                                     timeStyle: 'short',
-                                }).format(new Date(aiRun.created_at))
+                                })
                             }}
                         </p>
                     </div>
                     <StatusBadge
-                        :label="aiRun.status"
+                        :label="runStatusLabel(aiRun.status)"
                         :tone="
                             aiRun.status === 'completed'
                                 ? 'green'
@@ -524,7 +537,7 @@ const runTask = async () => {
                 </article>
             </div>
             <p v-else class="py-8 text-center text-sm text-slate-400">
-                Noch keine KI-Aktivitäten vorhanden.
+                {{ t('candidate.ai.noActivity') }}
             </p>
         </SectionCard>
     </div>

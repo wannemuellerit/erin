@@ -138,7 +138,7 @@ watchEffect(() => {
                     :tabindex="2"
                     autocomplete="email"
                     name="email"
-                    placeholder="name@beispiel.de"
+                    :placeholder="t('auth.emailPlaceholder')"
                 />
                 <InputError :message="errors.email" />
             </div>

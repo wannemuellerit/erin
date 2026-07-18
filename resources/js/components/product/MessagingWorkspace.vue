@@ -1,29 +1,26 @@
 <script setup lang="ts">
 import { router, useForm, usePage } from '@inertiajs/vue3';
-import {
-    FileText,
-    Inbox,
-    Languages,
-    Paperclip,
-    Search,
-    Send,
-} from '@lucide/vue';
+import { FileText, Inbox, Languages, Paperclip, Send } from '@lucide/vue';
 import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
+import EmptyState from '@/components/product/EmptyState.vue';
+import SearchField from '@/components/product/SearchField.vue';
+import de from '@/i18n/messages/product-components-de';
+import en from '@/i18n/messages/product-components-en';
 import { index, read, send } from '@/routes/messages';
-import type { Conversation } from '@/types';
+import type { Conversation, MessagingWorkspaceProps } from '@/types';
 
-const props = withDefaults(
-    defineProps<{
-        perspective?: 'employer' | 'candidate';
-        conversations?: Conversation[];
-        selected?: number | null;
-    }>(),
-    {
-        perspective: 'employer',
-        conversations: () => [],
-        selected: null,
-    },
-);
+const props = withDefaults(defineProps<MessagingWorkspaceProps>(), {
+    perspective: 'employer',
+    conversations: () => [],
+    selected: null,
+});
+
+const { locale, t } = useI18n({
+    useScope: 'local',
+    messages: { de, en },
+});
+
 const page = usePage();
 const currentUserId = computed(() => page.props.auth?.user?.id);
 const query = ref('');
@@ -59,7 +56,15 @@ const name = (conversation: Conversation) =>
         .map((participant) => participant.name)
         .join(', ') ||
     conversation.title ||
-    'Konversation';
+    t('messagingWorkspace.conversationFallback');
+const formatDate = (value: string) =>
+    new Intl.DateTimeFormat(locale.value, {
+        dateStyle: 'short',
+    }).format(new Date(value));
+const formatTime = (value: string) =>
+    new Intl.DateTimeFormat(locale.value, {
+        timeStyle: 'short',
+    }).format(new Date(value));
 const messageForm = useForm({
     body: '',
     type: 'text',
@@ -104,16 +109,13 @@ const submit = () => {
     >
         <aside class="border-r border-slate-200 bg-white">
             <div class="border-b border-slate-100 p-4">
-                <div class="relative">
-                    <Search
-                        class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400"
-                    /><input
-                        v-model="query"
-                        type="search"
-                        placeholder="Nachrichten durchsuchen …"
-                        class="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 text-xs"
-                    />
-                </div>
+                <SearchField
+                    v-model="query"
+                    size="sm"
+                    :label="t('messagingWorkspace.searchLabel')"
+                    :placeholder="t('messagingWorkspace.searchPlaceholder')"
+                    class="bg-slate-50 text-xs"
+                />
             </div>
             <div v-if="filtered.length" class="divide-y divide-slate-100">
                 <button
@@ -143,11 +145,7 @@ const submit = () => {
                                 v-if="conversation.last_message_at"
                                 class="text-[9px] text-slate-400"
                                 >{{
-                                    new Intl.DateTimeFormat('de-DE', {
-                                        dateStyle: 'short',
-                                    }).format(
-                                        new Date(conversation.last_message_at),
-                                    )
+                                    formatDate(conversation.last_message_at)
                                 }}</span
                             ></span
                         >
@@ -159,7 +157,7 @@ const submit = () => {
                             class="mt-1 block truncate text-xs text-slate-500"
                             >{{
                                 conversation.messages?.at(-1)?.body ||
-                                'Noch keine Nachricht'
+                                t('messagingWorkspace.noMessagePreview')
                             }}</span
                         >
                     </span>
@@ -170,12 +168,15 @@ const submit = () => {
                     >
                 </button>
             </div>
-            <div v-else class="p-8 text-center">
-                <Inbox class="mx-auto size-7 text-slate-300" />
-                <p class="mt-3 text-xs text-slate-400">
-                    Keine Konversationen vorhanden.
-                </p>
-            </div>
+            <EmptyState
+                v-else
+                compact
+                :icon="Inbox"
+                :title="t('messagingWorkspace.noConversationsTitle')"
+                :description="
+                    t('messagingWorkspace.noConversationsDescription')
+                "
+            />
         </aside>
 
         <section v-if="active" class="flex min-w-0 flex-col bg-slate-50/60">
@@ -200,12 +201,14 @@ const submit = () => {
                     v-if="!active.messages?.length"
                     class="grid h-full place-items-center text-center"
                 >
-                    <div>
-                        <Inbox class="mx-auto size-8 text-slate-300" />
-                        <p class="mt-3 text-sm text-slate-400">
-                            Schreiben Sie die erste Nachricht.
-                        </p>
-                    </div>
+                    <EmptyState
+                        compact
+                        :icon="Inbox"
+                        :title="t('messagingWorkspace.firstMessageTitle')"
+                        :description="
+                            t('messagingWorkspace.firstMessageDescription')
+                        "
+                    />
                 </div>
                 <div
                     v-for="message in active.messages ?? []"
@@ -244,7 +247,11 @@ const submit = () => {
                                 ><span
                                     v-if="!attachment.download_url"
                                     class="ml-auto text-[9px]"
-                                    >Prüfung läuft</span
+                                    >{{
+                                        t(
+                                            'messagingWorkspace.attachmentPending',
+                                        )
+                                    }}</span
                                 >
                             </a>
                         </div>
@@ -258,11 +265,7 @@ const submit = () => {
                                 : ''
                         "
                     >
-                        {{
-                            new Intl.DateTimeFormat('de-DE', {
-                                timeStyle: 'short',
-                            }).format(new Date(message.created_at))
-                        }}
+                        {{ formatTime(message.created_at) }}
                     </p>
                 </div>
             </div>
@@ -270,8 +273,7 @@ const submit = () => {
                 <div class="mb-2 flex items-center gap-2 text-[10px]">
                     <Languages class="size-3.5 text-violet-500" /><span
                         class="text-slate-400"
-                        >Übersetzungen werden in der Konversation
-                        gespeichert.</span
+                        >{{ t('messagingWorkspace.translations') }}</span
                     >
                 </div>
                 <form
@@ -280,6 +282,7 @@ const submit = () => {
                 >
                     <label
                         class="grid size-9 shrink-0 cursor-pointer place-items-center rounded-xl text-slate-400 hover:bg-white hover:text-[var(--erin-primary)]"
+                        :aria-label="t('messagingWorkspace.attachFiles')"
                         ><Paperclip class="size-[18px]" /><input
                             type="file"
                             multiple
@@ -294,13 +297,16 @@ const submit = () => {
                     <textarea
                         v-model="messageForm.body"
                         rows="1"
-                        placeholder="Nachricht schreiben …"
+                        :placeholder="
+                            t('messagingWorkspace.messagePlaceholder')
+                        "
                         class="max-h-28 min-h-9 flex-1 resize-none bg-transparent py-2 text-sm outline-none placeholder:text-slate-400"
                     />
                     <button
                         type="submit"
                         :disabled="messageForm.processing"
                         class="grid size-9 shrink-0 place-items-center rounded-xl bg-[var(--erin-primary)] text-white disabled:opacity-50"
+                        :aria-label="t('messagingWorkspace.send')"
                     >
                         <Send class="size-4" />
                     </button>
@@ -311,13 +317,11 @@ const submit = () => {
             v-else
             class="grid place-items-center bg-slate-50 p-8 text-center"
         >
-            <div>
-                <Inbox class="mx-auto size-9 text-slate-300" />
-                <h2 class="mt-4 font-bold">Keine Nachricht ausgewählt</h2>
-                <p class="mt-2 text-sm text-slate-500">
-                    Wählen Sie links eine Konversation aus.
-                </p>
-            </div>
+            <EmptyState
+                :icon="Inbox"
+                :title="t('messagingWorkspace.noSelectionTitle')"
+                :description="t('messagingWorkspace.noSelectionDescription')"
+            />
         </section>
     </div>
 </template>

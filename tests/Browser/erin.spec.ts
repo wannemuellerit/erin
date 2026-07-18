@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
@@ -9,21 +10,34 @@ const accounts = {
         name: 'Wannemüller Admin',
     },
     candidate: {
-        email: 'candidate@wannemueller.dev',
+        email: 'candidate01@wannemueller.dev',
         name: 'Anna Kowalska',
     },
     company: {
-        email: 'recruiting@mueller-elektro.example',
+        email: 'unternehmen.mueller@wannemueller.dev',
         name: 'Marie Müller',
+    },
+    support: {
+        email: 'support.e2e@wannemueller.dev',
+        name: 'Erin E2E Support',
+    },
+    onboardingCandidate: {
+        email: 'onboarding.candidate@wannemueller.dev',
+    },
+    onboardingCompany: {
+        email: 'onboarding.company@wannemueller.dev',
     },
 } as const;
 
-async function logIn(page: Page, email: string): Promise<void> {
+async function submitLogin(page: Page, email: string): Promise<void> {
     await page.goto('/login');
     await page.getByLabel('E-Mail-Adresse', { exact: true }).fill(email);
     await page.getByLabel('Passwort', { exact: true }).fill(password);
     await page.getByTestId('login-button').click();
+}
 
+async function logIn(page: Page, email: string): Promise<void> {
+    await submitLogin(page, email);
     await expect(page).toHaveURL(/\/dashboard(?:\?.*)?$/);
     await expect(page.getByRole('main')).toBeVisible();
 }
@@ -50,6 +64,41 @@ async function expectAccessibleAppChrome(page: Page): Promise<void> {
     );
     await expect(sidebarToggle).toBeVisible();
     await expect(sidebarToggle).toHaveAccessibleName('Navigation öffnen');
+}
+
+async function expectNoSeriousAccessibilityViolations(
+    page: Page,
+    include?: string,
+): Promise<void> {
+    let audit = new AxeBuilder({ page }).withTags([
+        'wcag2a',
+        'wcag2aa',
+        'wcag21a',
+        'wcag21aa',
+    ]);
+
+    if (include) {
+        audit = audit.include(include);
+    }
+
+    const results = await audit.analyze();
+    const violations = results.violations
+        .filter(
+            (violation) =>
+                violation.impact === 'critical' ||
+                violation.impact === 'serious',
+        )
+        .map((violation) => ({
+            id: violation.id,
+            impact: violation.impact,
+            help: violation.help,
+            targets: violation.nodes.flatMap((node) => node.target),
+        }));
+
+    expect(
+        violations,
+        `Axe hat schwerwiegende WCAG-Verstöße gefunden:\n${JSON.stringify(violations, null, 2)}`,
+    ).toEqual([]);
 }
 
 async function expectNoHorizontalOverflow(page: Page): Promise<void> {
@@ -105,6 +154,7 @@ test.describe('Login und Rollenbereiche', () => {
         await expect(loginPassword).toHaveAccessibleName('Passwort');
         await expect(insert).toHaveAccessibleName('Einsetzen');
         await expect(submit).toHaveAccessibleName('Anmelden');
+        await expectNoSeriousAccessibilityViolations(page);
 
         await insert.click();
 
@@ -145,6 +195,31 @@ test.describe('Login und Rollenbereiche', () => {
             ).toBeVisible();
         }
 
+        await expectNoSeriousAccessibilityViolations(page);
+
+        await page
+            .getByRole('link', {
+                name: 'Paket & Abrechnung',
+                exact: true,
+            })
+            .click();
+        await expect(page).toHaveURL(/\/admin\/billing$/);
+        await expect(
+            page.getByRole('heading', {
+                level: 1,
+                name: 'Abrechnung & Stripe',
+            }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole('heading', {
+                level: 2,
+                name: 'Stripe-Konfigurationsstatus',
+            }),
+        ).toBeVisible();
+        await expect(page.getByText(/sk_(?:test|live)_/)).toHaveCount(0);
+        await expect(page.getByText(/whsec_/)).toHaveCount(0);
+        await expectNoSeriousAccessibilityViolations(page);
+
         await page.getByRole('link', { name: 'Benutzer', exact: true }).click();
 
         await expect(page).toHaveURL(/\/admin\/users$/);
@@ -176,6 +251,7 @@ test.describe('Login und Rollenbereiche', () => {
         await expect(
             page.getByRole('link', { name: 'Benutzer', exact: true }),
         ).toHaveCount(0);
+        await expectNoSeriousAccessibilityViolations(page);
 
         await page
             .getByRole('link', { name: 'Passende Jobs', exact: true })
@@ -216,6 +292,7 @@ test.describe('Login und Rollenbereiche', () => {
         await expect(
             page.getByRole('link', { name: 'Benutzer', exact: true }),
         ).toHaveCount(0);
+        await expectNoSeriousAccessibilityViolations(page);
 
         await page
             .getByRole('link', {
@@ -231,6 +308,145 @@ test.describe('Login und Rollenbereiche', () => {
                 name: 'Stellenanzeigen',
             }),
         ).toBeVisible();
+    });
+
+    test('rendert die Benachrichtigungseinstellungen mit Browser-Push und Erinnerungen', async ({
+        page,
+    }) => {
+        await logIn(page, accounts.company.email);
+        await page.goto('/settings/notifications');
+
+        await expect(
+            page.getByRole('heading', {
+                level: 1,
+                name: 'Benachrichtigungen',
+            }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole('region', {
+                name: 'Browser-Push auf diesem Gerät',
+            }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole('heading', {
+                level: 2,
+                name: 'Erinnerungen',
+            }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole('button', {
+                name: 'Einstellungen speichern',
+            }),
+        ).toBeVisible();
+        await expectNoSeriousAccessibilityViolations(page);
+    });
+});
+
+test.describe('Onboarding und Abrechnung', () => {
+    test('führt eine Fachkraft vom Onboarding in ihr Profil', async ({
+        page,
+    }) => {
+        await submitLogin(page, accounts.onboardingCandidate.email);
+        await expect(page).toHaveURL(/\/onboarding$/);
+        await expect(page.getByTestId('candidate-onboarding')).toBeVisible();
+        await page
+            .getByRole('button', { name: 'Einrichtung abschließen' })
+            .hover();
+        await expectNoSeriousAccessibilityViolations(page);
+
+        await page.locator('#occupation_id').selectOption({ index: 1 });
+        await page.getByLabel('Wunschposition *').fill('Elektriker');
+        await page.getByLabel('Jahre Berufserfahrung *').fill('5');
+        await page.getByLabel('Telefonnummer *').fill('+49 170 1234567');
+        await page.getByLabel('Aktuelles Land (ISO) *').fill('PL');
+        await page.getByLabel('Aktuelle Stadt *').fill('Wrocław');
+        await page
+            .getByPlaceholder(
+                'Beschreibe deine Erfahrung, Stärken und gewünschte Tätigkeit.',
+            )
+            .fill(
+                'Ich bin ausgebildeter Elektriker mit fünf Jahren Berufserfahrung und möchte langfristig in einem deutschen Industriebetrieb arbeiten.',
+            );
+        await page
+            .getByRole('button', { name: 'Einrichtung abschließen' })
+            .click();
+
+        await expect(page).toHaveURL(/\/candidate\/profile$/);
+    });
+
+    test('führt ein Unternehmen bis zur Stripe-Abrechnungsseite', async ({
+        page,
+    }) => {
+        await submitLogin(page, accounts.onboardingCompany.email);
+        await expect(page).toHaveURL(/\/onboarding$/);
+        await expect(page.getByTestId('company-onboarding')).toBeVisible();
+        await expectNoSeriousAccessibilityViolations(page);
+
+        await page.getByRole('button', { name: /Basic/ }).click();
+        await page
+            .getByLabel('Rechtlicher Firmenname *')
+            .fill('E2E Onboarding GmbH');
+        await page
+            .getByLabel('Rechnungs-E-Mail *')
+            .fill('rechnung.e2e@wannemueller.dev');
+        await page.getByLabel('Branche *').fill('Elektrotechnik');
+        await page.getByLabel('Mitarbeitende *').fill('25');
+        await page.getByLabel('Straße *').fill('Teststraße 42');
+        await page.getByLabel('Postleitzahl *').fill('40210');
+        await page.getByLabel('Stadt *').fill('Düsseldorf');
+        await page.getByLabel('Land (ISO) *').fill('DE');
+        await page
+            .getByRole('button', { name: 'Speichern und weiter' })
+            .click();
+
+        await expect(page).toHaveURL(/\/employer\/billing$/);
+        await expect(
+            page.getByRole('heading', {
+                level: 1,
+                name: 'Paket & Abrechnung',
+            }),
+        ).toBeVisible();
+        await expectNoSeriousAccessibilityViolations(page);
+    });
+});
+
+test.describe('Support und Mandantentrennung', () => {
+    test('zeigt die Supportansicht dauerhaft schreibgeschützt', async ({
+        page,
+    }) => {
+        await logIn(page, accounts.support.email);
+        await page.goto('/admin/support');
+        await expect(
+            page.getByRole('heading', { level: 1, name: 'Support' }),
+        ).toBeVisible();
+        await expectNoSeriousAccessibilityViolations(page);
+
+        await page
+            .getByPlaceholder('Grund, mindestens 10 Zeichen …')
+            .fill('Reproduzierbarer schreibgeschützter E2E-Supportfall');
+        await page.getByRole('button', { name: 'Ansicht öffnen' }).click();
+
+        await expect(page).toHaveURL(/\/dashboard(?:\?.*)?$/);
+        const supportBanner = page.getByRole('status');
+        await expect(supportBanner).toContainText('Supportansicht');
+        await expect(supportBanner).toContainText(accounts.support.name);
+        await expectNoSeriousAccessibilityViolations(page);
+
+        await page.getByTestId('header-profile-menu').click();
+        await page.getByTestId('product-logout-button').click();
+
+        await expect(page).toHaveURL(/\/dashboard(?:\?.*)?$/);
+        await expect(supportBanner).toBeVisible();
+    });
+
+    test('verweigert einem Unternehmen eine mandantenfremde Stellenbearbeitung', async ({
+        page,
+    }) => {
+        await logIn(page, accounts.company.email);
+
+        const response = await page.goto('/employer/jobs/990002/edit');
+
+        expect(response?.status()).toBe(404);
     });
 });
 
@@ -257,6 +473,38 @@ test.describe('Englische Oberfläche', () => {
         await expect(page.getByTestId('login-button')).toHaveAccessibleName(
             'Sign in',
         );
+        await expectNoSeriousAccessibilityViolations(page);
+    });
+
+    test('wechselt die Sprache auf Startseite und Login manuell', async ({
+        page,
+    }) => {
+        await page.goto('/');
+
+        await page.getByRole('button', { name: 'German', exact: true }).click();
+        await expect(
+            page.getByRole('heading', {
+                level: 1,
+                name: 'Die besten Fachkräfte. Grenzenlos gefunden.',
+            }),
+        ).toBeVisible();
+
+        await page.goto('/login');
+        await page
+            .getByRole('button', { name: 'Englisch', exact: true })
+            .click();
+
+        await expect(
+            page.getByRole('heading', {
+                level: 1,
+                name: 'Welcome back',
+            }),
+        ).toBeVisible();
+        await expect(page.getByTestId('locale-en')).toHaveAttribute(
+            'aria-pressed',
+            'true',
+        );
+        await expectNoSeriousAccessibilityViolations(page);
     });
 
     test('übernimmt nach dem SPA-Login die hinterlegte Kontosprache', async ({
@@ -294,12 +542,59 @@ test.describe('Mobile Abnahme', () => {
         isMobile: true,
     });
 
+    test('zeigt die Sprachwahl auf der mobilen Startseite direkt an', async ({
+        page,
+    }) => {
+        await page.goto('/');
+
+        await expect(
+            page.getByRole('group', { name: 'Sprache', exact: true }),
+        ).toBeVisible();
+        await page
+            .getByRole('button', { name: 'Englisch', exact: true })
+            .click();
+        await expect(
+            page.getByRole('heading', {
+                level: 1,
+                name: 'The best professionals. Found without borders.',
+            }),
+        ).toBeVisible();
+        await expectNoHorizontalOverflow(page);
+    });
+
+    test('wechselt die Sprache auf dem mobilen Login ohne horizontalen Overflow', async ({
+        page,
+    }) => {
+        await page.goto('/login');
+
+        await expect(
+            page.getByRole('group', { name: 'Sprache', exact: true }),
+        ).toBeVisible();
+        await page
+            .getByRole('button', { name: 'Englisch', exact: true })
+            .click();
+
+        await expect(
+            page.getByRole('heading', {
+                level: 1,
+                name: 'Welcome back',
+            }),
+        ).toBeVisible();
+        await expect(page.getByTestId('locale-en')).toHaveAttribute(
+            'aria-pressed',
+            'true',
+        );
+        await expectNoHorizontalOverflow(page);
+        await expectNoSeriousAccessibilityViolations(page);
+    });
+
     test('bleibt im Firmen-Dashboard und in der Stellenliste ohne horizontalen Overflow', async ({
         page,
     }) => {
         await logIn(page, accounts.company.email);
         await expectAccessibleAppChrome(page);
         await expectNoHorizontalOverflow(page);
+        await expectNoSeriousAccessibilityViolations(page);
 
         await page.getByRole('button', { name: 'Navigation öffnen' }).click();
         await expect(
@@ -321,4 +616,52 @@ test.describe('Mobile Abnahme', () => {
         ).toBeVisible();
         await expectNoHorizontalOverflow(page);
     });
+});
+
+test.describe('Tablet-Navigation', () => {
+    for (const width of [640, 1023]) {
+        test(`hält die öffentliche Navigation bei ${width} Pixeln vollständig erreichbar`, async ({
+            page,
+        }) => {
+            await page.setViewportSize({ width, height: 900 });
+            await page.goto('/');
+
+            const menuButton = page.getByRole('button', {
+                name: 'Menü öffnen',
+            });
+            await expect(menuButton).toBeVisible();
+            await expect(
+                page.getByRole('group', { name: 'Sprache', exact: true }),
+            ).toBeVisible();
+            await expect(
+                page.getByRole('link', { name: 'Preise', exact: true }),
+            ).toHaveCount(0);
+
+            await menuButton.click();
+
+            await expect(
+                page.getByRole('link', {
+                    name: 'Für Unternehmen',
+                    exact: true,
+                }),
+            ).toBeVisible();
+            await expect(
+                page.getByRole('link', {
+                    name: 'Für Fachkräfte',
+                    exact: true,
+                }),
+            ).toBeVisible();
+            await expect(
+                page.getByRole('link', {
+                    name: 'So funktioniert’s',
+                    exact: true,
+                }),
+            ).toBeVisible();
+            await expect(
+                page.getByRole('link', { name: 'Preise', exact: true }),
+            ).toBeVisible();
+            await expectNoHorizontalOverflow(page);
+            await expectNoSeriousAccessibilityViolations(page, 'header');
+        });
+    }
 });

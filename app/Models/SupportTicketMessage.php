@@ -11,7 +11,11 @@ class SupportTicketMessage extends Model
 
     protected function casts(): array
     {
-        return ['is_internal' => 'boolean', 'attachments' => 'array'];
+        return [
+            'is_internal' => 'boolean',
+            'attachments' => 'array',
+            'delivered_at' => 'datetime',
+        ];
     }
 
     /**

@@ -65,7 +65,7 @@ const toneClasses = {
                 <Minus v-else class="size-3.5" />
                 {{ change }}
             </span>
-            <span v-if="hint" class="text-slate-400">{{ hint }}</span>
+            <span v-if="hint" class="text-slate-600">{{ hint }}</span>
         </div>
     </article>
 </template>

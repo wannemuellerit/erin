@@ -13,6 +13,7 @@ import {
     Upload,
 } from '@lucide/vue';
 import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import PageHeader from '@/components/product/PageHeader.vue';
 import ProgressBar from '@/components/product/ProgressBar.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
@@ -68,14 +69,11 @@ const props = withDefaults(
     },
 );
 
-const benefitLabels: Record<string, string> = {
-    accommodation: 'Unterkunft vorhanden',
-    german_course: 'Deutschkurs',
-    visa_support: 'Visa-Unterstützung',
-    canteen: 'Kantine',
-    work_clothing: 'Arbeitskleidung',
-    company_vehicle: 'Firmenfahrzeug',
-};
+const { t, te } = useI18n();
+const benefitLabel = (benefit: string) =>
+    te(`employer.companyProfile.benefits.${benefit}`)
+        ? t(`employer.companyProfile.benefits.${benefit}`)
+        : benefit;
 
 const form = useForm({
     name: props.company?.name ?? '',
@@ -141,20 +139,20 @@ const mediaTone = (scanResult: string): StatusTone => {
     return 'yellow';
 };
 const mediaLabel = (scanResult: string) => {
-    if (scanResult === 'clean') {
-        return 'Geprüft';
-    }
-
-    if (scanResult === 'infected') {
-        return 'Abgelehnt';
-    }
-
-    if (scanResult === 'failed') {
-        return 'Prüfung fehlgeschlagen';
-    }
-
-    return 'Prüfung läuft';
+    return te(`employer.companyProfile.scanStatus.${scanResult}`)
+        ? t(`employer.companyProfile.scanStatus.${scanResult}`)
+        : t('employer.companyProfile.scanStatus.pending');
 };
+const selectedMediaLabel = computed(() => {
+    const count = form.media.length;
+
+    return t(
+        count === 1
+            ? 'employer.companyProfile.selectedMedia.one'
+            : 'employer.companyProfile.selectedMedia.other',
+        { count },
+    );
+});
 const addLocation = () => {
     form.locations.push({
         name: '',
@@ -178,12 +176,12 @@ const submit = () => {
 </script>
 
 <template>
-    <Head title="Unternehmensprofil" />
+    <Head :title="t('employer.companyProfile.metaTitle')" />
     <div class="erin-page">
         <PageHeader
-            eyebrow="Employer Branding"
-            title="Unternehmensprofil"
-            description="Zeigen Sie Fachkräften, was Ihr Unternehmen besonders macht."
+            :eyebrow="t('employer.companyProfile.eyebrow')"
+            :title="t('employer.companyProfile.title')"
+            :description="t('employer.companyProfile.description')"
             :icon="Building2"
         >
             <template #actions>
@@ -194,7 +192,7 @@ const submit = () => {
                     @click="submit"
                 >
                     <Save class="size-4" />
-                    Änderungen speichern
+                    {{ t('employer.companyProfile.saveChanges') }}
                 </button>
             </template>
         </PageHeader>
@@ -206,11 +204,10 @@ const submit = () => {
             <div>
                 <Building2 class="mx-auto size-9 text-slate-300" />
                 <h2 class="mt-4 font-bold">
-                    Kein Unternehmensprofil verfügbar
+                    {{ t('employer.companyProfile.emptyTitle') }}
                 </h2>
                 <p class="mt-2 text-sm text-slate-500">
-                    Sobald ein Unternehmen zugeordnet ist, können Sie das Profil
-                    hier bearbeiten.
+                    {{ t('employer.companyProfile.emptyDescription') }}
                 </p>
             </div>
         </div>
@@ -222,8 +219,8 @@ const submit = () => {
         >
             <div class="space-y-6">
                 <SectionCard
-                    title="Logo & Medien"
-                    description="Uploads werden privat gespeichert und vor der Freigabe geprüft."
+                    :title="t('employer.companyProfile.mediaTitle')"
+                    :description="t('employer.companyProfile.mediaDescription')"
                 >
                     <div
                         class="flex flex-col gap-4 rounded-2xl bg-slate-950 p-5 text-white sm:flex-row sm:items-center"
@@ -242,14 +239,14 @@ const submit = () => {
                                 {{ logo.original_name }}
                             </p>
                             <p v-else class="mt-1 text-xs text-slate-400">
-                                Noch kein Logo hochgeladen
+                                {{ t('employer.companyProfile.noLogo') }}
                             </p>
                         </div>
                         <label
                             class="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl bg-white px-4 text-xs font-bold text-slate-800"
                         >
                             <Upload class="size-4" />
-                            Logo wählen
+                            {{ t('employer.companyProfile.chooseLogo') }}
                             <input
                                 type="file"
                                 accept=".jpg,.jpeg,.png,.gif,.webp"
@@ -267,7 +264,11 @@ const submit = () => {
                         v-if="form.logo"
                         class="mt-3 text-xs font-semibold text-teal-700"
                     >
-                        Neues Logo: {{ form.logo.name }}
+                        {{
+                            t('employer.companyProfile.newLogo', {
+                                name: form.logo.name,
+                            })
+                        }}
                     </p>
 
                     <div
@@ -305,7 +306,11 @@ const submit = () => {
                                 v-if="medium.download_url"
                                 :href="medium.download_url"
                                 class="grid size-8 place-items-center rounded-lg text-slate-400 hover:bg-slate-100"
-                                :aria-label="`${medium.original_name} herunterladen`"
+                                :aria-label="
+                                    t('employer.companyProfile.downloadMedia', {
+                                        name: medium.original_name,
+                                    })
+                                "
                             >
                                 <Download class="size-4" />
                             </a>
@@ -315,14 +320,14 @@ const submit = () => {
                         v-else
                         class="mt-5 rounded-xl bg-slate-50 p-4 text-center text-sm text-slate-400"
                     >
-                        Noch keine Medien hochgeladen.
+                        {{ t('employer.companyProfile.noMedia') }}
                     </p>
 
                     <label
                         class="mt-4 flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 p-5 text-sm font-bold text-slate-500 hover:border-blue-300"
                     >
                         <Upload class="size-4" />
-                        Bilder, Videos oder PDF auswählen
+                        {{ t('employer.companyProfile.chooseMedia') }}
                         <input
                             type="file"
                             multiple
@@ -340,15 +345,17 @@ const submit = () => {
                         v-if="form.media.length"
                         class="mt-2 text-xs text-slate-500"
                     >
-                        {{ form.media.length }} Datei(en) zum Upload ausgewählt.
+                        {{ selectedMediaLabel }}
                     </p>
                 </SectionCard>
 
-                <SectionCard title="Unternehmensdaten">
+                <SectionCard
+                    :title="t('employer.companyProfile.companyDataTitle')"
+                >
                     <div class="grid gap-5 sm:grid-cols-2">
                         <label>
                             <span class="text-sm font-bold text-slate-700">
-                                Firmenname *
+                                {{ t('employer.companyProfile.fields.name') }} *
                             </span>
                             <input
                                 v-model="form.name"
@@ -358,13 +365,20 @@ const submit = () => {
                         </label>
                         <label>
                             <span class="text-sm font-bold text-slate-700">
-                                Rechtlicher Name
+                                {{
+                                    t(
+                                        'employer.companyProfile.fields.legalName',
+                                    )
+                                }}
                             </span>
                             <input v-model="form.legal_name" :class="input" />
                         </label>
                         <label>
                             <span class="text-sm font-bold text-slate-700">
-                                Branche *
+                                {{
+                                    t('employer.companyProfile.fields.industry')
+                                }}
+                                *
                             </span>
                             <input
                                 v-model="form.industry"
@@ -374,7 +388,11 @@ const submit = () => {
                         </label>
                         <label>
                             <span class="text-sm font-bold text-slate-700">
-                                Mitarbeiterzahl
+                                {{
+                                    t(
+                                        'employer.companyProfile.fields.employeeCount',
+                                    )
+                                }}
                             </span>
                             <input
                                 v-model.number="form.employee_count"
@@ -385,7 +403,9 @@ const submit = () => {
                         </label>
                         <label>
                             <span class="text-sm font-bold text-slate-700">
-                                Webseite
+                                {{
+                                    t('employer.companyProfile.fields.website')
+                                }}
                             </span>
                             <input
                                 v-model="form.website"
@@ -395,7 +415,7 @@ const submit = () => {
                         </label>
                         <label>
                             <span class="text-sm font-bold text-slate-700">
-                                Telefon
+                                {{ t('employer.companyProfile.fields.phone') }}
                             </span>
                             <input
                                 v-model="form.phone"
@@ -405,7 +425,10 @@ const submit = () => {
                         </label>
                         <label>
                             <span class="text-sm font-bold text-slate-700">
-                                Land (ISO) *
+                                {{
+                                    t('employer.companyProfile.fields.country')
+                                }}
+                                *
                             </span>
                             <input
                                 v-model="form.country_code"
@@ -416,7 +439,7 @@ const submit = () => {
                         </label>
                         <label>
                             <span class="text-sm font-bold text-slate-700">
-                                Stadt *
+                                {{ t('employer.companyProfile.fields.city') }} *
                             </span>
                             <input
                                 v-model="form.city"
@@ -427,7 +450,9 @@ const submit = () => {
                     </div>
                 </SectionCard>
 
-                <SectionCard title="Warum bei uns arbeiten?">
+                <SectionCard
+                    :title="t('employer.companyProfile.whyWorkHereTitle')"
+                >
                     <textarea
                         v-model="form.description"
                         required
@@ -436,7 +461,9 @@ const submit = () => {
                     />
                 </SectionCard>
 
-                <SectionCard title="Benefits & Unterstützung">
+                <SectionCard
+                    :title="t('employer.companyProfile.benefitsTitle')"
+                >
                     <div
                         v-if="benefit_options.length"
                         class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
@@ -451,17 +478,19 @@ const submit = () => {
                                 type="checkbox"
                                 class="size-4 rounded border-slate-300"
                             />
-                            {{ benefitLabels[benefit] ?? benefit }}
+                            {{ benefitLabel(benefit) }}
                         </label>
                     </div>
                     <p v-else class="text-sm text-slate-400">
-                        Keine Benefits konfiguriert.
+                        {{ t('employer.companyProfile.noBenefits') }}
                     </p>
                 </SectionCard>
 
                 <SectionCard
-                    title="Standorte"
-                    description="Mehrere Recruiting-Standorte können separat gepflegt werden."
+                    :title="t('employer.companyProfile.locationsTitle')"
+                    :description="
+                        t('employer.companyProfile.locationsDescription')
+                    "
                 >
                     <div v-if="form.locations.length" class="space-y-4">
                         <article
@@ -474,7 +503,12 @@ const submit = () => {
                                     <span
                                         class="text-xs font-bold text-slate-600"
                                     >
-                                        Bezeichnung *
+                                        {{
+                                            t(
+                                                'employer.companyProfile.fields.locationName',
+                                            )
+                                        }}
+                                        *
                                     </span>
                                     <input
                                         v-model="location.name"
@@ -486,7 +520,12 @@ const submit = () => {
                                     <span
                                         class="text-xs font-bold text-slate-600"
                                     >
-                                        Stadt *
+                                        {{
+                                            t(
+                                                'employer.companyProfile.fields.city',
+                                            )
+                                        }}
+                                        *
                                     </span>
                                     <input
                                         v-model="location.city"
@@ -498,7 +537,12 @@ const submit = () => {
                                     <span
                                         class="text-xs font-bold text-slate-600"
                                     >
-                                        Land (ISO) *
+                                        {{
+                                            t(
+                                                'employer.companyProfile.fields.country',
+                                            )
+                                        }}
+                                        *
                                     </span>
                                     <input
                                         v-model="location.country_code"
@@ -511,7 +555,11 @@ const submit = () => {
                                     <span
                                         class="text-xs font-bold text-slate-600"
                                     >
-                                        PLZ
+                                        {{
+                                            t(
+                                                'employer.companyProfile.fields.postalCode',
+                                            )
+                                        }}
                                     </span>
                                     <input
                                         v-model="location.postal_code"
@@ -522,7 +570,11 @@ const submit = () => {
                                     <span
                                         class="text-xs font-bold text-slate-600"
                                     >
-                                        Anschrift
+                                        {{
+                                            t(
+                                                'employer.companyProfile.fields.address',
+                                            )
+                                        }}
                                     </span>
                                     <input
                                         v-model="location.address_line1"
@@ -540,7 +592,11 @@ const submit = () => {
                                         v-model="location.is_headquarters"
                                         type="checkbox"
                                     />
-                                    Hauptstandort
+                                    {{
+                                        t(
+                                            'employer.companyProfile.headquarters',
+                                        )
+                                    }}
                                 </label>
                                 <button
                                     type="button"
@@ -548,7 +604,7 @@ const submit = () => {
                                     @click="form.locations.splice(index, 1)"
                                 >
                                     <Trash2 class="size-3.5" />
-                                    Entfernen
+                                    {{ t('employer.companyProfile.remove') }}
                                 </button>
                             </div>
                         </article>
@@ -557,7 +613,7 @@ const submit = () => {
                         v-else
                         class="rounded-xl bg-slate-50 p-5 text-center text-sm text-slate-400"
                     >
-                        Noch keine Standorte angelegt.
+                        {{ t('employer.companyProfile.noLocations') }}
                     </p>
                     <button
                         type="button"
@@ -565,19 +621,21 @@ const submit = () => {
                         @click="addLocation"
                     >
                         <Plus class="size-4" />
-                        Standort hinzufügen
+                        {{ t('employer.companyProfile.addLocation') }}
                     </button>
                 </SectionCard>
             </div>
 
             <aside class="space-y-6 xl:sticky xl:top-24 xl:self-start">
-                <SectionCard title="Profil-Vollständigkeit">
+                <SectionCard
+                    :title="t('employer.companyProfile.completenessTitle')"
+                >
                     <div class="flex items-end justify-between">
                         <p class="text-3xl font-extrabold">
                             {{ profileCompleteness }} %
                         </p>
                         <span class="text-xs font-bold text-teal-600">
-                            Live berechnet
+                            {{ t('employer.companyProfile.calculatedLive') }}
                         </span>
                     </div>
                     <ProgressBar
@@ -587,21 +645,25 @@ const submit = () => {
                         tone="teal"
                     />
                 </SectionCard>
-                <SectionCard title="Sichere Medien">
+                <SectionCard
+                    :title="t('employer.companyProfile.secureMediaTitle')"
+                >
                     <div class="space-y-3 text-xs leading-5 text-slate-500">
                         <p class="flex gap-2">
                             <ShieldCheck
                                 class="size-4 shrink-0 text-[var(--erin-secondary)]"
                             />
-                            Dateien werden privat gespeichert und auf
-                            Schadsoftware geprüft.
+                            {{
+                                t(
+                                    'employer.companyProfile.privateStorageNotice',
+                                )
+                            }}
                         </p>
                         <p class="flex gap-2">
                             <MapPin
                                 class="size-4 shrink-0 text-[var(--erin-primary)]"
                             />
-                            Freigegebene Dateien werden nur über zeitlich
-                            begrenzte Links ausgeliefert.
+                            {{ t('employer.companyProfile.signedLinksNotice') }}
                         </p>
                     </div>
                 </SectionCard>
@@ -611,7 +673,7 @@ const submit = () => {
                     class="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[var(--erin-primary)] text-sm font-bold text-white disabled:opacity-50"
                 >
                     <Save class="size-4" />
-                    Profil speichern
+                    {{ t('employer.companyProfile.saveProfile') }}
                 </button>
             </aside>
         </form>

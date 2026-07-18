@@ -63,3 +63,55 @@ export type Availability = {
     ends_at: string;
     timezone: string;
 };
+
+export type ProductPerspective = 'employer' | 'candidate';
+
+export type MessagingWorkspaceProps = {
+    perspective?: ProductPerspective;
+    conversations?: Conversation[];
+    selected?: number | null;
+};
+
+export type InterviewCenterProps = {
+    perspective?: ProductPerspective;
+    interviews?: Interview[];
+    availability?: Availability[];
+    timezone?: string;
+};
+
+export type ReferralCode = {
+    id: number;
+    code: string;
+    url: string;
+    commission_cents?: number;
+    currency?: string;
+};
+
+export type ReferralMetrics = {
+    clicks: number;
+    registrations: number;
+    applications: number;
+    placements: number;
+    approved_cents: number;
+    paid_cents: number;
+};
+
+export type Referral = {
+    id: number;
+    status: string;
+    clicked_at?: string | null;
+    registered_at?: string | null;
+    hired_at?: string | null;
+    hold_until?: string | null;
+    approved_at?: string | null;
+    paid_at?: string | null;
+    commission_cents?: number;
+    currency?: string;
+};
+
+export type ReferralDashboardProps = {
+    perspective?: ProductPerspective;
+    code?: ReferralCode | null;
+    metrics?: ReferralMetrics;
+    referrals?: Referral[];
+};

@@ -9,10 +9,12 @@ import {
     Users,
 } from '@lucide/vue';
 import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import PageHeader from '@/components/product/PageHeader.vue';
 import ProgressBar from '@/components/product/ProgressBar.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
+import { useFormatters } from '@/composables/useFormatters';
 import {
     cancel,
     change,
@@ -119,6 +121,8 @@ const billingForm = useForm({
     postal_code: props.company?.postal_code ?? '',
     address_line1: props.company?.address_line1 ?? '',
 });
+const { t, te } = useI18n();
+const { formatCurrency, formatDate } = useFormatters();
 const addonForm = useForm({ quantity: 1 });
 const currentPlan = computed(() => props.entitlements.plan);
 const percent = (usage?: Usage) => {
@@ -130,12 +134,21 @@ const percent = (usage?: Usage) => {
 };
 const money = (cents?: number | null, currency = 'EUR') =>
     cents == null
-        ? 'Auf Anfrage'
-        : new Intl.NumberFormat('de-DE', {
-              style: 'currency',
-              currency,
+        ? t('employer.billing.onRequest')
+        : formatCurrency(cents / 100, currency, {
               maximumFractionDigits: 0,
-          }).format(cents / 100);
+          });
+const subscriptionStatusLabel = computed(() => {
+    const status = props.company?.subscription_status;
+
+    if (!status) {
+        return t('employer.billing.noSubscription');
+    }
+
+    return te(`employer.billing.subscriptionStatus.${status}`)
+        ? t(`employer.billing.subscriptionStatus.${status}`)
+        : status.replaceAll('_', ' ');
+});
 const changePlan = (plan: Plan) => {
     if (!props.subscription) {
         router.post(checkout.url(plan.id));
@@ -148,12 +161,12 @@ const changePlan = (plan: Plan) => {
 </script>
 
 <template>
-    <Head title="Paket & Abrechnung" />
+    <Head :title="t('employer.billing.metaTitle')" />
     <div class="erin-page">
         <PageHeader
-            eyebrow="Abrechnung"
-            title="Paket & Abrechnung"
-            description="Verwalten Sie Ihr Abonnement, Kontingente und Rechnungsdaten."
+            :eyebrow="t('employer.billing.eyebrow')"
+            :title="t('employer.billing.title')"
+            :description="t('employer.billing.description')"
             :icon="CreditCard"
         >
             <template #actions>
@@ -163,7 +176,8 @@ const changePlan = (plan: Plan) => {
                     class="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700"
                     @click="router.post(portal.url())"
                 >
-                    Stripe-Portal öffnen <ExternalLink class="size-4" />
+                    {{ t('employer.billing.openStripePortal') }}
+                    <ExternalLink class="size-4" />
                 </button>
             </template>
         </PageHeader>
@@ -180,13 +194,10 @@ const changePlan = (plan: Plan) => {
                         <p
                             class="text-xs font-bold tracking-wider text-blue-100 uppercase"
                         >
-                            Aktuelles Paket
+                            {{ t('employer.billing.currentPlan') }}
                         </p>
                         <StatusBadge
-                            :label="
-                                company?.subscription_status ??
-                                'Kein Abonnement'
-                            "
+                            :label="subscriptionStatusLabel"
                             :tone="
                                 subscription
                                     ? entitlements.past_due
@@ -197,22 +208,25 @@ const changePlan = (plan: Plan) => {
                         />
                     </div>
                     <h2 class="mt-2 text-3xl font-extrabold">
-                        {{ currentPlan?.name ?? 'Noch kein Paket gewählt' }}
+                        {{
+                            currentPlan?.name ??
+                            t('employer.billing.noPlanSelected')
+                        }}
                     </h2>
                     <p class="mt-2 text-sm text-blue-100/80">
-                        <template v-if="company?.subscription_renews_at"
-                            >Verlängerung am
+                        <template v-if="company?.subscription_renews_at">
                             {{
-                                new Intl.DateTimeFormat('de-DE', {
-                                    dateStyle: 'long',
-                                }).format(
-                                    new Date(company.subscription_renews_at),
-                                )
+                                t('employer.billing.renewsOn', {
+                                    date: formatDate(
+                                        company.subscription_renews_at,
+                                        { dateStyle: 'long' },
+                                    ),
+                                })
                             }}</template
                         >
-                        <template v-else
-                            >Wählen Sie unten ein verfügbares Paket.</template
-                        >
+                        <template v-else>
+                            {{ t('employer.billing.choosePlanHint') }}
+                        </template>
                     </p>
                 </div>
                 <div v-if="currentPlan" class="text-left lg:text-right">
@@ -222,14 +236,18 @@ const changePlan = (plan: Plan) => {
                         }}
                     </p>
                     <p class="mt-1 text-xs text-blue-100">
-                        {{ currentPlan.term_months }} Monate Laufzeit
+                        {{
+                            t('employer.billing.termMonths', {
+                                count: currentPlan.term_months ?? 0,
+                            })
+                        }}
                     </p>
                 </div>
             </div>
         </section>
 
         <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <SectionCard title="Job-Slots"
+            <SectionCard :title="t('employer.billing.usage.jobSlots')"
                 ><p class="text-2xl font-extrabold">
                     {{ entitlements.jobs?.used ?? 0 }} /
                     {{ entitlements.jobs?.limit ?? '∞' }}
@@ -239,11 +257,15 @@ const changePlan = (plan: Plan) => {
                     :value="percent(entitlements.jobs)"
                     :show-value="false"
                 />
-                <p class="mt-3 text-xs text-slate-400">
-                    {{ entitlements.jobs?.remaining ?? 0 }} verfügbar
+                <p class="mt-3 text-xs text-slate-600">
+                    {{
+                        t('employer.billing.usage.available', {
+                            count: entitlements.jobs?.remaining ?? 0,
+                        })
+                    }}
                 </p></SectionCard
             >
-            <SectionCard title="Recruiter-Sitze"
+            <SectionCard :title="t('employer.billing.usage.recruiterSeats')"
                 ><p class="text-2xl font-extrabold">
                     {{ entitlements.seats?.used ?? 0 }} /
                     {{ entitlements.seats?.limit ?? '∞' }}
@@ -254,13 +276,21 @@ const changePlan = (plan: Plan) => {
                     :show-value="false"
                     tone="teal"
                 />
-                <p class="mt-3 text-xs text-slate-400">
-                    {{ entitlements.seats?.additional ?? 0 }} Zusatzsitze
+                <p class="mt-3 text-xs text-slate-600">
+                    {{
+                        t('employer.billing.usage.additionalSeats', {
+                            count: entitlements.seats?.additional ?? 0,
+                        })
+                    }}
                 </p></SectionCard
             >
-            <SectionCard title="KI-Credits"
+            <SectionCard :title="t('employer.billing.usage.aiCredits')"
                 ><p class="text-2xl font-extrabold">
-                    {{ entitlements.ai_credits?.remaining ?? 0 }} verfügbar
+                    {{
+                        t('employer.billing.usage.available', {
+                            count: entitlements.ai_credits?.remaining ?? 0,
+                        })
+                    }}
                 </p>
                 <ProgressBar
                     class="mt-3"
@@ -268,11 +298,15 @@ const changePlan = (plan: Plan) => {
                     :show-value="false"
                     tone="orange"
                 />
-                <p class="mt-3 text-xs text-slate-400">
-                    {{ entitlements.ai_credits?.used ?? 0 }} genutzt
+                <p class="mt-3 text-xs text-slate-600">
+                    {{
+                        t('employer.billing.usage.used', {
+                            count: entitlements.ai_credits?.used ?? 0,
+                        })
+                    }}
                 </p></SectionCard
             >
-            <SectionCard title="Visa-Pakete"
+            <SectionCard :title="t('employer.billing.usage.visaPackages')"
                 ><p class="text-2xl font-extrabold">
                     {{ entitlements.visa_credits?.remaining ?? 0 }}
                 </p>
@@ -282,16 +316,19 @@ const changePlan = (plan: Plan) => {
                     :show-value="false"
                     tone="teal"
                 />
-                <p class="mt-3 text-xs text-slate-400">
-                    {{ entitlements.visa_credits?.purchased ?? 0 }} zusätzlich
-                    gekauft
+                <p class="mt-3 text-xs text-slate-600">
+                    {{
+                        t('employer.billing.usage.additionallyPurchased', {
+                            count: entitlements.visa_credits?.purchased ?? 0,
+                        })
+                    }}
                 </p></SectionCard
             >
         </div>
 
         <SectionCard
-            title="Verfügbare Pakete"
-            description="Upgrades gelten sofort, Downgrades zum nächsten Laufzeitbeginn"
+            :title="t('employer.billing.plansTitle')"
+            :description="t('employer.billing.plansDescription')"
         >
             <div
                 v-if="plans.length"
@@ -311,15 +348,19 @@ const changePlan = (plan: Plan) => {
                         <h3 class="font-extrabold">{{ plan.name }}</h3>
                         <StatusBadge
                             v-if="currentPlan?.id === plan.id"
-                            label="Aktuell"
+                            :label="t('employer.billing.current')"
                             tone="blue"
                         />
                     </div>
                     <p class="mt-3 text-2xl font-extrabold">
                         {{ money(plan.price_cents, plan.currency) }}
                     </p>
-                    <p class="mt-1 text-xs text-slate-400">
-                        {{ plan.term_months }} Monate
+                    <p class="mt-1 text-xs text-slate-600">
+                        {{
+                            t('employer.billing.months', {
+                                count: plan.term_months ?? 0,
+                            })
+                        }}
                     </p>
                     <p class="mt-3 min-h-10 text-xs leading-5 text-slate-500">
                         {{ plan.description }}
@@ -327,16 +368,31 @@ const changePlan = (plan: Plan) => {
                     <ul class="mt-4 space-y-2 text-xs text-slate-600">
                         <li class="flex gap-2">
                             <Check class="size-3.5 text-teal-500" />
-                            {{ plan.active_jobs_limit ?? 'Unbegrenzt' }} aktive
-                            Jobs
+                            {{
+                                t('employer.billing.planFeatures.activeJobs', {
+                                    count:
+                                        plan.active_jobs_limit ??
+                                        t('employer.billing.unlimited'),
+                                })
+                            }}
                         </li>
                         <li class="flex gap-2">
                             <Users class="size-3.5 text-teal-500" />
-                            {{ plan.seat_limit ?? 'Unbegrenzt' }} Sitze
+                            {{
+                                t('employer.billing.planFeatures.seats', {
+                                    count:
+                                        plan.seat_limit ??
+                                        t('employer.billing.unlimited'),
+                                })
+                            }}
                         </li>
                         <li class="flex gap-2">
                             <Sparkles class="size-3.5 text-teal-500" />
-                            {{ plan.ai_credits_monthly ?? 0 }} KI-Credits
+                            {{
+                                t('employer.billing.planFeatures.aiCredits', {
+                                    count: plan.ai_credits_monthly ?? 0,
+                                })
+                            }}
                         </li>
                     </ul>
                     <button
@@ -345,26 +401,26 @@ const changePlan = (plan: Plan) => {
                         :disabled="
                             plan.is_enterprise || !plan.checkout_available
                         "
-                        class="mt-5 h-10 w-full rounded-xl bg-[var(--erin-primary)] text-xs font-bold text-white disabled:bg-slate-200 disabled:text-slate-400"
+                        class="mt-5 h-10 w-full rounded-xl bg-[var(--erin-primary)] text-xs font-bold text-white disabled:bg-slate-200 disabled:text-slate-600"
                         @click="changePlan(plan)"
                     >
                         {{
                             plan.is_enterprise
-                                ? 'Kontakt aufnehmen'
+                                ? t('employer.billing.contactUs')
                                 : subscription
-                                  ? 'Zu diesem Paket wechseln'
-                                  : 'Paket wählen'
+                                  ? t('employer.billing.switchPlan')
+                                  : t('employer.billing.choosePlan')
                         }}
                     </button>
                 </article>
             </div>
-            <p v-else class="py-8 text-center text-sm text-slate-400">
-                Aktuell sind keine Pakete konfiguriert.
+            <p v-else class="py-8 text-center text-sm text-slate-600">
+                {{ t('employer.billing.noPlans') }}
             </p>
         </SectionCard>
 
         <div class="grid gap-6 xl:grid-cols-[1fr_0.7fr]">
-            <SectionCard title="Rechnungsdaten">
+            <SectionCard :title="t('employer.billing.billingDetailsTitle')">
                 <form
                     class="grid gap-4 sm:grid-cols-2"
                     @submit.prevent="
@@ -374,16 +430,18 @@ const changePlan = (plan: Plan) => {
                     "
                 >
                     <label class="sm:col-span-2"
-                        ><span class="text-xs font-bold text-slate-600"
-                            >Rechtlicher Firmenname</span
+                        ><span class="text-xs font-bold text-slate-600">{{
+                            t('employer.billing.fields.legalName')
+                        }}</span
                         ><input
                             v-model="billingForm.legal_name"
                             required
                             class="mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
                     /></label>
                     <label
-                        ><span class="text-xs font-bold text-slate-600"
-                            >Rechnungs-E-Mail</span
+                        ><span class="text-xs font-bold text-slate-600">{{
+                            t('employer.billing.fields.email')
+                        }}</span
                         ><input
                             v-model="billingForm.email"
                             required
@@ -391,39 +449,44 @@ const changePlan = (plan: Plan) => {
                             class="mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
                     /></label>
                     <label
-                        ><span class="text-xs font-bold text-slate-600"
-                            >USt-ID</span
+                        ><span class="text-xs font-bold text-slate-600">{{
+                            t('employer.billing.fields.vatId')
+                        }}</span
                         ><input
                             v-model="billingForm.vat_id"
                             class="mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
                     /></label>
                     <label
-                        ><span class="text-xs font-bold text-slate-600"
-                            >Straße</span
+                        ><span class="text-xs font-bold text-slate-600">{{
+                            t('employer.billing.fields.street')
+                        }}</span
                         ><input
                             v-model="billingForm.address_line1"
                             required
                             class="mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
                     /></label>
                     <label
-                        ><span class="text-xs font-bold text-slate-600"
-                            >PLZ</span
+                        ><span class="text-xs font-bold text-slate-600">{{
+                            t('employer.billing.fields.postalCode')
+                        }}</span
                         ><input
                             v-model="billingForm.postal_code"
                             required
                             class="mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
                     /></label>
                     <label
-                        ><span class="text-xs font-bold text-slate-600"
-                            >Stadt</span
+                        ><span class="text-xs font-bold text-slate-600">{{
+                            t('employer.billing.fields.city')
+                        }}</span
                         ><input
                             v-model="billingForm.city"
                             required
                             class="mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
                     /></label>
                     <label
-                        ><span class="text-xs font-bold text-slate-600"
-                            >Land</span
+                        ><span class="text-xs font-bold text-slate-600">{{
+                            t('employer.billing.fields.country')
+                        }}</span
                         ><input
                             v-model="billingForm.country_code"
                             required
@@ -435,12 +498,12 @@ const changePlan = (plan: Plan) => {
                         :disabled="billingForm.processing"
                         class="h-10 rounded-xl bg-[var(--erin-primary)] text-xs font-bold text-white disabled:opacity-50 sm:col-span-2"
                     >
-                        Rechnungsdaten speichern
+                        {{ t('employer.billing.saveBillingDetails') }}
                     </button>
                 </form>
             </SectionCard>
             <div class="space-y-6">
-                <SectionCard title="Zusatzkontingente">
+                <SectionCard :title="t('employer.billing.addOnsTitle')">
                     <form
                         v-if="add_ons.seat_enabled"
                         class="flex items-center gap-2"
@@ -461,7 +524,7 @@ const changePlan = (plan: Plan) => {
                             type="submit"
                             class="h-10 flex-1 rounded-xl border border-slate-200 text-xs font-bold"
                         >
-                            Recruiter-Sitze hinzufügen
+                            {{ t('employer.billing.addRecruiterSeats') }}
                         </button>
                     </form>
                     <button
@@ -470,19 +533,22 @@ const changePlan = (plan: Plan) => {
                         class="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 text-xs font-bold"
                         @click="router.post(visaCredits.url(), { credits: 1 })"
                     >
-                        <Plus class="size-4" /> Visumpaket kaufen
+                        <Plus class="size-4" />
+                        {{ t('employer.billing.buyVisaPackage') }}
                     </button>
                     <p
                         v-if="!add_ons.seat_enabled && !add_ons.visa_enabled"
-                        class="text-sm text-slate-400"
+                        class="text-sm text-slate-600"
                     >
-                        Zusatzkäufe sind aktuell nicht konfiguriert.
+                        {{ t('employer.billing.addOnsUnavailable') }}
                     </p>
                 </SectionCard>
-                <SectionCard v-if="subscription" title="Abonnement">
+                <SectionCard
+                    v-if="subscription"
+                    :title="t('employer.billing.subscriptionTitle')"
+                >
                     <p class="text-xs leading-5 text-slate-500">
-                        Kündigungen werden zum Ende der aktuellen Laufzeit
-                        wirksam.
+                        {{ t('employer.billing.cancellationDescription') }}
                     </p>
                     <button
                         v-if="!company?.cancel_at_period_end"
@@ -490,11 +556,11 @@ const changePlan = (plan: Plan) => {
                         class="mt-4 h-10 w-full rounded-xl border border-red-200 text-xs font-bold text-red-600"
                         @click="router.post(cancel.url())"
                     >
-                        Zum Laufzeitende kündigen
+                        {{ t('employer.billing.cancelAtPeriodEnd') }}
                     </button>
                     <StatusBadge
                         v-else
-                        label="Kündigung vorgemerkt"
+                        :label="t('employer.billing.cancellationScheduled')"
                         tone="yellow"
                     />
                 </SectionCard>

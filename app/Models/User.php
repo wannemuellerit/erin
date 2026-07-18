@@ -99,6 +99,22 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     }
 
     /**
+     * @return HasMany<RecruiterReminder, $this>
+     */
+    public function assignedReminders(): HasMany
+    {
+        return $this->hasMany(RecruiterReminder::class, 'assignee_id');
+    }
+
+    /**
+     * @return HasMany<ActivityEntry, $this>
+     */
+    public function activityEntries(): HasMany
+    {
+        return $this->hasMany(ActivityEntry::class, 'subject_user_id');
+    }
+
+    /**
      * @return HasMany<NotificationPreference, $this>
      */
     public function notificationPreferences(): HasMany

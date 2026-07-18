@@ -13,33 +13,12 @@ import { edit as editProfile } from '@/routes/profile';
 import { edit as editSecurity } from '@/routes/security';
 import type { NavItem } from '@/types';
 
-const { locale } = useI18n();
-const copy = {
-    de: {
-        title: 'Einstellungen',
-        description: 'Profil- und Kontoeinstellungen verwalten',
-        navigation: 'Einstellungsnavigation',
-        profile: 'Profil',
-        security: 'Sicherheit',
-        notifications: 'Benachrichtigungen',
-        appearance: 'Darstellung',
-    },
-    en: {
-        title: 'Settings',
-        description: 'Manage your profile and account settings',
-        navigation: 'Settings navigation',
-        profile: 'Profile',
-        security: 'Security',
-        notifications: 'Notifications',
-        appearance: 'Appearance',
-    },
-} as const;
-const text = computed(() => (locale.value === 'en' ? copy.en : copy.de));
+const { t } = useI18n();
 const sidebarNavItems = computed<NavItem[]>(() => [
-    { title: text.value.profile, href: editProfile() },
-    { title: text.value.security, href: editSecurity() },
-    { title: text.value.notifications, href: editNotifications() },
-    { title: text.value.appearance, href: editAppearance() },
+    { title: t('settings.layout.profile'), href: editProfile() },
+    { title: t('settings.layout.security'), href: editSecurity() },
+    { title: t('settings.layout.notifications'), href: editNotifications() },
+    { title: t('settings.layout.appearance'), href: editAppearance() },
 ]);
 
 const { isCurrentOrParentUrl } = useCurrentUrl();
@@ -47,13 +26,16 @@ const { isCurrentOrParentUrl } = useCurrentUrl();
 
 <template>
     <div class="px-4 py-6">
-        <Heading :title="text.title" :description="text.description" />
+        <Heading
+            :title="t('settings.layout.title')"
+            :description="t('settings.layout.description')"
+        />
 
         <div class="flex flex-col lg:flex-row lg:space-x-12">
             <aside class="w-full max-w-xl lg:w-48">
                 <nav
                     class="flex flex-col space-y-1 space-x-0"
-                    :aria-label="text.navigation"
+                    :aria-label="t('settings.layout.navigation')"
                 >
                     <Button
                         v-for="item in sidebarNavItems"

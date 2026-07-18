@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Link, router, usePage } from '@inertiajs/vue3';
+import { useEchoNotification } from '@laravel/echo-vue';
 import {
     Bell,
     Check,
@@ -10,7 +11,7 @@ import {
     ShieldCheck,
     X,
 } from '@lucide/vue';
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Breadcrumbs from '@/components/Breadcrumbs.vue';
 import {
@@ -73,11 +74,59 @@ const impersonation = computed(
     () => page.props.impersonation as Impersonation | null | undefined,
 );
 const user = computed(() => page.props.auth?.user);
-const notifications = computed<NotificationFeed>(() => {
+const sharedNotifications = (): NotificationFeed => {
     const shared = page.props.notifications as NotificationFeed | undefined;
 
     return shared ?? { unread_count: 0, items: [] };
-});
+};
+const liveNotifications = ref<NotificationFeed>(sharedNotifications());
+const notifications = computed<NotificationFeed>(() => liveNotifications.value);
+
+watch(
+    () => page.props.notifications,
+    () => {
+        liveNotifications.value = sharedNotifications();
+    },
+);
+
+useEchoNotification<Record<string, unknown>>(
+    `App.Models.User.${user.value?.id ?? 0}`,
+    (payload) => {
+        const nested =
+            payload.data && typeof payload.data === 'object'
+                ? (payload.data as SharedNotification['data'])
+                : (payload as SharedNotification['data']);
+        const id =
+            typeof payload.id === 'string'
+                ? payload.id
+                : `live-${Date.now().toString()}`;
+
+        if (
+            liveNotifications.value.items.some(
+                (notification) => notification.id === id,
+            )
+        ) {
+            return;
+        }
+
+        liveNotifications.value = {
+            unread_count: liveNotifications.value.unread_count + 1,
+            items: [
+                {
+                    id,
+                    type:
+                        typeof payload.type === 'string'
+                            ? payload.type
+                            : undefined,
+                    data: nested,
+                    read_at: null,
+                    created_at: new Date().toISOString(),
+                },
+                ...liveNotifications.value.items,
+            ].slice(0, 8),
+        };
+    },
+);
 
 const settingsUrl = '/settings/profile';
 const supportUrl = computed(() =>
@@ -157,6 +206,7 @@ const changeLocale = (nextLocale: 'de' | 'en') => {
             preserveScroll: true,
             onSuccess: () => {
                 locale.value = nextLocale;
+                document.documentElement.lang = nextLocale;
             },
         },
     );
@@ -226,7 +276,7 @@ const signOut = () => {
                     class="erin-focus h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pr-4 pl-10 text-sm text-slate-900 placeholder:text-slate-400 hover:border-slate-300 focus:bg-white"
                 />
                 <kbd
-                    class="absolute top-1/2 right-3 hidden -translate-y-1/2 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-400 sm:block"
+                    class="absolute top-1/2 right-3 hidden -translate-y-1/2 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 sm:block"
                 >
                     ⌘ K
                 </kbd>
@@ -334,10 +384,11 @@ const signOut = () => {
                 <DropdownMenuTrigger as-child>
                     <button
                         type="button"
+                        data-test="header-profile-menu"
                         class="erin-focus hidden h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-2 sm:flex"
                     >
                         <span
-                            class="grid size-7 place-items-center rounded-lg bg-blue-100 text-xs font-bold text-[var(--erin-primary,#2563EB)]"
+                            class="grid size-7 place-items-center rounded-lg bg-slate-100 text-xs font-bold text-slate-800"
                         >
                             {{ user?.name?.slice(0, 2).toUpperCase() ?? 'ER' }}
                         </span>
@@ -359,7 +410,7 @@ const signOut = () => {
                             {{ user?.name ?? t('shell.userFallback') }}
                         </span>
                         <span
-                            class="block truncate text-xs font-normal text-slate-400"
+                            class="block truncate text-xs font-normal text-slate-600"
                         >
                             {{ user?.email }}
                         </span>

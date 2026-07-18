@@ -29,7 +29,7 @@ defineOptions({
     layout: {
         breadcrumbs: [
             {
-                title: 'Security settings',
+                title: 'settings.security.title',
                 href: edit(),
             },
         ],

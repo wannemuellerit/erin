@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Requests\Admin\UpdatePlanRequest;
 use App\Models\Company;
 use App\Models\Plan;
+use App\Services\Billing\StripeConfigurationStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,8 +15,10 @@ use Inertia\Response;
 
 class BillingController extends AdminController
 {
-    public function index(Request $request): Response
-    {
+    public function index(
+        Request $request,
+        StripeConfigurationStatus $stripeConfiguration,
+    ): Response {
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:120'],
             'subscription_status' => ['nullable', 'string', 'max:40'],
@@ -72,6 +75,7 @@ class BillingController extends AdminController
                     ->join('plans', 'plans.id', '=', 'companies.current_plan_id')
                     ->sum('plans.price_cents'),
             ],
+            'stripe_configuration' => $stripeConfiguration->forPlans($plans),
         ]);
     }
 

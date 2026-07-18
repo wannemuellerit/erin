@@ -11,6 +11,7 @@ import {
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import AppLogoIcon from '@/components/AppLogoIcon.vue';
+import LocaleSwitcher from '@/components/product/LocaleSwitcher.vue';
 import { home } from '@/routes';
 
 defineProps<{
@@ -52,7 +53,7 @@ const copyrightYear = computed(() => new Date().getFullYear());
                     <p
                         class="text-[10px] font-bold tracking-[0.16em] text-blue-200 uppercase"
                     >
-                        Recruiting OS
+                        {{ t('public.common.recruitingOs') }}
                     </p>
                 </div>
             </Link>
@@ -107,7 +108,7 @@ const copyrightYear = computed(() => new Date().getFullYear());
             </div>
         </aside>
 
-        <main class="relative flex min-h-svh flex-col bg-white">
+        <main class="relative flex min-h-svh min-w-0 flex-col bg-white">
             <div class="flex items-center justify-between px-5 py-5 sm:px-8">
                 <Link
                     :href="home()"
@@ -116,18 +117,21 @@ const copyrightYear = computed(() => new Date().getFullYear());
                     <ArrowLeft class="size-4" />
                     {{ t('auth.backHome') }}
                 </Link>
-                <div class="flex items-center gap-2 lg:hidden">
-                    <AppLogoIcon class="size-8" />
-                    <span class="font-extrabold text-slate-950"
-                        >erin<span class="text-blue-600">.</span></span
-                    >
+                <div class="flex items-center gap-3">
+                    <LocaleSwitcher :show-label="false" compact />
+                    <div class="hidden items-center gap-2 sm:flex lg:hidden">
+                        <AppLogoIcon class="size-8" />
+                        <span class="font-extrabold text-slate-950"
+                            >erin<span class="text-blue-600">.</span></span
+                        >
+                    </div>
                 </div>
             </div>
 
             <div
                 class="flex flex-1 items-center justify-center px-5 py-8 sm:px-8"
             >
-                <div class="w-full max-w-[27rem]">
+                <div class="w-full max-w-[calc(100vw-2.5rem)] sm:max-w-[27rem]">
                     <div class="mb-8">
                         <p
                             class="mb-2 text-xs font-bold tracking-[0.12em] text-[var(--erin-primary,#2563EB)] uppercase"
@@ -151,7 +155,7 @@ const copyrightYear = computed(() => new Date().getFullYear());
                 </div>
             </div>
 
-            <div class="px-8 py-5 text-center text-[11px] text-slate-400">
+            <div class="px-8 py-5 text-center text-[11px] text-slate-600">
                 © {{ copyrightYear }} Erin · {{ t('auth.privacy') }} ·
                 {{ t('auth.imprint') }}
             </div>

@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
 import AppLogoIcon from '@/components/AppLogoIcon.vue';
+
+const { t } = useI18n();
 </script>
 
 <template>
@@ -9,9 +12,9 @@ import AppLogoIcon from '@/components/AppLogoIcon.vue';
             erin<span class="text-blue-600">.</span>
         </span>
         <span
-            class="truncate text-[10px] font-semibold tracking-[0.12em] text-slate-400 uppercase"
+            class="truncate text-[10px] font-semibold tracking-[0.12em] text-slate-600 uppercase"
         >
-            Recruiting OS
+            {{ t('public.common.recruitingOs') }}
         </span>
     </div>
 </template>

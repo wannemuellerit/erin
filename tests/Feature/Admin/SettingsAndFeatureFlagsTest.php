@@ -21,6 +21,17 @@ it('validates color syntax and contrast before publishing a theme', function () 
         ->patch(route('admin.settings.theme.update'), ['colors' => $invalid])
         ->assertSessionHasErrors('colors.text');
 
+    $lowContrastPrimary = PlatformSettings::DEFAULT_COLORS;
+    $lowContrastPrimary['primary'] = '#3B82F6';
+    $lowContrastPrimary['primary_hover'] = '#60A5FA';
+
+    $this->actingAs($admin)
+        ->patch(route('admin.settings.theme.update'), ['colors' => $lowContrastPrimary])
+        ->assertSessionHasErrors([
+            'colors.primary',
+            'colors.primary_hover',
+        ]);
+
     $this->actingAs($admin)
         ->patch(route('admin.settings.theme.update'), [
             'colors' => PlatformSettings::DEFAULT_COLORS,

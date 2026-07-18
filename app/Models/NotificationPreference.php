@@ -17,6 +17,7 @@ class NotificationPreference extends Model
         'application',
         'interview',
         'message',
+        'reminder',
         'support',
         'system',
     ];

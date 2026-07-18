@@ -2,8 +2,10 @@
 import { Head, router } from '@inertiajs/vue3';
 import { BriefcaseBusiness, CalendarDays, Inbox, Search } from '@lucide/vue';
 import { ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import PageHeader from '@/components/product/PageHeader.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
+import { useFormatters } from '@/composables/useFormatters';
 import { useStatusLabels } from '@/composables/useStatusLabels';
 import { withdraw } from '@/routes/candidate/applications';
 import { respond } from '@/routes/candidate/invitations';
@@ -62,9 +64,13 @@ withDefaults(
     },
 );
 const search = ref('');
+const { t } = useI18n();
+const { formatDate } = useFormatters();
 const { statusLabel: translatedStatusLabel } = useStatusLabels();
 const statusLabel = (status: string) =>
     translatedStatusLabel('application', status);
+const visaStatusLabel = (status: string) =>
+    translatedStatusLabel('visaCase', status);
 const tone = (status: string): StatusTone => {
     if (['hired', 'contract_signed', 'accepted'].includes(status)) {
         return 'green';
@@ -93,12 +99,12 @@ const tone = (status: string): StatusTone => {
 </script>
 
 <template>
-    <Head title="Meine Bewerbungen" />
+    <Head :title="t('candidate.applications.metaTitle')" />
     <div class="erin-page">
         <PageHeader
-            eyebrow="Mein Fortschritt"
-            title="Meine Bewerbungen"
-            description="Verfolge jeden Schritt und erkenne sofort, was als Nächstes zu tun ist."
+            :eyebrow="t('candidate.applications.eyebrow')"
+            :title="t('candidate.applications.title')"
+            :description="t('candidate.applications.description')"
             :icon="BriefcaseBusiness"
         />
 
@@ -106,7 +112,9 @@ const tone = (status: string): StatusTone => {
             v-if="invitations.length"
             class="erin-panel border-teal-200 p-5"
         >
-            <h2 class="font-extrabold">Offene Einladungen</h2>
+            <h2 class="font-extrabold">
+                {{ t('candidate.applications.invitations.title') }}
+            </h2>
             <div class="mt-3 grid gap-3 lg:grid-cols-2">
                 <article
                     v-for="invitation in invitations"
@@ -115,13 +123,14 @@ const tone = (status: string): StatusTone => {
                 >
                     <p class="text-sm font-bold">
                         {{
-                            invitation.job_posting?.title ?? 'Stelleneinladung'
+                            invitation.job_posting?.title ??
+                            t('candidate.applications.invitations.fallback')
                         }}
                     </p>
                     <p class="mt-1 text-xs text-teal-700">
                         {{
                             invitation.job_posting?.company?.name ??
-                            'Unternehmen'
+                            t('candidate.common.company')
                         }}
                     </p>
                     <p
@@ -141,7 +150,7 @@ const tone = (status: string): StatusTone => {
                                 )
                             "
                         >
-                            Annehmen
+                            {{ t('candidate.applications.invitations.accept') }}
                         </button>
                         <button
                             class="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-600"
@@ -153,7 +162,7 @@ const tone = (status: string): StatusTone => {
                                 )
                             "
                         >
-                            Ablehnen
+                            {{ t('candidate.applications.invitations.reject') }}
                         </button>
                     </div>
                 </article>
@@ -167,7 +176,7 @@ const tone = (status: string): StatusTone => {
                 /><input
                     v-model="search"
                     type="search"
-                    placeholder="Bewerbungen durchsuchen …"
+                    :placeholder="t('candidate.applications.searchPlaceholder')"
                     class="h-10 w-full rounded-xl border border-slate-200 pl-10 text-sm"
                 />
             </div>
@@ -203,24 +212,26 @@ const tone = (status: string): StatusTone => {
                         <h2 class="font-extrabold">
                             {{
                                 application.job_posting?.title ??
-                                'Stelle nicht mehr verfügbar'
+                                t('candidate.common.jobUnavailable')
                             }}
                         </h2>
                         <p class="mt-1 text-xs text-slate-500">
                             {{
                                 application.job_posting?.company?.name ??
-                                'Unternehmen nicht verfügbar'
+                                t('candidate.common.companyUnavailable')
                             }}
                         </p>
                         <p
                             v-if="application.applied_at"
                             class="mt-2 flex items-center gap-1.5 text-[10px] text-slate-400"
                         >
-                            <CalendarDays class="size-3" /> Beworben am
+                            <CalendarDays class="size-3" />
                             {{
-                                new Intl.DateTimeFormat('de-DE', {
-                                    dateStyle: 'medium',
-                                }).format(new Date(application.applied_at))
+                                t('candidate.applications.appliedOn', {
+                                    date: formatDate(application.applied_at, {
+                                        dateStyle: 'medium',
+                                    }),
+                                })
                             }}
                         </p>
                     </div>
@@ -235,11 +246,11 @@ const tone = (status: string): StatusTone => {
                         <p
                             class="text-[9px] font-bold tracking-wider text-slate-400 uppercase"
                         >
-                            Visa-Prozess
+                            {{ t('candidate.applications.visaProcess') }}
                         </p>
                         <p class="mt-1 text-xs font-bold text-slate-700">
                             {{ application.visa_case.progress ?? 0 }} % ·
-                            {{ application.visa_case.status }}
+                            {{ visaStatusLabel(application.visa_case.status) }}
                         </p>
                     </div>
                     <button
@@ -257,7 +268,7 @@ const tone = (status: string): StatusTone => {
                             )
                         "
                     >
-                        Zurückziehen
+                        {{ t('candidate.applications.withdraw') }}
                     </button>
                 </div>
                 <div
@@ -293,10 +304,11 @@ const tone = (status: string): StatusTone => {
         >
             <div>
                 <Inbox class="mx-auto size-9 text-slate-300" />
-                <h2 class="mt-4 font-bold">Noch keine Bewerbungen</h2>
+                <h2 class="mt-4 font-bold">
+                    {{ t('candidate.applications.emptyTitle') }}
+                </h2>
                 <p class="mt-2 max-w-md text-sm text-slate-500">
-                    Passende Stellen findest du im Jobbereich. Sobald du dich
-                    bewirbst, erscheint der Status hier.
+                    {{ t('candidate.applications.emptyDescription') }}
                 </p>
             </div>
         </div>

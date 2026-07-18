@@ -2,12 +2,13 @@
 import { Head, router } from '@inertiajs/vue3';
 import { Search, ScrollText, X } from '@lucide/vue';
 import { reactive } from 'vue';
+import EmptyState from '@/components/product/EmptyState.vue';
 import PageHeader from '@/components/product/PageHeader.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import adminAudit from '@/routes/admin/audit';
-import AdminEmptyState from './_components/AdminEmptyState.vue';
 import AdminPagination from './_components/AdminPagination.vue';
-import { cleanFilters, formatDate, humanize } from './_shared';
+import { useAdminI18n } from './_i18n';
+import { cleanFilters } from './_shared';
 import type { AdminPaginator } from './_shared';
 
 type AuditLogRow = {
@@ -60,6 +61,8 @@ const filters = reactive({
     until: props.filters.until ?? '',
 });
 
+const { t, formatDate, humanize } = useAdminI18n();
+
 function applyFilters(): void {
     router.get(adminAudit.index.url(), cleanFilters(filters), {
         preserveState: true,
@@ -76,7 +79,7 @@ function targetLabel(log: AuditLogRow): string {
 
     return type
         ? `${humanize(type)}${log.auditable_id ? ` #${log.auditable_id}` : ''}`
-        : 'System';
+        : t('common.system');
 }
 
 function hasDetails(log: AuditLogRow): boolean {
@@ -85,13 +88,13 @@ function hasDetails(log: AuditLogRow): boolean {
 </script>
 
 <template>
-    <Head title="Audit Log" />
+    <Head :title="t('audit.metaTitle')" />
 
     <div class="erin-page">
         <PageHeader
-            eyebrow="Governance"
-            title="Audit Log"
-            :description="`${logs.total} protokollierte Zugriffe und Änderungen, unverändert aus dem Audit-Stream.`"
+            :eyebrow="t('audit.eyebrow')"
+            :title="t('audit.title')"
+            :description="t('audit.description', { count: logs.total })"
             :icon="ScrollText"
         />
 
@@ -101,23 +104,23 @@ function hasDetails(log: AuditLogRow): boolean {
                 @submit.prevent="applyFilters"
             >
                 <label class="relative">
-                    <span class="sr-only">Audit Log durchsuchen</span>
+                    <span class="sr-only">{{ t('audit.searchLabel') }}</span>
                     <Search
                         class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-slate-400"
                     />
                     <input
                         v-model="filters.search"
                         type="search"
-                        placeholder="Ereignis, Name oder E-Mail …"
+                        :placeholder="t('audit.searchPlaceholder')"
                         class="erin-focus h-11 w-full rounded-xl border border-slate-200 pr-3 pl-10 text-sm"
                     />
                 </label>
                 <select
                     v-model="filters.event"
-                    aria-label="Ereignis"
+                    :aria-label="t('audit.event')"
                     class="erin-focus h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
                 >
-                    <option value="">Alle Ereignisse</option>
+                    <option value="">{{ t('audit.allEvents') }}</option>
                     <option v-for="event in events" :key="event" :value="event">
                         {{ event }}
                     </option>
@@ -126,28 +129,28 @@ function hasDetails(log: AuditLogRow): boolean {
                     v-model="filters.actor_id"
                     type="number"
                     min="1"
-                    placeholder="Akteur-ID"
-                    aria-label="Akteur-ID"
+                    :placeholder="t('audit.actorId')"
+                    :aria-label="t('audit.actorId')"
                     class="erin-focus h-11 rounded-xl border border-slate-200 px-3 text-sm"
                 />
                 <input
                     v-model="filters.company_id"
                     type="number"
                     min="1"
-                    placeholder="Firma-ID"
-                    aria-label="Firma-ID"
+                    :placeholder="t('common.companyId')"
+                    :aria-label="t('common.companyId')"
                     class="erin-focus h-11 rounded-xl border border-slate-200 px-3 text-sm"
                 />
                 <input
                     v-model="filters.from"
                     type="date"
-                    aria-label="Von"
+                    :aria-label="t('common.from')"
                     class="erin-focus h-11 rounded-xl border border-slate-200 px-3 text-sm"
                 />
                 <input
                     v-model="filters.until"
                     type="date"
-                    aria-label="Bis"
+                    :aria-label="t('common.until')"
                     class="erin-focus h-11 rounded-xl border border-slate-200 px-3 text-sm"
                 />
                 <div class="flex gap-2">
@@ -155,11 +158,11 @@ function hasDetails(log: AuditLogRow): boolean {
                         type="submit"
                         class="erin-focus h-11 rounded-xl bg-blue-600 px-4 text-sm font-bold text-white"
                     >
-                        Filtern
+                        {{ t('common.filter') }}
                     </button>
                     <button
                         type="button"
-                        aria-label="Filter zurücksetzen"
+                        :aria-label="t('common.resetFilters')"
                         class="erin-focus grid size-11 place-items-center rounded-xl border border-slate-200 text-slate-500"
                         @click="resetFilters"
                     >
@@ -174,11 +177,21 @@ function hasDetails(log: AuditLogRow): boolean {
                         <tr
                             class="text-[11px] font-bold tracking-wide text-slate-500 uppercase"
                         >
-                            <th class="px-5 py-3">Ereignis</th>
-                            <th class="px-5 py-3">Akteur</th>
-                            <th class="px-5 py-3">Kontext</th>
-                            <th class="px-5 py-3">Netzwerk</th>
-                            <th class="px-5 py-3 text-right">Zeitpunkt</th>
+                            <th class="px-5 py-3">
+                                {{ t('audit.columns.event') }}
+                            </th>
+                            <th class="px-5 py-3">
+                                {{ t('audit.columns.actor') }}
+                            </th>
+                            <th class="px-5 py-3">
+                                {{ t('audit.columns.context') }}
+                            </th>
+                            <th class="px-5 py-3">
+                                {{ t('audit.columns.network') }}
+                            </th>
+                            <th class="px-5 py-3 text-right">
+                                {{ t('audit.columns.time') }}
+                            </th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
@@ -200,30 +213,45 @@ function hasDetails(log: AuditLogRow): boolean {
                                     <summary
                                         class="cursor-pointer text-xs font-semibold text-blue-600"
                                     >
-                                        Änderungsdetails
+                                        {{ t('audit.changeDetails') }}
                                     </summary>
                                     <div class="mt-2 max-w-xl space-y-2">
                                         <pre
                                             v-if="log.before_values"
                                             class="overflow-auto rounded-lg bg-slate-950 p-3 text-[10px] text-slate-200"
-                                        >
-Vorher: {{ JSON.stringify(log.before_values, null, 2) }}</pre>
+                                            >{{ t('audit.before') }}: {{
+                                                JSON.stringify(
+                                                    log.before_values,
+                                                    null,
+                                                    2,
+                                                )
+                                            }}</pre>
                                         <pre
                                             v-if="log.after_values"
                                             class="overflow-auto rounded-lg bg-slate-950 p-3 text-[10px] text-slate-200"
-                                        >
-Nachher: {{ JSON.stringify(log.after_values, null, 2) }}</pre>
+                                            >{{ t('audit.after') }}: {{
+                                                JSON.stringify(
+                                                    log.after_values,
+                                                    null,
+                                                    2,
+                                                )
+                                            }}</pre>
                                         <pre
                                             v-if="log.metadata"
                                             class="overflow-auto rounded-lg bg-slate-950 p-3 text-[10px] text-slate-200"
-                                        >
-Metadaten: {{ JSON.stringify(log.metadata, null, 2) }}</pre>
+                                            >{{ t('audit.metadata') }}: {{
+                                                JSON.stringify(
+                                                    log.metadata,
+                                                    null,
+                                                    2,
+                                                )
+                                            }}</pre>
                                     </div>
                                 </details>
                             </td>
                             <td class="px-5 py-4">
                                 <p class="text-sm font-semibold text-slate-800">
-                                    {{ log.actor?.name ?? 'System' }}
+                                    {{ log.actor?.name ?? t('common.system') }}
                                 </p>
                                 <p
                                     v-if="log.actor"
@@ -233,7 +261,7 @@ Metadaten: {{ JSON.stringify(log.metadata, null, 2) }}</pre>
                                 </p>
                                 <p
                                     v-if="log.actor"
-                                    class="mt-1 text-[11px] text-slate-400"
+                                    class="mt-1 text-[11px] text-slate-600"
                                 >
                                     {{ humanize(log.actor.role) }} · #{{
                                         log.actor.id
@@ -241,19 +269,28 @@ Metadaten: {{ JSON.stringify(log.metadata, null, 2) }}</pre>
                                 </p>
                             </td>
                             <td class="px-5 py-4 text-xs text-slate-600">
-                                <p>{{ log.company?.name ?? 'Keine Firma' }}</p>
+                                <p>
+                                    {{
+                                        log.company?.name ??
+                                        t('common.noCompany')
+                                    }}
+                                </p>
                                 <p
                                     v-if="log.company"
-                                    class="mt-1 text-slate-400"
+                                    class="mt-1 text-slate-600"
                                 >
-                                    Firma #{{ log.company.id }}
+                                    {{
+                                        t('audit.companyReference', {
+                                            id: log.company.id,
+                                        })
+                                    }}
                                 </p>
                             </td>
                             <td class="px-5 py-4 text-xs text-slate-600">
                                 <p>{{ log.ip_address ?? '—' }}</p>
                                 <p
                                     v-if="log.user_agent"
-                                    class="mt-1 max-w-56 truncate text-slate-400"
+                                    class="mt-1 max-w-56 truncate text-slate-600"
                                     :title="log.user_agent"
                                 >
                                     {{ log.user_agent }}
@@ -268,7 +305,11 @@ Metadaten: {{ JSON.stringify(log.metadata, null, 2) }}</pre>
                     </tbody>
                 </table>
             </div>
-            <AdminEmptyState v-else />
+            <EmptyState
+                v-else
+                :title="t('common.emptyTitle')"
+                :description="t('common.emptyDescription')"
+            />
             <AdminPagination :paginator="logs" />
         </SectionCard>
     </div>

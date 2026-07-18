@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
+import { useI18n } from 'vue-i18n';
 import ReferralDashboard from '@/components/product/ReferralDashboard.vue';
 
 type ReferralCode = {
@@ -35,10 +36,11 @@ defineProps<{
     metrics?: ReferralMetrics;
     referrals?: Referral[];
 }>();
+const { t } = useI18n();
 </script>
 
 <template>
-    <Head title="Referrals" />
+    <Head :title="t('employer.referrals.metaTitle')" />
     <ReferralDashboard
         perspective="employer"
         :code="code"

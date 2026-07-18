@@ -13,6 +13,7 @@ use App\Models\JobInvitation;
 use App\Models\JobPosting;
 use App\Models\Referral;
 use App\Notifications\ActivityNotification;
+use App\Services\Activity\ActivityRecorder;
 use App\Services\Applications\ApplicationWorkflow;
 use App\Services\Audit\AuditLogger;
 use App\Services\Matching\CandidateMatchService;
@@ -85,6 +86,7 @@ class MarketplaceController extends Controller
         JobPosting $job,
         CandidateMatchService $matching,
         AuditLogger $audit,
+        ActivityRecorder $activity,
     ): RedirectResponse {
         abort_unless($job->status === JobStatus::Published && $job->published_at !== null, 404);
         $profile = $request->user()?->candidateProfile()
@@ -176,6 +178,18 @@ class MarketplaceController extends Controller
             'status' => ApplicationStatus::New->value,
             'match_score' => $match['score'],
         ], companyId: $job->company_id);
+        $activity->record(
+            'application.created',
+            $request->user(),
+            $job->company_id,
+            $application,
+            [
+                'candidate_label' => $profile->anonymizedLabel(),
+                'job_title' => $job->title,
+            ],
+            $request->user(),
+            'shared',
+        );
         Referral::query()
             ->where('referred_user_id', $request->user()?->getKey())
             ->where('status', ReferralStatus::Registered)

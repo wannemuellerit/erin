@@ -53,12 +53,16 @@ class UpdateThemeRequest extends FormRequest
                 ['text', 'surface', 4.5, __('Text und Karten benötigen mindestens Kontrast 4,5:1.')],
                 ['text_muted', 'background', 4.5, __('Sekundärtext und Hintergrund benötigen mindestens Kontrast 4,5:1.')],
                 ['primary', 'background', 3.0, __('Primärfarbe und Hintergrund benötigen mindestens Kontrast 3:1.')],
+                ['primary', '#FFFFFF', 4.5, __('Primärfarbe und weiße Buttonschrift benötigen mindestens Kontrast 4,5:1.')],
+                ['primary_hover', '#FFFFFF', 4.5, __('Hoverfarbe und weiße Buttonschrift benötigen mindestens Kontrast 4,5:1.')],
             ];
 
             foreach ($pairs as [$foreground, $background, $minimum, $message]) {
                 if ($this->contrastRatio(
                     (string) $colors[$foreground],
-                    (string) $colors[$background],
+                    str_starts_with($background, '#')
+                        ? $background
+                        : (string) $colors[$background],
                 ) < $minimum) {
                     $validator->errors()->add("colors.{$foreground}", $message);
                 }

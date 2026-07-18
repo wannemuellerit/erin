@@ -10,21 +10,15 @@ import {
     X,
 } from '@lucide/vue';
 import { reactive } from 'vue';
+import EmptyState from '@/components/product/EmptyState.vue';
 import MetricCard from '@/components/product/MetricCard.vue';
 import PageHeader from '@/components/product/PageHeader.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
 import adminReferrals from '@/routes/admin/referrals';
-import AdminEmptyState from './_components/AdminEmptyState.vue';
 import AdminPagination from './_components/AdminPagination.vue';
-import {
-    cleanFilters,
-    formatCurrency,
-    formatDate,
-    humanize,
-    isPast,
-    statusTone,
-} from './_shared';
+import { useAdminI18n } from './_i18n';
+import { cleanFilters, isPast, statusTone } from './_shared';
 import type { AdminPaginator } from './_shared';
 
 type ReferralRow = {
@@ -98,6 +92,8 @@ const updateForm = useForm({
     reason: '',
 });
 
+const { t, formatCurrency, formatDate, humanize } = useAdminI18n();
+
 function applyFilters(): void {
     router.get(adminReferrals.index.url(), cleanFilters(filters), {
         preserveState: true,
@@ -123,9 +119,7 @@ function updateReferral(
     let reason = '';
 
     if (status === 'rejected') {
-        const input = window.prompt(
-            'Bitte gib einen Ablehnungsgrund an (mindestens 5 Zeichen):',
-        );
+        const input = window.prompt(t('referrals.rejectionPrompt'));
 
         if (input === null || input.trim().length < 5) {
             return;
@@ -134,7 +128,10 @@ function updateReferral(
         reason = input.trim();
     } else if (
         !window.confirm(
-            `Referral #${referral.id} wirklich auf „${humanize(status)}“ setzen?`,
+            t('referrals.confirm', {
+                id: referral.id,
+                status: humanize(status),
+            }),
         )
     ) {
         return;
@@ -150,31 +147,33 @@ function updateReferral(
 </script>
 
 <template>
-    <Head title="Referrals" />
+    <Head :title="t('referrals.metaTitle')" />
 
     <div class="erin-page">
         <PageHeader
-            eyebrow="Growth Operations"
-            title="Referrals"
-            :description="`${referrals.total} Empfehlungen mit echter Attribution, Haltefrist und Auszahlungshistorie.`"
+            :eyebrow="t('referrals.eyebrow')"
+            :title="t('referrals.title')"
+            :description="
+                t('referrals.description', { count: referrals.total })
+            "
             :icon="UserRoundPlus"
         />
 
         <div class="grid gap-4 sm:grid-cols-3">
             <MetricCard
-                label="In Haltefrist"
+                :label="t('referrals.metrics.holding')"
                 :value="formatCurrency(summary.holding_cents)"
                 :icon="Clock3"
                 tone="orange"
             />
             <MetricCard
-                label="Freigegeben"
+                :label="t('referrals.metrics.approved')"
                 :value="formatCurrency(summary.approved_cents)"
                 :icon="BadgeEuro"
                 tone="teal"
             />
             <MetricCard
-                label="Ausgezahlt"
+                :label="t('referrals.metrics.paid')"
                 :value="formatCurrency(summary.paid_cents)"
                 :icon="WalletCards"
                 tone="violet"
@@ -187,23 +186,25 @@ function updateReferral(
                 @submit.prevent="applyFilters"
             >
                 <label class="relative">
-                    <span class="sr-only">Referrals suchen</span>
+                    <span class="sr-only">{{
+                        t('referrals.searchLabel')
+                    }}</span>
                     <Search
                         class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-slate-400"
                     />
                     <input
                         v-model="filters.search"
                         type="search"
-                        placeholder="Code, Empfehlender oder Fachkraft …"
+                        :placeholder="t('referrals.searchPlaceholder')"
                         class="erin-focus h-11 w-full rounded-xl border border-slate-200 pr-3 pl-10 text-sm"
                     />
                 </label>
                 <select
                     v-model="filters.status"
-                    aria-label="Referral-Status"
+                    :aria-label="t('referrals.status')"
                     class="erin-focus h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
                 >
-                    <option value="">Alle Status</option>
+                    <option value="">{{ t('common.allStatuses') }}</option>
                     <option
                         v-for="status in statuses"
                         :key="status"
@@ -217,11 +218,11 @@ function updateReferral(
                         type="submit"
                         class="erin-focus h-11 rounded-xl bg-blue-600 px-4 text-sm font-bold text-white"
                     >
-                        Filtern
+                        {{ t('common.filter') }}
                     </button>
                     <button
                         type="button"
-                        aria-label="Filter zurücksetzen"
+                        :aria-label="t('common.resetFilters')"
                         class="erin-focus grid size-11 place-items-center rounded-xl border border-slate-200 text-slate-500"
                         @click="resetFilters"
                     >
@@ -236,12 +237,24 @@ function updateReferral(
                         <tr
                             class="text-[11px] font-bold tracking-wide text-slate-500 uppercase"
                         >
-                            <th class="px-5 py-3">Empfehlung</th>
-                            <th class="px-5 py-3">Vermittlung</th>
-                            <th class="px-5 py-3">Provision</th>
-                            <th class="px-5 py-3">Zeitachse</th>
-                            <th class="px-5 py-3">Status</th>
-                            <th class="px-5 py-3 text-right">Aktionen</th>
+                            <th class="px-5 py-3">
+                                {{ t('referrals.columns.referral') }}
+                            </th>
+                            <th class="px-5 py-3">
+                                {{ t('referrals.columns.placement') }}
+                            </th>
+                            <th class="px-5 py-3">
+                                {{ t('referrals.columns.commission') }}
+                            </th>
+                            <th class="px-5 py-3">
+                                {{ t('referrals.columns.timeline') }}
+                            </th>
+                            <th class="px-5 py-3">
+                                {{ t('referrals.columns.status') }}
+                            </th>
+                            <th class="px-5 py-3 text-right">
+                                {{ t('referrals.columns.actions') }}
+                            </th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
@@ -269,7 +282,7 @@ function updateReferral(
                                 <p class="text-sm font-semibold text-slate-800">
                                     {{
                                         referral.referred_user?.name ??
-                                        'Noch nicht registriert'
+                                        t('referrals.notRegistered')
                                     }}
                                 </p>
                                 <p
@@ -287,7 +300,7 @@ function updateReferral(
                                                 .title
                                         }}
                                     </p>
-                                    <p class="mt-0.5 text-xs text-slate-400">
+                                    <p class="mt-0.5 text-xs text-slate-600">
                                         {{
                                             referral.application.job_posting
                                                 .company.name
@@ -304,14 +317,15 @@ function updateReferral(
                                         )
                                     }}
                                 </p>
-                                <p class="mt-1 text-xs text-slate-400">
-                                    Code-Satz:
+                                <p class="mt-1 text-xs text-slate-600">
                                     {{
-                                        formatCurrency(
-                                            referral.referral_code
-                                                .commission_cents,
-                                            referral.referral_code.currency,
-                                        )
+                                        t('referrals.codeRate', {
+                                            amount: formatCurrency(
+                                                referral.referral_code
+                                                    .commission_cents,
+                                                referral.referral_code.currency,
+                                            ),
+                                        })
                                     }}
                                 </p>
                             </td>
@@ -319,19 +333,36 @@ function updateReferral(
                                 class="px-5 py-4 text-xs whitespace-nowrap text-slate-500"
                             >
                                 <p>
-                                    Klick {{ formatDate(referral.clicked_at) }}
+                                    {{
+                                        t('referrals.clickedAt', {
+                                            date: formatDate(
+                                                referral.clicked_at,
+                                            ),
+                                        })
+                                    }}
                                 </p>
                                 <p class="mt-1">
-                                    Einstellung
-                                    {{ formatDate(referral.hired_at) }}
+                                    {{
+                                        t('referrals.hiredAt', {
+                                            date: formatDate(referral.hired_at),
+                                        })
+                                    }}
                                 </p>
                                 <p class="mt-1">
-                                    Haltefrist
-                                    {{ formatDate(referral.hold_until) }}
+                                    {{
+                                        t('referrals.holdUntilLabel', {
+                                            date: formatDate(
+                                                referral.hold_until,
+                                            ),
+                                        })
+                                    }}
                                 </p>
                                 <p v-if="referral.paid_at" class="mt-1">
-                                    Auszahlung
-                                    {{ formatDate(referral.paid_at) }}
+                                    {{
+                                        t('referrals.paidAt', {
+                                            date: formatDate(referral.paid_at),
+                                        })
+                                    }}
                                 </p>
                             </td>
                             <td class="px-5 py-4">
@@ -364,7 +395,7 @@ function updateReferral(
                                         "
                                     >
                                         <Check class="size-3.5" />
-                                        Freigeben
+                                        {{ t('referrals.approve') }}
                                     </button>
                                     <button
                                         v-if="referral.status === 'approved'"
@@ -375,7 +406,7 @@ function updateReferral(
                                             updateReferral(referral, 'paid')
                                         "
                                     >
-                                        Als ausgezahlt markieren
+                                        {{ t('referrals.markPaid') }}
                                     </button>
                                     <button
                                         v-if="
@@ -390,16 +421,16 @@ function updateReferral(
                                             updateReferral(referral, 'rejected')
                                         "
                                     >
-                                        Ablehnen
+                                        {{ t('referrals.reject') }}
                                     </button>
                                     <span
                                         v-if="
                                             referral.status === 'paid' ||
                                             referral.status === 'rejected'
                                         "
-                                        class="text-xs text-slate-400"
+                                        class="text-xs text-slate-600"
                                     >
-                                        Abgeschlossen
+                                        {{ t('referrals.completed') }}
                                     </span>
                                 </div>
                             </td>
@@ -407,7 +438,11 @@ function updateReferral(
                     </tbody>
                 </table>
             </div>
-            <AdminEmptyState v-else />
+            <EmptyState
+                v-else
+                :title="t('common.emptyTitle')"
+                :description="t('common.emptyDescription')"
+            />
             <AdminPagination :paginator="referrals" />
         </SectionCard>
     </div>

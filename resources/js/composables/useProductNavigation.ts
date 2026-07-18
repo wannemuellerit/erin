@@ -87,6 +87,11 @@ export function useProductNavigation() {
                     href: '/employer/pipeline',
                     icon: ListChecks,
                 },
+                {
+                    label: t('operations.nav.analytics'),
+                    href: '/employer/analytics',
+                    icon: Activity,
+                },
             ],
         },
         {
@@ -101,6 +106,16 @@ export function useProductNavigation() {
                     label: t('nav.interviews'),
                     href: '/employer/interviews',
                     icon: CalendarDays,
+                },
+                {
+                    label: t('operations.nav.productivity'),
+                    href: '/employer/productivity',
+                    icon: ListChecks,
+                },
+                {
+                    label: t('operations.nav.support'),
+                    href: '/support',
+                    icon: LifeBuoy,
                 },
             ],
         },
@@ -193,6 +208,11 @@ export function useProductNavigation() {
                     label: t('nav.referrals'),
                     href: '/candidate/referrals',
                     icon: Gift,
+                },
+                {
+                    label: t('operations.nav.support'),
+                    href: '/support',
+                    icon: LifeBuoy,
                 },
             ],
         },
