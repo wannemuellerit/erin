@@ -59,6 +59,43 @@ class Company extends Model
         ];
     }
 
+    public function stripeName(): ?string
+    {
+        return $this->legal_name ?: $this->name;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function stripeAddress(): array
+    {
+        return array_filter([
+            'line1' => $this->address_line1,
+            'postal_code' => $this->postal_code,
+            'city' => $this->city,
+            'country' => $this->country_code,
+        ], fn (mixed $value): bool => filled($value));
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function stripePreferredLocales(): array
+    {
+        return ['de'];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function stripeMetadata(): array
+    {
+        return [
+            'erin_company_id' => (string) $this->getKey(),
+            'erin_company_slug' => $this->slug,
+        ];
+    }
+
     /**
      * @return BelongsTo<Plan, $this>
      */

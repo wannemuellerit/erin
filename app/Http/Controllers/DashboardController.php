@@ -32,6 +32,13 @@ class DashboardController extends Controller
         $user = $request->user();
         abort_if($user === null, 401);
 
+        if (
+            in_array($user->role, [UserRole::Candidate, UserRole::Company], true)
+            && $user->onboarding_completed_at === null
+        ) {
+            return redirect()->route('onboarding.show');
+        }
+
         if ($user->role === UserRole::Candidate) {
             $profile = $user->candidateProfile()
                 ->with(['documents', 'skills', 'languages'])

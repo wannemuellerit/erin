@@ -3,7 +3,8 @@
 namespace Tests\Feature\Auth;
 
 use App\Models\User;
-use Database\Seeders\DatabaseSeeder;
+use Database\Seeders\DemoDataSeeder;
+use Database\Seeders\DomainCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\RateLimiter;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -47,7 +48,12 @@ class AuthenticationTest extends TestCase
 
     public function test_seeded_demo_user_can_authenticate(): void
     {
-        $this->seed(DatabaseSeeder::class);
+        config()->set('app.demo_mode', true);
+
+        $this->seed([
+            DomainCatalogSeeder::class,
+            DemoDataSeeder::class,
+        ]);
 
         $response = $this->post(route('login.store'), [
             'email' => 'admin@wannemueller.dev',

@@ -468,7 +468,7 @@ const changePlan = (plan: Plan) => {
                         v-if="add_ons.visa_enabled"
                         type="button"
                         class="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 text-xs font-bold"
-                        @click="router.post(visaCredits.url(), { quantity: 1 })"
+                        @click="router.post(visaCredits.url(), { credits: 1 })"
                     >
                         <Plus class="size-4" /> Visumpaket kaufen
                     </button>

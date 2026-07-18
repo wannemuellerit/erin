@@ -15,6 +15,7 @@ use App\Http\Controllers\Employer\JobController as EmployerJobController;
 use App\Http\Controllers\Employer\PortalController as EmployerPortalController;
 use App\Http\Controllers\InterviewController;
 use App\Http\Controllers\JobMediaController;
+use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\PublicPageController;
 use App\Http\Controllers\ReferralController;
 use App\Http\Controllers\SupportActionController;
@@ -33,6 +34,12 @@ Route::get('r/{code}', [ReferralController::class, 'track'])->name('referrals.tr
 Route::get('join/{token}', [EmployerPortalController::class, 'trackInvitation'])->name('company-invitations.track');
 
 Route::middleware(['auth', 'verified'])->group(function (): void {
+    Route::get('onboarding', [OnboardingController::class, 'show'])->name('onboarding.show');
+    Route::put('onboarding/candidate', [OnboardingController::class, 'candidate'])
+        ->name('onboarding.candidate');
+    Route::put('onboarding/company', [OnboardingController::class, 'company'])
+        ->name('onboarding.company');
+
     Route::get('dashboard', DashboardController::class)->name('dashboard');
 
     Route::post('companies/{company}/activate', [AccountController::class, 'activateCompany'])
@@ -98,7 +105,7 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         ->name('company-invitations.accept');
 });
 
-Route::middleware(['auth', 'verified', 'role:company', 'company.member'])
+Route::middleware(['auth', 'verified', 'role:company', 'company.member', 'onboarding.complete'])
     ->prefix('employer')
     ->name('employer.')
     ->group(function (): void {
@@ -148,7 +155,7 @@ Route::middleware(['auth', 'verified', 'role:company', 'company.member'])
         });
     });
 
-Route::middleware(['auth', 'verified', 'role:candidate'])
+Route::middleware(['auth', 'verified', 'role:candidate', 'onboarding.complete'])
     ->prefix('candidate')
     ->name('candidate.')
     ->group(function (): void {

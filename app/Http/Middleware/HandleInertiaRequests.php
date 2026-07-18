@@ -50,6 +50,7 @@ class HandleInertiaRequests extends Middleware
                     'status' => $user->status->value,
                     'locale' => $user->locale,
                     'two_factor_enabled' => $user->two_factor_confirmed_at !== null,
+                    'onboarding_completed' => $user->onboarding_completed_at !== null,
                 ] : null,
                 'companies' => fn (): array => $user?->companies()
                     ->select(['companies.id', 'companies.name', 'companies.slug', 'companies.status'])

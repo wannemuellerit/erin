@@ -80,6 +80,10 @@ class BillingController extends Controller
 
         $company->update($validated);
 
+        if (filled($company->stripe_id)) {
+            $company->syncStripeCustomerDetails();
+        }
+
         return back()->with('success', __('Rechnungsdaten wurden gespeichert.'));
     }
 
@@ -122,6 +126,7 @@ class BillingController extends Controller
                 'success_url' => route('employer.billing.success').'?session_id={CHECKOUT_SESSION_ID}',
                 'cancel_url' => route('employer.billing'),
                 'billing_address_collection' => 'required',
+                'allow_promotion_codes' => true,
                 'customer_update' => [
                     'address' => 'auto',
                     'name' => 'auto',
@@ -138,6 +143,10 @@ class BillingController extends Controller
 
     public function success(Request $request): RedirectResponse
     {
+        $request->validate([
+            'session_id' => ['required', 'string', 'max:255', 'regex:/^cs_(test_|live_)?[A-Za-z0-9]+$/'],
+        ]);
+
         return redirect()->route('employer.billing')->with(
             'success',
             __('Zahlung eingegangen. Das Portal wird nach Bestätigung des Stripe-Webhooks automatisch freigeschaltet.'),

@@ -14,6 +14,7 @@ use App\Models\JobPosting;
 use App\Models\Plan;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
+use Database\Seeders\DemoDataSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Gate;
 
@@ -25,14 +26,21 @@ it('seeds the immutable launch catalog and verified demo identities', function (
     expect(Plan::query()->pluck('slug')->sort()->values()->all())
         ->toBe(['basic', 'business', 'enterprise', 'premium'])
         ->and(Plan::query()->where('slug', 'basic')->value('price_cents'))->toBe(299_900)
-        ->and(Plan::query()->where('slug', 'enterprise')->value('seat_limit'))->toBeNull();
+        ->and(Plan::query()->where('slug', 'enterprise')->value('seat_limit'))->toBeNull()
+        ->and(User::query()->count())->toBe(0);
+
+    config()->set('app.demo_mode', true);
+    $this->seed(DemoDataSeeder::class);
 
     $admin = User::query()->where('email', 'admin@wannemueller.dev')->firstOrFail();
 
     expect($admin->role)->toBe(UserRole::SuperAdmin)
         ->and($admin->status)->toBe(UserStatus::Active)
         ->and($admin->hasVerifiedEmail())->toBeTrue()
-        ->and($admin->isSuperAdmin())->toBeTrue();
+        ->and($admin->isSuperAdmin())->toBeTrue()
+        ->and(CandidateProfile::query()->count())->toBe(10)
+        ->and(Company::query()->count())->toBe(2)
+        ->and(User::query()->where('role', UserRole::Company)->count())->toBe(2);
 
     $candidate = CandidateProfile::query()->firstOrFail();
     $application = JobApplication::query()->firstOrFail();

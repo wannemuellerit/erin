@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\BlockSupportWrites;
 use App\Http\Middleware\EnsureCompanyMember;
+use App\Http\Middleware\EnsureOnboardingComplete;
 use App\Http\Middleware\EnsurePlatformAccess;
 use App\Http\Middleware\EnsureRole;
 use App\Http\Middleware\EnsureStaffTwoFactor;
@@ -31,6 +32,9 @@ return Application::configure(basePath: dirname(__DIR__))
         }
 
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
+        $middleware->validateCsrfTokens(except: [
+            'billing/webhook',
+        ]);
 
         $middleware->web(append: [
             HandleAppearance::class,
@@ -46,6 +50,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => EnsureRole::class,
             'company.member' => EnsureCompanyMember::class,
             'company.subscribed' => EnsureSubscribedCompany::class,
+            'onboarding.complete' => EnsureOnboardingComplete::class,
             'staff.2fa' => EnsureStaffTwoFactor::class,
         ]);
     })

@@ -9,7 +9,7 @@
     ],
     "license": "MIT",
     "require": {
-        "php": "^8.3",
+        "php": "^8.4.1",
         "ext-redis": "*",
         "ext-sodium": "*",
         "firebase/php-jwt": "^7.1",

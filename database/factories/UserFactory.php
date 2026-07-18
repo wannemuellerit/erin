@@ -34,6 +34,7 @@ class UserFactory extends Factory
             'status' => UserStatus::Active,
             'locale' => 'de',
             'timezone' => 'Europe/Berlin',
+            'onboarding_completed_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
             /* @chisel-2fa */

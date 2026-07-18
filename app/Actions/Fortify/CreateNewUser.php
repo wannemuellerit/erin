@@ -81,6 +81,7 @@ class CreateNewUser implements CreatesNewUsers
                 'role' => $role,
                 'status' => UserStatus::Pending,
                 'locale' => $input['locale'] ?? 'de',
+                'onboarding_completed_at' => $invitation !== null ? now() : null,
             ]);
 
             if ($role === UserRole::Company) {

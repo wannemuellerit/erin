@@ -39,6 +39,9 @@ class RegistrationTest extends TestCase
         ]);
 
         $this->assertAuthenticated();
+        $user = User::query()->where('email', 'test@example.com')->firstOrFail();
+        $this->assertNull($user->onboarding_completed_at);
+        $this->assertNotNull($user->candidateProfile);
         $response->assertRedirect(route('dashboard', absolute: false));
     }
 
@@ -64,6 +67,7 @@ class RegistrationTest extends TestCase
 
         $this->assertAuthenticatedAs($user);
         $this->assertSame(UserRole::Company, $user->role);
+        $this->assertNull($user->onboarding_completed_at);
         $this->assertSame($plan->getKey(), $company->current_plan_id);
         $this->assertDatabaseHas('company_memberships', [
             'company_id' => $company->getKey(),

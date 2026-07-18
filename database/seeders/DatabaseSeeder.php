@@ -14,9 +14,10 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->call([
-            DomainCatalogSeeder::class,
-            DemoDataSeeder::class,
-        ]);
+        $this->call(DomainCatalogSeeder::class);
+
+        if (app()->environment('local') && config('app.demo_mode')) {
+            $this->call(DemoDataSeeder::class);
+        }
     }
 }
