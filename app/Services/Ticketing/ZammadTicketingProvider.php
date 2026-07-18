@@ -45,18 +45,26 @@ class ZammadTicketingProvider implements TicketingProvider
             'article' => $article,
         ])->throw()->json();
 
-        if (! is_array($response) || ! isset($response['id'])) {
+        if (
+            ! is_array($response)
+            || ! $this->validId($response['id'] ?? null)
+        ) {
             throw new RuntimeException('Zammad hat keine gültige Ticket-ID zurückgegeben.');
         }
         $articleIds = is_array($response['article_ids'] ?? null)
             ? array_values($response['article_ids'])
             : [];
-        $articleId = isset($articleIds[0]) ? (string) $articleIds[0] : null;
+        $articleId = $articleIds[0] ?? null;
+        if (! $this->validId($articleId)) {
+            throw new RuntimeException(
+                'Zammad hat keine gültige ID für den Eröffnungsartikel zurückgegeben.',
+            );
+        }
 
         return [
             'external_id' => (string) $response['id'],
             'external_number' => isset($response['number']) ? (string) $response['number'] : null,
-            'external_article_id' => $articleId,
+            'external_article_id' => (string) $articleId,
         ];
     }
 
@@ -76,26 +84,43 @@ class ZammadTicketingProvider implements TicketingProvider
             ? $response['assets']['Ticket']
             : [];
         $matchedTicketWithoutOpeningArticle = false;
+        $matches = [];
+        $inspectedTicketIds = [];
 
         foreach ($tickets as $candidate) {
             if (
                 ! is_array($candidate)
                 || ($candidate['note'] ?? null) !== $marker
-                || ! isset($candidate['id'])
+                || ! $this->validId($candidate['id'] ?? null)
             ) {
                 continue;
             }
 
+            $externalTicketId = (string) $candidate['id'];
+            if (isset($inspectedTicketIds[$externalTicketId])) {
+                continue;
+            }
+            $inspectedTicketIds[$externalTicketId] = true;
+
             $details = $this->request()
-                ->get('/api/v1/tickets/'.rawurlencode((string) $candidate['id']))
+                ->get('/api/v1/tickets/'.rawurlencode($externalTicketId))
                 ->throw()
                 ->json();
-            if (! is_array($details) || ! isset($details['id'])) {
+            if (
+                ! is_array($details)
+                || ! $this->validId($details['id'] ?? null)
+            ) {
                 continue;
             }
 
+            $resolvedExternalTicketId = (string) $details['id'];
+            if (! hash_equals($externalTicketId, $resolvedExternalTicketId)) {
+                throw new RuntimeException(
+                    'Die Zammad-Ticketdetails widersprechen der angefragten Ticket-ID.',
+                );
+            }
             $openingArticle = $this->findArticleByMessageMarker(
-                (string) $details['id'],
+                $resolvedExternalTicketId,
                 $firstMessage,
             );
             if ($openingArticle === null) {
@@ -104,13 +129,22 @@ class ZammadTicketingProvider implements TicketingProvider
                 continue;
             }
 
-            return [
-                'external_id' => (string) $details['id'],
+            $matches[$resolvedExternalTicketId] = [
+                'external_id' => $resolvedExternalTicketId,
                 'external_number' => isset($details['number'])
                     ? (string) $details['number']
                     : null,
                 'external_article_id' => $openingArticle['external_article_id'],
             ];
+        }
+
+        if (count($matches) > 1) {
+            throw new RuntimeException(
+                'Mehrere Zammad-Tickets besitzen denselben Erin-Zustellmarker.',
+            );
+        }
+        if ($matches !== []) {
+            return array_values($matches)[0];
         }
 
         if ($matchedTicketWithoutOpeningArticle) {
@@ -151,7 +185,10 @@ class ZammadTicketingProvider implements TicketingProvider
             ->throw()
             ->json();
 
-        if (! is_array($response) || ! isset($response['id'])) {
+        if (
+            ! is_array($response)
+            || ! $this->validId($response['id'] ?? null)
+        ) {
             throw new RuntimeException('Zammad hat keine gültige Artikel-ID zurückgegeben.');
         }
 
@@ -184,18 +221,40 @@ class ZammadTicketingProvider implements TicketingProvider
             return null;
         }
 
-        $marker = $this->messageMarker($message);
+        $message->loadMissing('author:id,role');
+        $markers = app(ZammadMessageMarker::class)->verificationMarkersFor($message);
+        $expectedSender = $message->author?->isPlatformStaff() === true
+            ? 'agent'
+            : 'customer';
+        $matches = [];
         foreach ($articles as $article) {
             if (
                 is_array($article)
-                && ($article['subject'] ?? null) === $marker
-                && isset($article['id'])
+                && in_array($article['subject'] ?? null, $markers, true)
+                && $this->validId($article['id'] ?? null)
+                && is_string($article['sender'] ?? null)
+                && mb_strtolower($article['sender']) === $expectedSender
+                && is_bool($article['internal'] ?? null)
+                && $article['internal'] === $message->is_internal
+                && is_string($article['body'] ?? null)
+                && hash_equals(
+                    trim($message->body),
+                    $this->plainText($article['body']),
+                )
             ) {
-                return ['external_article_id' => (string) $article['id']];
+                $matches[(string) $article['id']] = [
+                    'external_article_id' => (string) $article['id'],
+                ];
             }
         }
 
-        return null;
+        if (count($matches) > 1) {
+            throw new RuntimeException(
+                'Mehrere Zammad-Artikel besitzen denselben Erin-Zustellmarker.',
+            );
+        }
+
+        return $matches === [] ? null : array_values($matches)[0];
     }
 
     public function article(string $externalArticleId): array
@@ -278,7 +337,24 @@ class ZammadTicketingProvider implements TicketingProvider
 
     private function messageMarker(SupportTicketMessage $message): string
     {
-        return 'Erin operation message:'.$message->getKey();
+        return app(ZammadMessageMarker::class)->for($message);
+    }
+
+    private function validId(mixed $value): bool
+    {
+        return (is_int($value) || is_string($value))
+            && preg_match('/\A[1-9][0-9]{0,18}\z/D', (string) $value) === 1;
+    }
+
+    private function plainText(string $body): string
+    {
+        $body = preg_replace('/<br\s*\/?>/i', "\n", $body) ?? $body;
+
+        return trim(html_entity_decode(
+            strip_tags($body),
+            ENT_QUOTES | ENT_HTML5,
+            'UTF-8',
+        ));
     }
 
     private function request(bool $retry = true): PendingRequest

@@ -52,6 +52,10 @@ Route::middleware(['auth', 'verified', 'role:super_admin,support', 'staff.2fa'])
                 ->name('companies.status.update');
             Route::patch('billing/plans/{plan}', [BillingController::class, 'updatePlan'])
                 ->name('billing.plans.update');
+            Route::patch(
+                'billing/manual-reviews/{billingChangeIntent:public_id}',
+                [BillingController::class, 'resolveManualReview'],
+            )->name('billing.manual-reviews.resolve');
             Route::patch('referrals/{referral}', [ReferralController::class, 'update'])
                 ->name('referrals.update');
             Route::patch('settings/theme', [SettingController::class, 'updateTheme'])

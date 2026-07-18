@@ -108,7 +108,9 @@ const copyrightYear = computed(() => new Date().getFullYear());
             </div>
         </aside>
 
-        <main class="relative flex min-h-svh min-w-0 flex-col bg-white">
+        <main
+            class="relative flex min-h-svh min-w-0 flex-col bg-white lg:h-svh lg:min-h-0 lg:overflow-y-auto"
+        >
             <div class="flex items-center justify-between px-5 py-5 sm:px-8">
                 <Link
                     :href="home()"
@@ -128,10 +130,10 @@ const copyrightYear = computed(() => new Date().getFullYear());
                 </div>
             </div>
 
-            <div
-                class="flex flex-1 items-center justify-center px-5 py-8 sm:px-8"
-            >
-                <div class="w-full max-w-[calc(100vw-2.5rem)] sm:max-w-[27rem]">
+            <div class="flex flex-1 justify-center px-5 py-8 sm:px-8">
+                <div
+                    class="my-auto w-full max-w-[calc(100vw-2.5rem)] sm:max-w-[27rem]"
+                >
                     <div class="mb-8">
                         <p
                             class="mb-2 text-xs font-bold tracking-[0.12em] text-[var(--erin-primary,#2563EB)] uppercase"

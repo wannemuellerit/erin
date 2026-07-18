@@ -7,6 +7,10 @@ use DateTimeZone;
 
 final class LaunchEvidenceValidator
 {
+    public function __construct(
+        private readonly GovernanceAttestationVerifier $attestationVerifier,
+    ) {}
+
     /**
      * @return list<array{
      *     id: string,
@@ -16,6 +20,35 @@ final class LaunchEvidenceValidator
      * }>
      */
     public function checks(): array
+    {
+        return $this->checksWithAttestationPin(null);
+    }
+
+    /**
+     * Runs the same rules against a disposable trust-root pin exclusively for
+     * unit tests and the explicitly synthetic adversarial control model.
+     *
+     * @return list<array{
+     *     id: string,
+     *     status: 'pass'|'warn'|'fail',
+     *     message: string,
+     *     errors: list<string>
+     * }>
+     */
+    public function checksAgainstSyntheticTestPin(string $fingerprint): array
+    {
+        return $this->checksWithAttestationPin($fingerprint);
+    }
+
+    /**
+     * @return list<array{
+     *     id: string,
+     *     status: 'pass'|'warn'|'fail',
+     *     message: string,
+     *     errors: list<string>
+     * }>
+     */
+    private function checksWithAttestationPin(?string $syntheticTestFingerprint): array
     {
         $evidence = config('operations.launch_evidence', []);
         $evidence = is_array($evidence) ? $evidence : [];
@@ -53,6 +86,29 @@ final class LaunchEvidenceValidator
         $backupErrors = [
             ...$backupErrors,
             ...$this->backupMetricErrors($backup),
+            ...$this->backupMeasurementErrors($backup),
+            ...$this->orderedEvidenceDates(
+                $backup,
+                'drill_started_at',
+                'drill_completed_at',
+                'verified_at',
+                'backup_clock_rollback',
+            ),
+            $this->validEvidenceDate(
+                $backup['drill_completed_at'] ?? null,
+                (int) config('operations.evidence_freshness.backup_restore_days', 90),
+            )
+                ? null
+                : 'drill_completed_at_invalid_or_stale',
+            ($backup['scope'] ?? null) === 'production'
+                ? null
+                : 'backup_scope_not_production',
+            ($backup['production_gate_eligible'] ?? null) === true
+                ? null
+                : 'backup_not_production_gate_eligible',
+            ($backup['independently_verified'] ?? null) === true
+                ? null
+                : 'backup_not_independently_verified',
             ($backup['encrypted_backup_verified'] ?? null) === true
                 ? null
                 : 'encrypted_backup_not_verified',
@@ -83,6 +139,12 @@ final class LaunchEvidenceValidator
             $this->nonNegativeInteger($security['open_high_findings'] ?? null) === 0
                 ? null
                 : 'open_high_findings',
+            ($security['independent_review_verified'] ?? null) === true
+                ? null
+                : 'independent_security_review_not_verified',
+            ($security['penetration_test_verified'] ?? null) === true
+                ? null
+                : 'penetration_test_not_verified',
         ];
 
         $dpoErrors = [
@@ -94,6 +156,9 @@ final class LaunchEvidenceValidator
                 (int) config('operations.evidence_freshness.dpo_approval_days', 365),
             ),
             ($dpo['status'] ?? null) === 'approved' ? null : 'approval_status_invalid',
+            ($dpo['authority_verified'] ?? null) === true
+                ? null
+                : 'dpo_authority_not_verified',
         ];
 
         $legalErrors = [
@@ -105,6 +170,9 @@ final class LaunchEvidenceValidator
                 (int) config('operations.evidence_freshness.legal_approval_days', 365),
             ),
             ($legal['status'] ?? null) === 'approved' ? null : 'approval_status_invalid',
+            ($legal['authority_verified'] ?? null) === true
+                ? null
+                : 'legal_authority_not_verified',
         ];
 
         $pilotErrors = $this->commonEvidenceErrors(
@@ -125,8 +193,31 @@ final class LaunchEvidenceValidator
             $this->validReference($pilot['rollback_reference'] ?? null)
                 ? null
                 : 'rollback_reference_invalid',
+            ...$this->orderedEvidenceDates(
+                $pilot,
+                'started_at',
+                'decision_at',
+                null,
+                'pilot_clock_rollback',
+            ),
+            ($pilot['synthetic'] ?? null) === false ? null : 'synthetic_pilot_not_eligible',
+            ($pilot['participant_consent_verified'] ?? null) === true
+                ? null
+                : 'pilot_participant_consent_not_verified',
+            ($pilot['stop_criteria_tested'] ?? null) === true
+                ? null
+                : 'pilot_stop_criteria_not_tested',
+            ($pilot['rollback_tested'] ?? null) === true
+                ? null
+                : 'pilot_rollback_not_tested',
             ($pilot['status'] ?? null) === 'approved' ? null : 'pilot_status_invalid',
         ];
+        $attestationErrors = $syntheticTestFingerprint === null
+            ? $this->attestationVerifier->errors($evidence)
+            : $this->attestationVerifier->errorsAgainstSyntheticTestPin(
+                $evidence,
+                $syntheticTestFingerprint,
+            );
 
         $backupErrors = [
             ...$backupErrors,
@@ -221,6 +312,12 @@ final class LaunchEvidenceValidator
                 'Pilotverantwortung, Abnahmekriterien, Rollback und Go-Entscheidung sind belegt.',
                 $failureStatus,
             ),
+            $this->result(
+                'evidence.attestation',
+                $attestationErrors,
+                'Die Governance-Evidenz ist Ed25519-signiert an Release, Commit und Evidenzdigest gebunden.',
+                $failureStatus,
+            ),
         ];
     }
 
@@ -294,6 +391,129 @@ final class LaunchEvidenceValidator
     }
 
     /**
+     * @param  array<string, mixed>  $section
+     * @return list<string>
+     */
+    private function backupMeasurementErrors(array $section): array
+    {
+        $errors = [];
+        $drillStartedAt = $this->evidenceDate($section['drill_started_at'] ?? null);
+        $drillCompletedAt = $this->evidenceDate($section['drill_completed_at'] ?? null);
+        $freshnessDays = (int) config(
+            'operations.evidence_freshness.backup_restore_days',
+            90,
+        );
+
+        if (! $this->validEvidenceDate($section['drill_started_at'] ?? null, $freshnessDays)) {
+            $errors[] = 'drill_started_at_invalid_or_stale';
+        }
+
+        foreach (['database', 'object_storage'] as $system) {
+            $backupCreatedAt = $this->evidenceDate($section["{$system}_backup_created_at"] ?? null);
+            $lastRecordAt = $this->evidenceDate(
+                $section["{$system}_last_restored_record_at"] ?? null,
+            );
+            $restoredAt = $this->evidenceDate($section["{$system}_restored_at"] ?? null);
+
+            if ($backupCreatedAt === null) {
+                $errors[] = "{$system}_backup_created_at_invalid";
+            }
+            if ($lastRecordAt === null) {
+                $errors[] = "{$system}_last_restored_record_at_invalid";
+            }
+            if ($restoredAt === null) {
+                $errors[] = "{$system}_restored_at_invalid";
+            }
+            if (! $this->validEvidenceDate(
+                $section["{$system}_backup_created_at"] ?? null,
+                $freshnessDays,
+            )) {
+                $errors[] = "{$system}_backup_created_at_future_or_stale";
+            }
+            if (! $this->validEvidenceDate(
+                $section["{$system}_last_restored_record_at"] ?? null,
+                $freshnessDays,
+            )) {
+                $errors[] = "{$system}_last_restored_record_at_future_or_stale";
+            }
+            if (! $this->validEvidenceDate(
+                $section["{$system}_restored_at"] ?? null,
+                $freshnessDays,
+            )) {
+                $errors[] = "{$system}_restored_at_future_or_stale";
+            }
+
+            if (
+                $backupCreatedAt !== null
+                && $lastRecordAt !== null
+                && $lastRecordAt > $backupCreatedAt
+            ) {
+                $errors[] = "{$system}_record_after_backup";
+            }
+            if (
+                $backupCreatedAt !== null
+                && $drillStartedAt !== null
+                && $backupCreatedAt > $drillStartedAt
+            ) {
+                $errors[] = "{$system}_backup_after_drill_start";
+            }
+            if (
+                $drillStartedAt !== null
+                && $restoredAt !== null
+                && $restoredAt < $drillStartedAt
+            ) {
+                $errors[] = "{$system}_restore_before_drill";
+            }
+            if (
+                $drillCompletedAt !== null
+                && $restoredAt !== null
+                && $restoredAt > $drillCompletedAt
+            ) {
+                $errors[] = "{$system}_restore_after_drill";
+            }
+
+            $declaredRpo = $this->nonNegativeInteger(
+                $section["{$system}_rpo_achieved_minutes"] ?? null,
+            );
+            $measuredRpo = $this->elapsedMinutes($lastRecordAt, $drillStartedAt);
+            if (
+                $declaredRpo !== null
+                && $measuredRpo !== null
+                && $declaredRpo !== $measuredRpo
+            ) {
+                $errors[] = "{$system}_rpo_measurement_mismatch";
+            }
+
+            $declaredRto = $this->nonNegativeInteger(
+                $section["{$system}_rto_achieved_minutes"] ?? null,
+            );
+            $measuredRto = $this->elapsedMinutes($drillStartedAt, $restoredAt);
+            if (
+                $declaredRto !== null
+                && $measuredRto !== null
+                && $declaredRto !== $measuredRto
+            ) {
+                $errors[] = "{$system}_rto_measurement_mismatch";
+            }
+        }
+
+        return $errors;
+    }
+
+    private function elapsedMinutes(
+        ?DateTimeImmutable $start,
+        ?DateTimeImmutable $end,
+    ): ?int {
+        if ($start === null || $end === null || $end < $start) {
+            return null;
+        }
+
+        $seconds = $end->getTimestamp() - $start->getTimestamp();
+
+        return intdiv($seconds + 59, 60);
+    }
+
+    /**
      * @return list<string>
      */
     private function independenceErrors(
@@ -328,7 +548,10 @@ final class LaunchEvidenceValidator
 
         $value = strtolower(trim($value));
 
-        return preg_match('/\A[0-9a-f]{40}\z/', $value) === 1 ? $value : null;
+        return preg_match('/\A[0-9a-f]{40}\z/', $value) === 1
+            && preg_match('/\A([0-9a-f])\1{39}\z/', $value) !== 1
+                ? $value
+                : null;
     }
 
     private function identityEmail(mixed $value): ?string
@@ -386,20 +609,66 @@ final class LaunchEvidenceValidator
 
     private function validEvidenceDate(mixed $value, int $freshnessDays): bool
     {
-        if (! is_string($value) || $freshnessDays < 1) {
+        $date = $this->evidenceDate($value);
+        if ($date === null || $freshnessDays < 1) {
             return false;
+        }
+
+        $now = new DateTimeImmutable('now', new DateTimeZone('UTC'));
+
+        return $date <= $now->modify('+5 minutes')
+            && $date >= $now->modify("-{$freshnessDays} days");
+    }
+
+    /**
+     * @param  array<string, mixed>  $section
+     * @return list<string>
+     */
+    private function orderedEvidenceDates(
+        array $section,
+        string $startField,
+        string $endField,
+        ?string $finalField,
+        string $rollbackError,
+    ): array {
+        $start = $this->evidenceDate($section[$startField] ?? null);
+        $end = $this->evidenceDate($section[$endField] ?? null);
+        $final = $finalField !== null
+            ? $this->evidenceDate($section[$finalField] ?? null)
+            : null;
+        $errors = [];
+
+        if ($start === null) {
+            $errors[] = "{$startField}_invalid";
+        }
+        if ($end === null) {
+            $errors[] = "{$endField}_invalid";
+        }
+        if ($start !== null && $end !== null && $end < $start) {
+            $errors[] = $rollbackError;
+        }
+        if ($finalField !== null && $final === null) {
+            $errors[] = "{$finalField}_invalid";
+        }
+        if ($end !== null && $final !== null && $final < $end) {
+            $errors[] = $rollbackError;
+        }
+
+        return $errors;
+    }
+
+    private function evidenceDate(mixed $value): ?DateTimeImmutable
+    {
+        if (! is_string($value)) {
+            return null;
         }
 
         $timezone = new DateTimeZone('UTC');
         $date = DateTimeImmutable::createFromFormat('!Y-m-d\TH:i:s\Z', $value, $timezone);
-        if (! $date instanceof DateTimeImmutable || $date->format('Y-m-d\TH:i:s\Z') !== $value) {
-            return false;
-        }
 
-        $now = new DateTimeImmutable('now', $timezone);
-
-        return $date <= $now->modify('+5 minutes')
-            && $date >= $now->modify("-{$freshnessDays} days");
+        return $date instanceof DateTimeImmutable && $date->format('Y-m-d\TH:i:s\Z') === $value
+            ? $date
+            : null;
     }
 
     private function nonNegativeInteger(mixed $value): ?int
@@ -433,8 +702,8 @@ final class LaunchEvidenceValidator
         $normalized = strtolower(trim($value));
 
         return $normalized === ''
-            || preg_match('/\b(?:tbd|todo|placeholder|pending|unknown|dummy|sample|example)\b/i', $value) === 1
-            || in_array($normalized, ['n/a', 'na', 'none', 'null', 'xxx', 'test'], true);
+            || preg_match('/\b(?:tbd|todo|fixme|changeme|placeholder|pending|unknown|dummy|sample|example|draft|lorem|ipsum)\b/i', $value) === 1
+            || in_array($normalized, ['n/a', 'na', 'none', 'null', 'xxx', 'test', 'not-set', 'unset'], true);
     }
 
     /**

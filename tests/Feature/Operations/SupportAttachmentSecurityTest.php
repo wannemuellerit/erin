@@ -15,15 +15,20 @@ use App\Models\User;
 use App\Services\Documents\ClamAvScanner;
 use App\Services\Ticketing\SupportAttachmentLimits;
 use App\Services\Ticketing\SupportAttachmentManager;
+use App\Services\Ticketing\SupportAttachmentOrphanCleaner;
 use App\Services\Ticketing\SupportSyncLock;
 use App\Services\Ticketing\SupportTicketMessagePresenter;
 use App\Services\Ticketing\ZammadTicketingProvider;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as ClientRequest;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 
 uses(RefreshDatabase::class);
 
@@ -184,7 +189,11 @@ it('imports Zammad attachments into private storage before exposing them', funct
     $attachment->refresh();
     expect($attachment)
         ->disk->toBe('private')
-        ->path->not->toBeNull()
+        ->path->toBe(sprintf(
+            'support-tickets/%d/zammad/%d.pdf',
+            $ticket->getKey(),
+            $attachment->getKey(),
+        ))
         ->mime_type->toBe('application/pdf')
         ->size_bytes->toBe(strlen($pdf))
         ->scan_result->toBe('clean')
@@ -565,6 +574,294 @@ it('enforces the aggregate limit again when building the Zammad payload', functi
     Http::assertNothingSent();
 });
 
+it('requires an unexpired untampered signed URL and the correct tenant for downloads', function () {
+    $requester = User::factory()->create(['email_verified_at' => now()]);
+    $ticket = SupportTicket::query()->create([
+        'requester_id' => $requester->getKey(),
+        'number' => 'ERIN-ATTACHMENT-AUTH',
+        'subject' => 'Download-Autorisierung',
+        'priority' => 'normal',
+        'status' => SupportTicketStatus::Open,
+    ]);
+    $message = $ticket->messages()->create([
+        'author_id' => $requester->getKey(),
+        'body' => 'Privater Inhalt.',
+        'is_internal' => false,
+    ]);
+    Storage::disk('private')->put('support-tickets/private.pdf', 'private-content');
+    $attachment = $message->files()->create([
+        'uploaded_by' => $requester->getKey(),
+        'source' => 'erin',
+        'disk' => 'private',
+        'path' => 'support-tickets/private.pdf',
+        'original_name' => 'private.pdf',
+        'mime_type' => 'application/pdf',
+        'size_bytes' => strlen('private-content'),
+        'checksum_sha256' => hash('sha256', 'private-content'),
+        'scan_result' => 'clean',
+        'scan_completed_at' => now(),
+    ]);
+    $signedUrl = URL::temporarySignedRoute(
+        'support.attachments.download',
+        now()->addMinutes(10),
+        ['attachment' => $attachment->getKey()],
+    );
+    $expiredUrl = URL::temporarySignedRoute(
+        'support.attachments.download',
+        now()->subMinute(),
+        ['attachment' => $attachment->getKey()],
+    );
+    $tamperedUrl = preg_replace('/signature=[^&]+/', 'signature=tampered', $signedUrl);
+
+    $this->actingAs($requester)
+        ->get(route('support.attachments.download', $attachment))
+        ->assertForbidden();
+    $this->actingAs($requester)
+        ->get($expiredUrl)
+        ->assertForbidden();
+    $this->actingAs($requester)
+        ->get((string) $tamperedUrl)
+        ->assertForbidden();
+
+    $otherTenant = User::factory()->create(['email_verified_at' => now()]);
+    $this->actingAs($otherTenant)
+        ->get($signedUrl)
+        ->assertForbidden();
+
+    $this->actingAs($requester)
+        ->get($signedUrl)
+        ->assertOk()
+        ->assertStreamedContent('private-content');
+});
+
+it('deletes an infected attachment imported from Zammad before exposing it', function () {
+    config()->set('services.zammad.enabled', true);
+    config()->set('services.zammad.url', 'https://zammad.example.test');
+    config()->set('services.zammad.token', 'zammad-test-token');
+    $payload = "%PDF-1.4\ninfected-test-content\n%%EOF";
+    Http::fake([
+        'https://zammad.example.test/api/v1/ticket_attachment/704/804/904' => Http::response(
+            $payload,
+            200,
+            ['Content-Type' => 'application/pdf'],
+        ),
+    ]);
+    $requester = User::factory()->create();
+    $ticket = SupportTicket::query()->create([
+        'requester_id' => $requester->getKey(),
+        'number' => 'ERIN-ATTACHMENT-ZAMMAD-MALWARE',
+        'subject' => 'Zammad-Malware',
+        'priority' => 'normal',
+        'status' => SupportTicketStatus::Open,
+        'external_system' => 'zammad',
+        'external_id' => '704',
+    ]);
+    $message = $ticket->messages()->create([
+        'external_article_id' => '804',
+        'source' => 'zammad',
+        'delivery_status' => 'delivered',
+        'body' => 'Verdächtiger Anhang',
+        'is_internal' => false,
+    ]);
+    $attachment = $message->files()->create([
+        'source' => 'zammad',
+        'external_id' => '904',
+        'original_name' => 'verdacht.pdf',
+        'scan_result' => 'pending',
+    ]);
+    $scanner = Mockery::mock(ClamAvScanner::class);
+    $scanner->shouldReceive('scan')->once()->andReturn('infected');
+
+    (new ImportZammadAttachment($attachment->getKey()))->handle(
+        new ZammadTicketingProvider,
+        $scanner,
+        app(SupportAttachmentLimits::class),
+    );
+
+    expect($attachment->fresh())
+        ->scan_result->toBe('infected')
+        ->disk->toBeNull()
+        ->path->toBeNull()
+        ->checksum_sha256->toBe(hash('sha256', $payload))
+        ->and(Storage::disk('private')->allFiles())->toBe([]);
+});
+
+it('fails closed and cleans up when ClamAV or the Zammad attachment API is unavailable', function () {
+    config()->set('services.zammad.enabled', true);
+    config()->set('services.zammad.url', 'https://zammad.example.test');
+    config()->set('services.zammad.token', 'zammad-test-token');
+    Http::fakeSequence()
+        ->push(['error' => 'provider unavailable'], 503)
+        ->push(['error' => 'provider unavailable'], 503)
+        ->push(['error' => 'provider unavailable'], 503);
+    $requester = User::factory()->create();
+    $ticket = SupportTicket::query()->create([
+        'requester_id' => $requester->getKey(),
+        'number' => 'ERIN-ATTACHMENT-PROVIDER-OUTAGE',
+        'subject' => 'Provider-Ausfall',
+        'priority' => 'normal',
+        'status' => SupportTicketStatus::Open,
+        'external_system' => 'zammad',
+        'external_id' => '705',
+    ]);
+    $message = $ticket->messages()->create([
+        'external_article_id' => '805',
+        'source' => 'zammad',
+        'delivery_status' => 'delivered',
+        'body' => 'Anhang bei Provider-Ausfall',
+        'is_internal' => false,
+    ]);
+    $attachment = $message->files()->create([
+        'source' => 'zammad',
+        'external_id' => '905',
+        'original_name' => 'ausfall.pdf',
+        'scan_result' => 'pending',
+    ]);
+    $scanner = Mockery::mock(ClamAvScanner::class);
+    $scanner->shouldNotReceive('scan');
+    $job = new ImportZammadAttachment($attachment->getKey());
+
+    expect(fn () => $job->handle(
+        new ZammadTicketingProvider,
+        $scanner,
+        app(SupportAttachmentLimits::class),
+    ))->toThrow(RequestException::class);
+    $job->failed(new RuntimeException('Provider weiterhin nicht verfügbar'));
+
+    expect($attachment->fresh())
+        ->scan_result->toBe('scan_failed')
+        ->disk->toBeNull()
+        ->path->toBeNull()
+        ->and(Storage::disk('private')->allFiles())->toBe([]);
+    Http::assertSentCount(3);
+
+    Storage::disk('private')->put('support-tickets/clamav-outage.pdf', 'clean-looking');
+    $localMessage = $ticket->messages()->create([
+        'author_id' => $requester->getKey(),
+        'source' => 'erin',
+        'delivery_status' => 'pending',
+        'body' => 'Lokaler Scan-Ausfall',
+        'is_internal' => false,
+    ]);
+    $localAttachment = $localMessage->files()->create([
+        'uploaded_by' => $requester->getKey(),
+        'source' => 'erin',
+        'disk' => 'private',
+        'path' => 'support-tickets/clamav-outage.pdf',
+        'original_name' => 'clamav-outage.pdf',
+        'mime_type' => 'application/pdf',
+        'size_bytes' => strlen('clean-looking'),
+        'checksum_sha256' => hash('sha256', 'clean-looking'),
+        'scan_result' => 'pending',
+    ]);
+    $unavailableScanner = Mockery::mock(ClamAvScanner::class);
+    $unavailableScanner->shouldReceive('scan')
+        ->once()
+        ->andThrow(new RuntimeException('ClamAV nicht erreichbar'));
+    $scanJob = new ScanSupportTicketAttachment($localAttachment->getKey());
+
+    expect(fn () => $scanJob->handle($unavailableScanner))
+        ->toThrow(RuntimeException::class, 'ClamAV nicht erreichbar');
+    $scanJob->failed(new RuntimeException('ClamAV nicht erreichbar'));
+
+    expect($localAttachment->fresh())
+        ->scan_result->toBe('scan_failed')
+        ->and($localMessage->fresh()->delivery_status)->toBe('failed');
+    Storage::disk('private')->assertMissing('support-tickets/clamav-outage.pdf');
+});
+
+it('rejects MIME-spoofed Zammad files without invoking ClamAV', function () {
+    config()->set('services.zammad.enabled', true);
+    config()->set('services.zammad.url', 'https://zammad.example.test');
+    config()->set('services.zammad.token', 'zammad-test-token');
+    Http::fake([
+        'https://zammad.example.test/api/v1/ticket_attachment/706/806/906' => Http::response(
+            '<html><script>alert("not a pdf")</script></html>',
+            200,
+            ['Content-Type' => 'application/pdf'],
+        ),
+    ]);
+    $requester = User::factory()->create();
+    $ticket = SupportTicket::query()->create([
+        'requester_id' => $requester->getKey(),
+        'number' => 'ERIN-ATTACHMENT-MIME-SPOOF',
+        'subject' => 'MIME-Spoofing',
+        'priority' => 'normal',
+        'status' => SupportTicketStatus::Open,
+        'external_system' => 'zammad',
+        'external_id' => '706',
+    ]);
+    $message = $ticket->messages()->create([
+        'external_article_id' => '806',
+        'source' => 'zammad',
+        'delivery_status' => 'delivered',
+        'body' => 'MIME-Spoof',
+        'is_internal' => false,
+    ]);
+    $attachment = $message->files()->create([
+        'source' => 'zammad',
+        'external_id' => '906',
+        'original_name' => 'getarnt.pdf',
+        'mime_type' => 'application/pdf',
+        'scan_result' => 'pending',
+    ]);
+    $scanner = Mockery::mock(ClamAvScanner::class);
+    $scanner->shouldNotReceive('scan');
+
+    (new ImportZammadAttachment($attachment->getKey()))->handle(
+        new ZammadTicketingProvider,
+        $scanner,
+        app(SupportAttachmentLimits::class),
+    );
+
+    expect($attachment->fresh())
+        ->scan_result->toBe('rejected')
+        ->disk->toBeNull()
+        ->path->toBeNull();
+});
+
+it('enforces the attachment count again immediately before a Zammad write', function () {
+    config()->set('services.zammad.enabled', true);
+    config()->set('services.zammad.url', 'https://zammad.example.test');
+    config()->set('services.zammad.token', 'zammad-test-token');
+    config()->set('support.attachments.max_files', 1);
+    Http::fake();
+    $requester = User::factory()->create();
+    $ticket = SupportTicket::query()->create([
+        'requester_id' => $requester->getKey(),
+        'number' => 'ERIN-ATTACHMENT-COUNT-EGRESS',
+        'subject' => 'Dateianzahl beim Versand',
+        'priority' => 'normal',
+        'status' => SupportTicketStatus::Open,
+    ]);
+    $message = $ticket->messages()->create([
+        'author_id' => $requester->getKey(),
+        'body' => 'Zu viele Anhänge.',
+        'is_internal' => false,
+    ]);
+    foreach (['eins.pdf', 'zwei.pdf'] as $name) {
+        $contents = "%PDF-1.4\n{$name}\n%%EOF";
+        $path = "support-tickets/{$name}";
+        Storage::disk('private')->put($path, $contents);
+        $message->files()->create([
+            'uploaded_by' => $requester->getKey(),
+            'source' => 'erin',
+            'disk' => 'private',
+            'path' => $path,
+            'original_name' => $name,
+            'mime_type' => 'application/pdf',
+            'size_bytes' => strlen($contents),
+            'checksum_sha256' => hash('sha256', $contents),
+            'scan_result' => 'clean',
+            'scan_completed_at' => now(),
+        ]);
+    }
+
+    expect(fn () => (new ZammadTicketingProvider)->createTicket($ticket, $message))
+        ->toThrow(SupportAttachmentLimitExceeded::class);
+    Http::assertNothingSent();
+});
+
 it('releases both synchronization jobs when their distributed lock is held', function () {
     $requester = User::factory()->create();
     $ticket = SupportTicket::query()->create([
@@ -603,4 +900,210 @@ it('releases both synchronization jobs when their distributed lock is held', fun
     } finally {
         $messageLock->release();
     }
+});
+
+it('deletes a deterministic Zammad file when persisting its database reference fails', function () {
+    $pdf = "%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF";
+    $requester = User::factory()->create();
+    $ticket = SupportTicket::query()->create([
+        'requester_id' => $requester->getKey(),
+        'number' => 'ERIN-ATTACHMENT-DB-FAILURE',
+        'subject' => 'Datenbankfehler nach Dateiablage',
+        'priority' => 'normal',
+        'status' => SupportTicketStatus::Open,
+        'external_system' => 'zammad',
+        'external_id' => '707',
+    ]);
+    $message = $ticket->messages()->create([
+        'external_article_id' => '807',
+        'source' => 'zammad',
+        'delivery_status' => 'delivered',
+        'body' => 'Anhang vor Datenbankfehler',
+        'is_internal' => false,
+    ]);
+    $attachment = $message->files()->create([
+        'source' => 'zammad',
+        'external_id' => '907',
+        'original_name' => 'datenbankfehler.pdf',
+        'scan_result' => 'pending',
+    ]);
+    $provider = Mockery::mock(TicketingProvider::class);
+    $provider->shouldReceive('downloadAttachment')
+        ->once()
+        ->andReturnUsing(function (
+            string $ticketId,
+            string $articleId,
+            string $attachmentId,
+            mixed $destination,
+        ) use ($pdf): array {
+            expect($ticketId)->toBe('707')
+                ->and($articleId)->toBe('807')
+                ->and($attachmentId)->toBe('907');
+            fwrite($destination, $pdf);
+
+            return [
+                'mime_type' => 'application/pdf',
+                'size_bytes' => strlen($pdf),
+                'checksum_sha256' => hash('sha256', $pdf),
+            ];
+        });
+    $scanner = Mockery::mock(ClamAvScanner::class);
+    $scanner->shouldReceive('scan')->once()->andReturn('clean');
+    $eventName = 'eloquent.updating: '.SupportTicketAttachment::class;
+    Event::listen($eventName, static function (SupportTicketAttachment $updating): void {
+        if ($updating->isDirty('path')) {
+            throw new RuntimeException('Simulierter Datenbankfehler nach Dateiablage.');
+        }
+    });
+
+    try {
+        expect(fn () => (new ImportZammadAttachment($attachment->getKey()))
+            ->handle(
+                $provider,
+                $scanner,
+                app(SupportAttachmentLimits::class),
+            ))->toThrow(RuntimeException::class, 'Simulierter Datenbankfehler');
+    } finally {
+        Event::forget($eventName);
+    }
+
+    expect($attachment->fresh())
+        ->scan_result->toBe('pending')
+        ->disk->toBeNull()
+        ->path->toBeNull()
+        ->and(Storage::disk('private')->allFiles())->toBe([]);
+});
+
+it('prunes only expired unreferenced deterministic Zammad files', function () {
+    config()->set('support.attachments.orphan_grace_hours', 24);
+    $requester = User::factory()->create();
+    $ticket = SupportTicket::query()->create([
+        'requester_id' => $requester->getKey(),
+        'number' => 'ERIN-ATTACHMENT-ORPHAN-PRUNE',
+        'subject' => 'Verwaiste Dateien',
+        'priority' => 'normal',
+        'status' => SupportTicketStatus::Open,
+    ]);
+    $message = $ticket->messages()->create([
+        'source' => 'zammad',
+        'delivery_status' => 'delivered',
+        'body' => 'Dateireferenzen',
+        'is_internal' => false,
+    ]);
+    $referencedPath = sprintf(
+        'support-tickets/%d/zammad/1001.pdf',
+        $ticket->getKey(),
+    );
+    $expiredOrphan = sprintf(
+        'support-tickets/%d/zammad/1002.pdf',
+        $ticket->getKey(),
+    );
+    $youngOrphan = sprintf(
+        'support-tickets/%d/zammad/1003.pdf',
+        $ticket->getKey(),
+    );
+    $unmanagedPath = sprintf(
+        'support-tickets/%d/manual/1004.pdf',
+        $ticket->getKey(),
+    );
+    $message->files()->create([
+        'source' => 'zammad',
+        'external_id' => '1001',
+        'disk' => 'private',
+        'path' => $referencedPath,
+        'original_name' => 'referenziert.pdf',
+        'scan_result' => 'clean',
+    ]);
+    foreach ([$referencedPath, $expiredOrphan, $youngOrphan, $unmanagedPath] as $path) {
+        Storage::disk('private')->put($path, 'pdf');
+    }
+    $expiredAt = now()->subHours(25)->getTimestamp();
+    touch(Storage::disk('private')->path($referencedPath), $expiredAt);
+    touch(Storage::disk('private')->path($expiredOrphan), $expiredAt);
+    touch(Storage::disk('private')->path($unmanagedPath), $expiredAt);
+    $cleaner = app(SupportAttachmentOrphanCleaner::class);
+
+    expect($cleaner->prune(false))->toBe([
+        'scanned' => 3,
+        'eligible' => 1,
+        'deleted' => 0,
+        'metadata_errors' => 0,
+        'deletion_errors' => 0,
+        'eligible_paths' => [$expiredOrphan],
+    ]);
+    Storage::disk('private')->assertExists($expiredOrphan);
+
+    expect($cleaner->prune(true))->toBe([
+        'scanned' => 3,
+        'eligible' => 1,
+        'deleted' => 1,
+        'metadata_errors' => 0,
+        'deletion_errors' => 0,
+        'eligible_paths' => [$expiredOrphan],
+    ]);
+    Storage::disk('private')->assertMissing($expiredOrphan);
+    Storage::disk('private')->assertExists($referencedPath);
+    Storage::disk('private')->assertExists($youngOrphan);
+    Storage::disk('private')->assertExists($unmanagedPath);
+});
+
+it('fails the orphan-prune command when object metadata cannot be read', function () {
+    $disk = Mockery::mock();
+    $disk->shouldReceive('allFiles')
+        ->once()
+        ->with('support-tickets')
+        ->andReturn(['support-tickets/1/zammad/1001.pdf']);
+    $disk->shouldReceive('lastModified')
+        ->once()
+        ->with('support-tickets/1/zammad/1001.pdf')
+        ->andThrow(new RuntimeException('Metadaten nicht verfügbar'));
+    $disk->shouldNotReceive('delete');
+    Storage::shouldReceive('disk')
+        ->once()
+        ->with('private')
+        ->andReturn($disk);
+
+    $exitCode = Artisan::call('erin:support:prune-orphan-attachments', [
+        '--execute' => true,
+        '--json' => true,
+    ]);
+
+    expect($exitCode)->toBe(1)
+        ->and(Artisan::output())
+        ->toContain('"status": "failed"')
+        ->toContain('"metadata_errors": 1')
+        ->toContain('"deletion_errors": 0');
+});
+
+it('fails the orphan-prune command when deleting an eligible object fails', function () {
+    $path = 'support-tickets/1/zammad/1002.pdf';
+    $disk = Mockery::mock();
+    $disk->shouldReceive('allFiles')
+        ->once()
+        ->with('support-tickets')
+        ->andReturn([$path]);
+    $disk->shouldReceive('lastModified')
+        ->once()
+        ->with($path)
+        ->andReturn(now()->subDays(2)->getTimestamp());
+    $disk->shouldReceive('delete')
+        ->once()
+        ->with($path)
+        ->andReturnFalse();
+    Storage::shouldReceive('disk')
+        ->once()
+        ->with('private')
+        ->andReturn($disk);
+
+    $exitCode = Artisan::call('erin:support:prune-orphan-attachments', [
+        '--execute' => true,
+        '--json' => true,
+    ]);
+
+    expect($exitCode)->toBe(1)
+        ->and(Artisan::output())
+        ->toContain('"status": "failed"')
+        ->toContain('"eligible": 1')
+        ->toContain('"deleted": 0')
+        ->toContain('"deletion_errors": 1');
 });

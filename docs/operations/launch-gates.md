@@ -17,10 +17,14 @@ Pilotentscheidung ersetzen.
    HTTPS-Evidenz referenziert.
 5. Security, Datenschutz, Recht, Restore und Pilot werden von den jeweils
    verantwortlichen Personen gegen genau diese Release-ID geprüft.
-6. Erst anschließend darf das strikte Release-Gate grün werden.
+6. Eine getrennte Release-Autorität signiert Release-ID, Commit und Digest der
+   vollständigen Evidenz mit einem im restriktiven Trust-Root freigegebenen
+   Ed25519-Schlüssel.
+7. Erst anschließend darf das strikte Release-Gate grün werden.
 
 ```bash
 php artisan erin:ops:security-audit --json
+php artisan erin:ops:governance-adversarial --json
 php artisan erin:ops:readiness --strict --probe --json
 ```
 
@@ -73,6 +77,14 @@ Die vollständigen Checklisten und das Evidenzschema stehen in
   oder Pilotfreigabe erteilen.
 - DPO- und Legal-Rolle müssen getrennt sein. Pilot-Owner, Stellvertretung und
   Go-/No-Go-Entscheider müssen ebenfalls verschieden sein.
+- Wiederholte Dummy-Commitwerte, Zeit-Rollback und ein lokaler oder
+  synthetischer Drill als vermeintliche Produktionsevidenz werden abgewiesen.
+- Security benötigt eine unabhängige Prüfung und einen realen Penetrationstest;
+  DPO und Legal benötigen bestätigte Befugnisse.
+- Die vollständige Evidenz benötigt eine gültige, nicht abgelaufene
+  Ed25519-Attestierung. Attestierung und Trust-Root müssen als restriktive
+  read-only Secrets vorliegen; fehlende, manipulierte oder widerrufene
+  Schlüssel blockieren den Release.
 
 Die Syntaxprüfung kann nicht beweisen, dass eine Person tatsächlich existiert
 oder die angegebene Rolle besitzt. Diese Identität und Befugnis ist Bestandteil
@@ -86,7 +98,9 @@ Drillablauf und Evidenz steht in
 
 Das Gate wird nur grün, wenn Datenbank **und** Objektstorage in einer isolierten
 Umgebung erfolgreich wiederhergestellt wurden, die Backups verschlüsselt waren
-und die gemessenen RPO-/RTO-Werte ihre Ziele nicht überschreiten.
+und die gemessenen RPO-/RTO-Werte ihre Ziele nicht überschreiten. Zusätzlich
+müssen Scope, Produktionstauglichkeit und unabhängige Verifikation ausdrücklich
+belegt sein; lokale Drill-Evidenz bleibt immer rot.
 
 ## Pilot-Gate
 

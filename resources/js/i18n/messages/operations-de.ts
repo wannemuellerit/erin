@@ -31,7 +31,7 @@ export default {
         attachments: 'Dateien anhängen',
         removeAttachment: 'Datei entfernen',
         attachmentHint:
-            'Bis zu 8 Dateien mit jeweils 20 MB. Alle Dateien werden vor der Freigabe auf Schadsoftware geprüft.',
+            'Bis zu {maxFiles} Dateien mit jeweils {maxFileMegabytes} MB und insgesamt {maxTotalMegabytes} MB. Alle Dateien werden vor der Freigabe auf Schadsoftware geprüft.',
         attachmentStatus: {
             pending: 'Prüfung läuft',
             clean: 'Geprüft',

@@ -22,6 +22,18 @@ class SupportAttachmentLimits
         return max(1, (int) config('support.attachments.max_total_kilobytes', 15360)) * 1024;
     }
 
+    /**
+     * @return array{maxFiles: int, maxFileMegabytes: float, maxTotalMegabytes: float}
+     */
+    public function forFrontend(): array
+    {
+        return [
+            'maxFiles' => $this->maxFiles(),
+            'maxFileMegabytes' => $this->maxFileBytes() / 1024 / 1024,
+            'maxTotalMegabytes' => $this->maxTotalBytes() / 1024 / 1024,
+        ];
+    }
+
     public function assertFileSize(int $size): void
     {
         if ($size < 0 || $size > $this->maxFileBytes()) {

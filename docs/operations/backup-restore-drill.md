@@ -32,10 +32,12 @@ Datenbankeintrag ohne zugehöriges Objekt ist unbrauchbar; ein Objekt ohne
 Metadaten und Zugriffskontrolle ebenfalls.
 
 Der Drill muss deshalb einen konsistenten Zeitpunkt oder ein dokumentiertes
-Konsistenzverfahren verwenden und Stichproben in beide Richtungen prüfen:
+Konsistenzverfahren verwenden und vollständig in beide Richtungen prüfen:
 
-- Datenbankeintrag verweist auf vorhandenes Objekt mit korrekter Prüfsumme;
-- Objekt besitzt gültige Metadaten, Mandantenzuordnung und Zugriffsregel;
+- jeder private Datenbankpfad verweist auf ein vorhandenes Objekt;
+- jedes Anwendungsobjekt besitzt eine gültige Datenbankreferenz;
+- ein leerer Bucket ist nur zulässig, wenn auch keine Datenbankreferenz
+  existiert;
 - abgelehnte, gelöschte oder quarantänisierte Dateien tauchen nicht
   unkontrolliert wieder auf.
 
@@ -51,6 +53,90 @@ Konsistenzverfahren verwenden und Stichproben in beide Richtungen prüfen:
   geschützt.
 
 ## Ausführbarer Drill
+
+### Lokaler technischer Drill
+
+Der lokale Drill liest ausschließlich die mit `compose.yaml` gestartete
+`local`- oder `testing`-Umgebung. Er verweigert Produktions-Compose-Dateien,
+erstellt keine Host-Portfreigaben und startet MySQL sowie MinIO in einem
+internen Docker-Netz mit flüchtigen `tmpfs`-Dateisystemen. Vor MySQL-Dump und
+MinIO-Mirror aktiviert er den Maintenance-Modus, stoppt Queue und Scheduler
+kontrolliert und pausiert den Laravel-Schreibpfad. Ein Exit-Trap stellt diesen
+Zustand auch bei einem Fehler wieder her:
+
+```bash
+ERIN_RESTORE_DRILL_CONFIRM=LOCAL_ISOLATED_DOCKER_ONLY \
+  scripts/ops/local-encrypted-restore-drill.sh
+```
+
+Dabei erzeugt der Drill einen zufälligen ephemeren Master-Key und leitet per
+HMAC-SHA256 mit getrennten Domain-Labels einen Verschlüsselungs- und einen
+MAC-Key ab. MySQL und MinIO werden mit AES-256-CBC und PBKDF2-HMAC-SHA256 mit
+mindestens 600.000 Iterationen verschlüsselt. Für jedes Ciphertext-Artefakt
+wird anschließend ein HMAC-SHA256 im Encrypt-then-MAC-Verfahren berechnet und
+**vor jeder Entschlüsselung** verifiziert. Master-, Verschlüsselungs- und
+MAC-Key sowie alle Klartext-Arbeitskopien liegen ausschließlich in einem
+gehärteten Docker-`tmpfs`. Nach dem Drill wird das gesamte Volume entfernt.
+Das belegt, dass kein Klartext-Backup zurückbleibt; es ist ausdrücklich keine
+Behauptung über eine physische Vernichtung auf darunterliegender Hardware.
+
+Der einmalig im `tmpfs` erzeugte deterministische MySQL-Voll-Dump ist zugleich
+Quelle des verschlüsselten Artefakts und des kanonischen Datenhashs. Der
+Datenhash umfasst alle mit vollständiger Spaltenliste erzeugten
+`INSERT INTO`-Zeilen aller Tabellen und sortiert sie byteweise, sodass auch
+Tabellen ohne Primärschlüssel stabil verglichen werden. Schema, Routinen,
+Events und Trigger werden mit einem separaten, semantisch normalisierten
+Strukturhash geprüft.
+
+Die SHA-256-Dateien binden die lokal erzeugte maschinenlesbare Evidenz und ihre
+HMAC-Sidecars. Weil die MAC-Schlüssel danach absichtlich nicht aufbewahrt
+werden, dienen diese Sidecars bei einer späteren Offline-Prüfung nur der
+Konsistenz des lokalen Drillpakets. Sie sind keine externe Signatur und kein
+Ersatz für unveränderliche, unabhängig authentifizierte Produktionsevidenz.
+
+Der Drill prüft zusätzlich folgende Negativfälle:
+
+- Entschlüsselung mit einem falschen Schlüssel wird abgewiesen;
+- manipuliertes Ciphertext-Artefakt wird durch den HMAC vor der Entschlüsselung
+  abgewiesen;
+- ein manipulierter HMAC-Sidecar wird abgewiesen;
+- ein absichtlich entferntes MinIO-Objekt erzeugt einen Manifestfehler;
+- eine Nicht-ID-Änderung und eine gelöschte Datenbankzeile verändern den
+  kanonischen Datenhash;
+- eine fehlende Datenbankreferenz, ein verwaistes Storage-Objekt und ein
+  leerer Bucket mit vorhandener Datenbankreferenz werden abgewiesen.
+
+Vor dem Datenbank-Dump wird außerdem ein eindeutiger Drill-Canary als
+Audit-Ereignis geschrieben. Dessen Metadaten enthalten den Pfad eines zweiten,
+ebenfalls temporären MinIO-Canarys. Damit beweist jeder erfolgreiche Lauf
+positiv mindestens eine echte DB→Objekt-Referenz; der separate
+Manifest-Negativcanary bleibt bewusst ohne Datenbankreferenz und wird erst
+nach dem DB↔MinIO-Abgleich berücksichtigt. Der Drill prüft nach dem Restore
+exakte ID und Zeit, Datensatzanzahlen, SHA-256-Manifeste der zentralen
+Geschäftstabellen sowie den vollständigen Daten- und Strukturhash. Datenbank-
+und Objekt-Canary werden anschließend aus der Quelle entfernt.
+
+Die maschinenlesbare Evidenz wird zunächst in einem exklusiven, versteckten
+Staging-Verzeichnis aufgebaut. `evidence.json`, ihr SHA-256-Sidecar und alle
+Artefakte werden auf Symlinks und Vollständigkeit geprüft; erst danach wird
+das gesamte Verzeichnis atomar veröffentlicht. Die Evidenz liegt unter
+`storage/app/operations/evidence/restore/local-restore-*/evidence.json`.
+Sie kann erneut geprüft werden:
+
+```bash
+docker compose exec -T laravel \
+  php artisan erin:ops:restore-evidence:verify \
+  /var/www/html/storage/app/operations/evidence/restore/<drill-id>/evidence.json \
+  --json
+```
+
+Diese Evidenz trägt zwingend die Klassifikation
+`LOCAL_SYNTHETIC_NOT_PRODUCTION_EVIDENCE`, enthält
+`production_gate_eligible=false` und hält unabhängige Verifikation, DPO,
+Legal sowie den echten Produktions-Restore offen. Sie darf deshalb niemals
+direkt als Produktionsfreigabe eingetragen werden.
+
+### Echter Produktions-Drill
 
 1. Incident-Startzeit und freigegebenen Drill-Owner protokollieren.
 2. Neueste laut RPO zulässige MySQL- und MinIO-Sicherung identifizieren.
@@ -100,7 +186,37 @@ Die zugehörigen Umgebungsvariablen beginnen mit
 `ERIN_BACKUP_ISOLATION_VERIFIED=true` dürfen erst nach realer Prüfung gesetzt
 werden.
 
-## Was technisch bereits vorhanden ist
+Die folgenden Zeitpunkte sind für MySQL und Objektstorage getrennt
+verpflichtend:
+
+- `ERIN_BACKUP_DB_CREATED_AT` und `ERIN_BACKUP_OBJECT_CREATED_AT`;
+- `ERIN_BACKUP_DB_LAST_RESTORED_RECORD_AT` und
+  `ERIN_BACKUP_OBJECT_LAST_RESTORED_RECORD_AT`;
+- `ERIN_BACKUP_DB_RESTORED_AT` und `ERIN_BACKUP_OBJECT_RESTORED_AT`;
+- `ERIN_BACKUP_DRILL_STARTED_AT` und `ERIN_BACKUP_DRILL_COMPLETED_AT`.
+
+Das Gate berechnet das erreichte RPO als Zeitspanne zwischen Incident- bzw.
+Drillstart und dem letzten wiederhergestellten fachlichen Datensatz. Der
+Backupzeitpunkt liegt kausal dazwischen:
+`letzter Datensatz ≤ Backup ≤ Drillstart ≤ Restore ≤ Abschluss`. Das erreichte
+RTO ist die Zeitspanne zwischen Drillstart und dem jeweiligen
+Restorezeitpunkt. Die
+angegebenen Minutenwerte müssen exakt den auf volle Minuten aufgerundeten
+Messwerten entsprechen und dürfen ihr jeweiliges Ziel nicht überschreiten.
+
+Der lokale synthetische Lauf erstellt zuerst beide Backups und setzt danach
+einen gesonderten simulierten Incident-/Drillstart. `operation_started_at`
+dokumentiert zusätzlich den Beginn der technischen Vorbereitung und darf nicht
+mit dem RTO-Start verwechselt werden.
+
+Für ein grünes Produktionsgate sind außerdem
+`ERIN_BACKUP_SCOPE=production`,
+`ERIN_BACKUP_PRODUCTION_GATE_ELIGIBLE=true`,
+`ERIN_BACKUP_INDEPENDENTLY_VERIFIED=true` sowie reale Start-, Abschluss- und
+Verifikationszeitpunkte erforderlich. Diese Werte dürfen nicht aus dem lokalen
+Drill übernommen werden.
+
+## Technische Abdeckung
 
 `scripts/ops/database-backup.sh` erzeugt einen restriktiv berechtigten
 MySQL-Dump mit SHA-256-Prüfsumme.
@@ -108,6 +224,10 @@ MySQL-Dump mit SHA-256-Prüfsumme.
 eine neu erzeugte temporäre Datenbank, prüft die Migrationstabelle und löscht
 die Datenbank anschließend.
 
-Diese Skripte ersetzen weder verschlüsselte externe Ablage noch den
-MinIO-Restore, fachliche Stichproben, RPO-/RTO-Messung und unabhängige
-Verifikation.
+`scripts/ops/local-encrypted-restore-drill.sh` ergänzt Verschlüsselung,
+isolierten MySQL-/MinIO-Restore, RPO-/RTO-Messung, Manifestvergleich,
+Negativkontrollen, sichere Bereinigung und maschinenlesbare Evidenz.
+
+Keines dieser Skripte ersetzt eine verschlüsselte externe Produktionsablage,
+die Wiederherstellung realer Produktionssicherungen, fachliche Stichproben
+durch reale Verantwortliche oder eine unabhängige Verifikation.

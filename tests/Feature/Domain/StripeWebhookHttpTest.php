@@ -16,10 +16,14 @@ uses(RefreshDatabase::class);
 /**
  * @param  array<string, mixed>  $payload
  */
-function erinPostSignedStripeWebhook(array $payload, string $secret, bool $valid = true): TestResponse
-{
+function erinPostSignedStripeWebhook(
+    array $payload,
+    string $secret,
+    bool $valid = true,
+    ?int $timestamp = null,
+): TestResponse {
     $json = json_encode($payload, JSON_THROW_ON_ERROR);
-    $timestamp = now()->getTimestamp();
+    $timestamp ??= now()->getTimestamp();
     $signature = hash_hmac(
         'sha256',
         $timestamp.'.'.$json,
@@ -74,6 +78,7 @@ function erinStripeSubscriptionPayload(
         'id' => $eventId,
         'object' => 'event',
         'type' => $eventType,
+        'livemode' => false,
         'created' => $eventCreated ?? now()->getTimestamp(),
         'data' => [
             'object' => [
@@ -106,6 +111,7 @@ function erinStripeSubscriptionPayload(
 }
 
 beforeEach(function () {
+    config()->set('cashier.secret', 'sk_test_http_acceptance');
     config()->set('cashier.webhook.secret', 'whsec_http_acceptance');
     config()->set('cashier.webhook.tolerance', 300);
     app()->instance(
@@ -277,6 +283,171 @@ it('rejects a webhook with an invalid Stripe signature without changing billing 
         ->and(IntegrationReceipt::query()->count())->toBe(0);
 });
 
+it('rejects signed live mode events while the application uses Stripe test keys', function () {
+    config()->set('cashier.secret', 'sk_test_http_acceptance');
+    $plan = Plan::factory()->create([
+        'stripe_product_id' => 'prod_http_wrong_mode',
+        'stripe_price_id' => 'price_http_wrong_mode',
+    ]);
+    $company = Company::factory()->create([
+        'current_plan_id' => null,
+        'stripe_id' => 'cus_http_wrong_mode',
+        'status' => CompanyStatus::Pending,
+        'subscription_status' => 'incomplete',
+    ]);
+    $payload = erinStripeSubscriptionPayload(
+        'evt_http_wrong_mode',
+        'customer.subscription.created',
+        $company,
+        $plan,
+    );
+    $payload['livemode'] = true;
+
+    erinPostSignedStripeWebhook($payload, 'whsec_http_acceptance')
+        ->assertForbidden();
+
+    expect($company->fresh()?->status)->toBe(CompanyStatus::Pending)
+        ->and($company->subscriptions()->count())->toBe(0)
+        ->and(IntegrationReceipt::query()->count())->toBe(0);
+});
+
+it('rejects signatures outside the configured tolerance before processing', function () {
+    $plan = Plan::factory()->create([
+        'stripe_product_id' => 'prod_http_stale_signature',
+        'stripe_price_id' => 'price_http_stale_signature',
+    ]);
+    $company = Company::factory()->create([
+        'stripe_id' => 'cus_http_stale_signature',
+        'status' => CompanyStatus::Pending,
+        'subscription_status' => 'incomplete',
+    ]);
+    $payload = erinStripeSubscriptionPayload(
+        'evt_http_stale_signature',
+        'customer.subscription.created',
+        $company,
+        $plan,
+    );
+
+    erinPostSignedStripeWebhook(
+        $payload,
+        'whsec_http_acceptance',
+        timestamp: now()->subMinutes(6)->getTimestamp(),
+    )->assertForbidden();
+
+    expect($company->subscriptions()->count())->toBe(0)
+        ->and(IntegrationReceipt::query()->count())->toBe(0);
+});
+
+it('rejects signed malformed event structures without dispatching them', function (
+    array $changes,
+) {
+    $plan = Plan::factory()->create([
+        'stripe_product_id' => 'prod_http_malformed',
+        'stripe_price_id' => 'price_http_malformed',
+    ]);
+    $company = Company::factory()->create([
+        'stripe_id' => 'cus_http_malformed',
+        'status' => CompanyStatus::Pending,
+    ]);
+    $payload = erinStripeSubscriptionPayload(
+        'evt_http_malformed',
+        'customer.subscription.created',
+        $company,
+        $plan,
+    );
+
+    foreach ($changes as $key => $value) {
+        if ($value === '__unset__') {
+            unset($payload[$key]);
+        } else {
+            $payload[$key] = $value;
+        }
+    }
+
+    erinPostSignedStripeWebhook($payload, 'whsec_http_acceptance')
+        ->assertBadRequest();
+
+    expect($company->subscriptions()->count())->toBe(0)
+        ->and(IntegrationReceipt::query()->count())->toBe(0);
+})->with([
+    'fehlende Ereignis-ID' => [['id' => '__unset__']],
+    'ungültiger Ereignistyp' => [['type' => 'customer/subscription']],
+    'fehlender Modus' => [['livemode' => '__unset__']],
+    'nicht boolescher Modus' => [['livemode' => 'false']],
+    'fehlendes Datenobjekt' => [['data' => []]],
+]);
+
+it('rejects signed invalid JSON before event dispatch', function () {
+    $json = '{"id":"evt_http_invalid_json","type":';
+    $timestamp = now()->getTimestamp();
+    $signature = hash_hmac(
+        'sha256',
+        $timestamp.'.'.$json,
+        'whsec_http_acceptance',
+    );
+
+    $this->call(
+        'POST',
+        route('cashier.webhook'),
+        [],
+        [],
+        [],
+        [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_STRIPE_SIGNATURE' => "t={$timestamp},v1={$signature}",
+        ],
+        $json,
+    )->assertBadRequest();
+
+    expect(IntegrationReceipt::query()->count())->toBe(0);
+});
+
+it('stores no provider secrets when canonical Stripe lookup fails', function () {
+    $plan = Plan::factory()->create([
+        'stripe_product_id' => 'prod_http_secret_failure',
+        'stripe_price_id' => 'price_http_secret_failure',
+    ]);
+    $company = Company::factory()->create([
+        'stripe_id' => 'cus_http_secret_failure',
+        'status' => CompanyStatus::Pending,
+    ]);
+    $secretInProviderMessage = 'sk_test_must_never_reach_receipts';
+    $gateway = new class($secretInProviderMessage) extends ErinStripeSubscriptionGateway
+    {
+        public function __construct(private readonly string $secret) {}
+
+        public function retrieve(string $subscriptionId): array
+        {
+            throw new RuntimeException(
+                "Stripe 500 mit vertraulichem Wert {$this->secret}",
+            );
+        }
+    };
+    app()->instance(StripeSubscriptionGateway::class, $gateway);
+    $payload = erinStripeSubscriptionPayload(
+        'evt_http_secret_failure',
+        'customer.subscription.created',
+        $company,
+        $plan,
+    );
+    $this->withoutExceptionHandling();
+
+    expect(
+        fn () => erinPostSignedStripeWebhook(
+            $payload,
+            'whsec_http_acceptance',
+        ),
+    )->toThrow(RuntimeException::class, 'Stripe 500');
+
+    $receipt = IntegrationReceipt::query()->sole();
+
+    expect($receipt->status)->toBe('failed')
+        ->and($receipt->error_message)
+        ->toBe('Die Stripe-Verarbeitung ist fehlgeschlagen; technische Details stehen ausschließlich im geschützten Anwendungslog.')
+        ->not->toContain($secretInProviderMessage)
+        ->and($company->subscriptions()->count())->toBe(0);
+});
+
 it('revokes portal access after a signed subscription deletion webhook', function () {
     $plan = Plan::factory()->create([
         'stripe_product_id' => 'prod_http_deleted',
@@ -421,7 +592,7 @@ it('uses canonical Stripe state for equal-second events and fully repairs prices
         $timestamp,
         [[
             'id' => 'si_equal_second_current',
-            'quantity' => 3,
+            'quantity' => 1,
             'current_period_start' => now()->startOfDay()->getTimestamp(),
             'current_period_end' => now()->addMonths(4)->startOfDay()->getTimestamp(),
             'price' => [
@@ -463,13 +634,13 @@ it('uses canonical Stripe state for equal-second events and fully repairs prices
         ->and($subscription)
         ->stripe_status->toBe('active')
         ->stripe_price->toBe($currentPlan->stripe_price_id)
-        ->quantity->toBe(3)
+        ->quantity->toBe(1)
         ->and($subscription->items()->count())->toBe(1)
         ->and($subscription->items()->sole())
         ->stripe_id->toBe('si_equal_second_current')
         ->stripe_product->toBe($currentPlan->stripe_product_id)
         ->stripe_price->toBe($currentPlan->stripe_price_id)
-        ->quantity->toBe(3)
+        ->quantity->toBe(1)
         ->and(IntegrationReceipt::query()
             ->where('provider', 'stripe:handled')
             ->whereIn('event_id', ['evt_z_equal_second', 'evt_a_equal_second'])
@@ -586,6 +757,216 @@ it('keeps an active replacement subscription authoritative when an old event arr
         ->and(IntegrationReceipt::query()
             ->where('provider', 'stripe:handled')
             ->where('event_id', 'evt_replacement_old_late_update')
+            ->where('status', 'processed')
+            ->count())->toBe(1);
+});
+
+it('ignores a new subscription whose signed metadata targets another company', function () {
+    $plan = Plan::factory()->create([
+        'stripe_product_id' => 'prod_foreign_metadata',
+        'stripe_price_id' => 'price_foreign_metadata',
+    ]);
+    $company = Company::factory()->create([
+        'current_plan_id' => null,
+        'stripe_id' => 'cus_foreign_metadata',
+        'status' => CompanyStatus::Pending,
+        'subscription_status' => 'incomplete',
+    ]);
+    $payload = erinStripeSubscriptionPayload(
+        'evt_foreign_metadata',
+        'customer.subscription.created',
+        $company,
+        $plan,
+    );
+    $payload['data']['object']['metadata']['company_id'] = '999999';
+    $gateway = app(StripeSubscriptionGateway::class);
+    expect($gateway)->toBeInstanceOf(ErinStripeSubscriptionGateway::class);
+    $gateway->put($payload['data']['object']);
+
+    erinPostSignedStripeWebhook(
+        $payload,
+        'whsec_http_acceptance',
+    )->assertOk();
+
+    expect($company->fresh()?->status)->toBe(CompanyStatus::Pending)
+        ->and($company->fresh()?->current_plan_id)->toBeNull()
+        ->and($company->subscriptions()->count())->toBe(0)
+        ->and(IntegrationReceipt::query()
+            ->where('event_id', 'evt_foreign_metadata')
+            ->value('status'))->toBe('processed');
+});
+
+it('rejects canonical Price Product drift for the current subscription atomically', function () {
+    $plan = Plan::factory()->create([
+        'stripe_product_id' => 'prod_canonical_drift',
+        'stripe_price_id' => 'price_canonical_drift',
+    ]);
+    $company = Company::factory()->create([
+        'current_plan_id' => $plan->getKey(),
+        'stripe_id' => 'cus_canonical_drift',
+        'stripe_subscription_id' => 'sub_canonical_drift',
+        'status' => CompanyStatus::Active,
+        'subscription_status' => 'active',
+    ]);
+    $subscription = $company->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_canonical_drift',
+        'stripe_status' => 'active',
+        'stripe_price' => $plan->stripe_price_id,
+        'quantity' => 1,
+    ]);
+    $subscription->items()->create([
+        'stripe_id' => 'si_canonical_drift',
+        'stripe_product' => $plan->stripe_product_id,
+        'stripe_price' => $plan->stripe_price_id,
+        'quantity' => 1,
+    ]);
+    $payload = erinStripeSubscriptionPayload(
+        'evt_canonical_product_drift',
+        'customer.subscription.updated',
+        $company,
+        $plan,
+        'past_due',
+        subscriptionId: 'sub_canonical_drift',
+    );
+    $payload['data']['object']['items']['data'][0]['price']['product'] = 'prod_wrong';
+    $gateway = app(StripeSubscriptionGateway::class);
+    expect($gateway)->toBeInstanceOf(ErinStripeSubscriptionGateway::class);
+    $gateway->put($payload['data']['object']);
+    $this->withoutExceptionHandling();
+
+    expect(
+        fn () => erinPostSignedStripeWebhook(
+            $payload,
+            'whsec_http_acceptance',
+        ),
+    )->toThrow(
+        RuntimeException::class,
+        'Price und Erin-Produktzuordnung',
+    );
+
+    $company->refresh();
+    expect($company->subscription_status)->toBe('active')
+        ->and($company->current_plan_id)->toBe($plan->getKey())
+        ->and($subscription->fresh()?->stripe_status)->toBe('active')
+        ->and($subscription->items()->sole()->stripe_product)
+        ->toBe($plan->stripe_product_id)
+        ->and(IntegrationReceipt::query()
+            ->where('event_id', 'evt_canonical_product_drift')
+            ->value('status'))->toBe('failed');
+});
+
+it('rejects canonical subscriptions containing more than one base package', function () {
+    $basic = Plan::factory()->create([
+        'stripe_product_id' => 'prod_multi_basic',
+        'stripe_price_id' => 'price_multi_basic',
+    ]);
+    $premium = Plan::factory()->create([
+        'stripe_product_id' => 'prod_multi_premium',
+        'stripe_price_id' => 'price_multi_premium',
+    ]);
+    $company = Company::factory()->create([
+        'stripe_id' => 'cus_multi_base',
+        'status' => CompanyStatus::Pending,
+        'subscription_status' => 'incomplete',
+    ]);
+    $payload = erinStripeSubscriptionPayload(
+        'evt_multi_base',
+        'customer.subscription.created',
+        $company,
+        $basic,
+        items: [
+            [
+                'id' => 'si_multi_basic',
+                'quantity' => 1,
+                'price' => [
+                    'id' => $basic->stripe_price_id,
+                    'product' => $basic->stripe_product_id,
+                ],
+            ],
+            [
+                'id' => 'si_multi_premium',
+                'quantity' => 1,
+                'price' => [
+                    'id' => $premium->stripe_price_id,
+                    'product' => $premium->stripe_product_id,
+                ],
+            ],
+        ],
+    );
+    $gateway = app(StripeSubscriptionGateway::class);
+    expect($gateway)->toBeInstanceOf(ErinStripeSubscriptionGateway::class);
+    $gateway->put($payload['data']['object']);
+    $this->withoutExceptionHandling();
+
+    expect(
+        fn () => erinPostSignedStripeWebhook(
+            $payload,
+            'whsec_http_acceptance',
+        ),
+    )->toThrow(RuntimeException::class, 'mehrere Erin-Basispakete');
+
+    expect($company->subscriptions()->count())->toBe(0)
+        ->and($company->fresh()?->current_plan_id)->toBeNull()
+        ->and(IntegrationReceipt::query()
+            ->where('event_id', 'evt_multi_base')
+            ->value('status'))->toBe('failed');
+});
+
+it('processes a signed schedule release from canonical subscription state and clears stale pending plan data', function () {
+    $current = Plan::factory()->create([
+        'stripe_product_id' => 'prod_schedule_release_current',
+        'stripe_price_id' => 'price_schedule_release_current',
+    ]);
+    $pending = Plan::factory()->create([
+        'stripe_product_id' => 'prod_schedule_release_pending',
+        'stripe_price_id' => 'price_schedule_release_pending',
+    ]);
+    $company = Company::factory()->create([
+        'current_plan_id' => $current->getKey(),
+        'pending_plan_id' => $pending->getKey(),
+        'pending_plan_effective_at' => now()->addMonth(),
+        'stripe_id' => 'cus_schedule_release',
+        'stripe_subscription_id' => 'sub_schedule_release',
+        'status' => CompanyStatus::Active,
+        'subscription_status' => 'active',
+    ]);
+    $canonical = erinStripeSubscriptionPayload(
+        'evt_unused_canonical_schedule_release',
+        'customer.subscription.updated',
+        $company,
+        $current,
+        subscriptionId: 'sub_schedule_release',
+    )['data']['object'];
+    $canonical['schedule'] = null;
+    $gateway = app(StripeSubscriptionGateway::class);
+    expect($gateway)->toBeInstanceOf(ErinStripeSubscriptionGateway::class);
+    $gateway->put($canonical);
+    $payload = [
+        'id' => 'evt_schedule_release_http',
+        'object' => 'event',
+        'type' => 'subscription_schedule.released',
+        'livemode' => false,
+        'created' => now()->getTimestamp(),
+        'data' => ['object' => [
+            'id' => 'sub_sched_schedule_release',
+            'object' => 'subscription_schedule',
+            'customer' => $company->stripe_id,
+            'subscription' => null,
+            'released_subscription' => 'sub_schedule_release',
+        ]],
+    ];
+
+    erinPostSignedStripeWebhook(
+        $payload,
+        'whsec_http_acceptance',
+    )->assertOk();
+
+    expect($company->fresh()?->pending_plan_id)->toBeNull()
+        ->and($company->fresh()?->pending_plan_effective_at)->toBeNull()
+        ->and(IntegrationReceipt::query()
+            ->where('provider', 'stripe:handled')
+            ->where('event_id', 'evt_schedule_release_http')
             ->where('status', 'processed')
             ->count())->toBe(1);
 });

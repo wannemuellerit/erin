@@ -71,7 +71,7 @@ class IntegrationEventGuard
                 ->whereNot('status', 'processed')
                 ->update([
                     'status' => 'failed',
-                    'error_message' => $exception->getMessage(),
+                    'error_message' => 'Die Verarbeitung des Integrationseingangs ist fehlgeschlagen; technische Details stehen ausschließlich im geschützten Anwendungslog.',
                     'updated_at' => now(),
                 ]);
 

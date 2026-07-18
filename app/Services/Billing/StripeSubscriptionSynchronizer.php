@@ -6,6 +6,8 @@ use App\Contracts\StripeSubscriptionGateway;
 use App\Enums\CompanyStatus;
 use App\Models\Company;
 use App\Models\Plan;
+use App\Models\PlanStripePrice;
+use App\Models\StripeAddonPrice;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
@@ -17,6 +19,7 @@ class StripeSubscriptionSynchronizer
 {
     public function __construct(
         private readonly StripeSubscriptionGateway $gateway,
+        private readonly StripeSubscriptionItemClassifier $itemsClassifier,
     ) {}
 
     /**
@@ -38,6 +41,43 @@ class StripeSubscriptionSynchronizer
             throw new RuntimeException('Das Stripe-Abonnement enthält keine gültige ID oder Kunden-ID.');
         }
 
+        $this->synchronizeCanonical($subscriptionId, $customerId);
+    }
+
+    /**
+     * Schedule events carry the canonical subscription reference under
+     * `subscription`; released schedules use `released_subscription`.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    public function synchronizeSchedule(array $payload): void
+    {
+        $schedule = $payload['data']['object'] ?? null;
+        if (! is_array($schedule)) {
+            throw new RuntimeException(
+                'Das Stripe-Ereignis enthält keinen gültigen Schedule.',
+            );
+        }
+
+        $subscriptionId = $this->externalId(
+            $schedule['subscription']
+                ?? $schedule['released_subscription']
+                ?? null,
+        );
+        $customerId = $this->externalId($schedule['customer'] ?? null);
+        if ($subscriptionId === null || $customerId === null) {
+            throw new RuntimeException(
+                'Der Stripe-Schedule enthält keine gültige Abonnement- oder Kunden-ID.',
+            );
+        }
+
+        $this->synchronizeCanonical($subscriptionId, $customerId);
+    }
+
+    private function synchronizeCanonical(
+        string $subscriptionId,
+        string $customerId,
+    ): void {
         $companyId = Company::query()
             ->where('stripe_id', $customerId)
             ->value('id');
@@ -62,6 +102,16 @@ class StripeSubscriptionSynchronizer
                 /** @var Company $companySnapshot */
                 $companySnapshot = Company::query()->findOrFail((int) $companyId);
                 $expectedCurrentId = $companySnapshot->stripe_subscription_id;
+                if (! $this->isCompanySubscription($companySnapshot, $target)) {
+                    if ($expectedCurrentId === $subscriptionId) {
+                        throw new RuntimeException(
+                            'Das aktuelle Stripe-Abonnement enthält kein gültiges Erin-Basispaket.',
+                        );
+                    }
+
+                    return;
+                }
+
                 $current = null;
                 if (
                     $expectedCurrentId !== null
@@ -97,11 +147,6 @@ class StripeSubscriptionSynchronizer
                             $current,
                             $target,
                         );
-                    } elseif (
-                        $expectedCurrentId === null
-                        && ! $this->isCompanySubscription($company, $target)
-                    ) {
-                        return;
                     }
 
                     $this->syncCompany($company, $selected);
@@ -140,16 +185,16 @@ class StripeSubscriptionSynchronizer
         }
 
         $items = $this->items($snapshot);
+        $baseItem = $this->itemsClassifier
+            ->classify($items)['base_item'];
         $firstItem = $items[0] ?? null;
         $trialEndsAt = $this->timestamp($snapshot['trial_end'] ?? null);
         $periodStart = $this->periodTimestamp(
-            $snapshot,
-            $firstItem,
+            $baseItem,
             'current_period_start',
         );
         $periodEnd = $this->periodTimestamp(
-            $snapshot,
-            $firstItem,
+            $baseItem,
             'current_period_end',
         );
         $isSinglePrice = count($items) === 1;
@@ -171,7 +216,10 @@ class StripeSubscriptionSynchronizer
                     ? $this->priceId($firstItem)
                     : null,
                 'quantity' => $isSinglePrice
-                    ? $this->integerOrNull($firstItem['quantity'] ?? null)
+                    ? $this->positiveIntegerOrNull(
+                        $firstItem['quantity'] ?? null,
+                        'Abonnementmenge',
+                    )
                     : null,
                 'trial_ends_at' => $trialEndsAt,
                 'current_period_start' => $periodStart,
@@ -199,7 +247,10 @@ class StripeSubscriptionSynchronizer
                 [
                     'stripe_product' => $productId,
                     'stripe_price' => $priceId,
-                    'quantity' => $this->integerOrNull($item['quantity'] ?? null),
+                    'quantity' => $this->positiveIntegerOrNull(
+                        $item['quantity'] ?? null,
+                        'Abonnementpositionsmenge',
+                    ),
                 ],
             );
         }
@@ -272,28 +323,30 @@ class StripeSubscriptionSynchronizer
         $plan = $this->planFor($snapshot);
         $status = (string) ($snapshot['status'] ?? 'incomplete');
         $items = $this->items($snapshot);
-        $firstItem = $items[0] ?? null;
+        $baseItem = $this->itemsClassifier
+            ->classify($items)['base_item'];
         $periodStart = $this->periodTimestamp(
-            $snapshot,
-            $firstItem,
+            $baseItem,
             'current_period_start',
         );
         $periodEnd = $this->periodTimestamp(
-            $snapshot,
-            $firstItem,
+            $baseItem,
             'current_period_end',
         );
         $trialEndsAt = $this->timestamp($snapshot['trial_end'] ?? null);
         $hasAccess = $this->hasPortalStatus($snapshot);
+        $pendingState = $this->canonicalPendingState($snapshot, $plan);
+        $pendingPlanId = $pendingState['known']
+            ? $pendingState['plan']?->getKey()
+            : $company->pending_plan_id;
+        $pendingEffectiveAt = $pendingState['known']
+            ? $pendingState['effective_at']
+            : $company->pending_plan_effective_at;
 
         $company->forceFill([
             'current_plan_id' => $plan?->getKey() ?? $company->current_plan_id,
-            'pending_plan_id' => $plan?->is($company->pendingPlan)
-                ? null
-                : $company->pending_plan_id,
-            'pending_plan_effective_at' => $plan?->is($company->pendingPlan)
-                ? null
-                : $company->pending_plan_effective_at,
+            'pending_plan_id' => $pendingPlanId,
+            'pending_plan_effective_at' => $pendingEffectiveAt,
             'stripe_subscription_id' => $this->requiredExternalId(
                 $snapshot['id'] ?? null,
                 'Abonnement',
@@ -325,22 +378,245 @@ class StripeSubscriptionSynchronizer
 
     /**
      * @param  array<string, mixed>  $snapshot
+     * @return array{
+     *     known: bool,
+     *     plan: Plan|null,
+     *     effective_at: CarbonImmutable|null
+     * }
      */
-    private function planFor(array $snapshot): ?Plan
+    private function canonicalPendingState(
+        array $snapshot,
+        ?Plan $currentPlan,
+    ): array {
+        $pendingUpdate = $snapshot['pending_update'] ?? null;
+        if ($pendingUpdate !== null) {
+            if (! is_array($pendingUpdate)) {
+                return [
+                    'known' => false,
+                    'plan' => null,
+                    'effective_at' => null,
+                ];
+            }
+
+            $items = $pendingUpdate['subscription_items'] ?? null;
+            if (! is_array($items)) {
+                throw new RuntimeException(
+                    'Das kanonische Stripe-Pending-Update enthält keine Positionen.',
+                );
+            }
+            $plan = $this->planForScheduledItems(array_values($items));
+
+            return [
+                'known' => true,
+                'plan' => $plan->is($currentPlan) ? null : $plan,
+                'effective_at' => null,
+            ];
+        }
+
+        $schedule = $snapshot['schedule'] ?? null;
+        if ($schedule === null) {
+            return [
+                'known' => true,
+                'plan' => null,
+                'effective_at' => null,
+            ];
+        }
+        if (! is_array($schedule)) {
+            return [
+                'known' => false,
+                'plan' => null,
+                'effective_at' => null,
+            ];
+        }
+        if (in_array(
+            $schedule['status'] ?? null,
+            ['canceled', 'completed', 'released'],
+            true,
+        )) {
+            return [
+                'known' => true,
+                'plan' => null,
+                'effective_at' => null,
+            ];
+        }
+
+        $phases = $schedule['phases'] ?? null;
+        $currentPhase = $schedule['current_phase'] ?? null;
+        if (! is_array($phases) || ! is_array($currentPhase)) {
+            throw new RuntimeException(
+                'Der kanonische Stripe-Schedule enthält keinen vollständigen Phasenplan.',
+            );
+        }
+        $currentStart = $this->integerOrNull(
+            $currentPhase['start_date'] ?? null,
+        );
+        $currentEnd = $this->integerOrNull(
+            $currentPhase['end_date'] ?? null,
+        );
+        if (
+            $currentStart === null
+            || $currentEnd === null
+            || $currentEnd <= $currentStart
+        ) {
+            throw new RuntimeException(
+                'Die aktuelle Stripe-Schedule-Phase ist ungültig.',
+            );
+        }
+
+        $currentIndex = null;
+        foreach (array_values($phases) as $index => $phase) {
+            if (
+                is_array($phase)
+                && $this->integerOrNull($phase['start_date'] ?? null)
+                    === $currentStart
+                && $this->integerOrNull($phase['end_date'] ?? null)
+                    === $currentEnd
+            ) {
+                $currentIndex = $index;
+                break;
+            }
+        }
+        if ($currentIndex === null) {
+            throw new RuntimeException(
+                'Die aktuelle Stripe-Schedule-Phase fehlt im kanonischen Phasenplan.',
+            );
+        }
+
+        $previousEnd = $currentEnd;
+        foreach (
+            array_slice(array_values($phases), $currentIndex + 1) as $phase
+        ) {
+            if (! is_array($phase)) {
+                throw new RuntimeException(
+                    'Der Stripe-Schedule enthält eine ungültige Zukunftsphase.',
+                );
+            }
+            $items = $phase['items'] ?? null;
+            if (! is_array($items)) {
+                throw new RuntimeException(
+                    'Eine Stripe-Schedule-Zukunftsphase enthält keine Positionen.',
+                );
+            }
+            $plan = $this->planForScheduledItems(array_values($items));
+            $effectiveAt = $this->integerOrNull(
+                $phase['start_date'] ?? null,
+            ) ?? $previousEnd;
+            if (! $plan->is($currentPlan)) {
+                return [
+                    'known' => true,
+                    'plan' => $plan,
+                    'effective_at' => CarbonImmutable::createFromTimestamp(
+                        $effectiveAt,
+                        config('app.timezone'),
+                    ),
+                ];
+            }
+            $previousEnd = $this->integerOrNull(
+                $phase['end_date'] ?? null,
+            ) ?? $previousEnd;
+        }
+
+        return [
+            'known' => true,
+            'plan' => null,
+            'effective_at' => null,
+        ];
+    }
+
+    /**
+     * @param  list<mixed>  $items
+     */
+    private function planForScheduledItems(array $items): Plan
     {
         $priceIds = [];
-        foreach ($this->items($snapshot) as $item) {
-            $priceId = $this->priceId($item);
-            if ($priceId !== null) {
-                $priceIds[] = $priceId;
+        $quantities = [];
+        foreach ($items as $item) {
+            $priceId = $this->externalId(data_get($item, 'price'));
+            if ($priceId === null || isset($priceIds[$priceId])) {
+                throw new RuntimeException(
+                    'Eine Stripe-Schedule-Phase enthält eine ungültige oder doppelte Price.',
+                );
+            }
+            $priceIds[$priceId] = true;
+            $quantities[$priceId] = $this->positiveIntegerOrNull(
+                data_get($item, 'quantity'),
+                'Schedule-Positionsmenge',
+            );
+        }
+
+        $basePlans = [];
+        PlanStripePrice::query()
+            ->with('plan')
+            ->whereIn('stripe_price_id', array_keys($priceIds))
+            ->get()
+            ->each(function (PlanStripePrice $price) use (&$basePlans): void {
+                $basePlans[$price->stripe_price_id] = $price->plan;
+            });
+        Plan::query()
+            ->whereIn('stripe_price_id', array_keys($priceIds))
+            ->get()
+            ->each(function (Plan $plan) use (&$basePlans): void {
+                $basePlans[(string) $plan->stripe_price_id] = $plan;
+            });
+
+        $addOnPrices = StripeAddonPrice::query()
+            ->whereIn('stripe_price_id', array_keys($priceIds))
+            ->pluck('stripe_price_id')
+            ->flip()
+            ->all();
+        foreach ([
+            config('services.stripe.seat_price_id'),
+            config('services.stripe.visa_price_id'),
+        ] as $configuredAddOnPrice) {
+            if (
+                is_string($configuredAddOnPrice)
+                && $configuredAddOnPrice !== ''
+            ) {
+                $addOnPrices[$configuredAddOnPrice] = 0;
             }
         }
 
-        if ($priceIds === []) {
-            return null;
+        $matched = [];
+        foreach (array_keys($priceIds) as $priceId) {
+            $plan = $basePlans[$priceId] ?? null;
+            $isAddOn = array_key_exists($priceId, $addOnPrices);
+            if ($plan instanceof Plan && $isAddOn) {
+                throw new RuntimeException(
+                    'Eine Stripe-Price ist zugleich als Basispaket und Add-on registriert.',
+                );
+            }
+            if ($plan instanceof Plan) {
+                if (($quantities[$priceId] ?? null) !== 1) {
+                    throw new RuntimeException(
+                        'Ein Erin-Basispaket muss in jeder Stripe-Schedule-Phase die Menge 1 besitzen.',
+                    );
+                }
+                $matched[] = $plan;
+
+                continue;
+            }
+            if (! $isAddOn) {
+                throw new RuntimeException(
+                    'Eine Stripe-Schedule-Phase enthält eine nicht freigegebene Add-on-Price.',
+                );
+            }
+        }
+        if (count($matched) !== 1) {
+            throw new RuntimeException(
+                'Eine Stripe-Schedule-Phase enthält nicht genau ein Erin-Basispaket.',
+            );
         }
 
-        return Plan::query()->whereIn('stripe_price_id', $priceIds)->first();
+        return $matched[0];
+    }
+
+    /**
+     * @param  array<string, mixed>  $snapshot
+     */
+    private function planFor(array $snapshot): ?Plan
+    {
+        return $this->itemsClassifier
+            ->classify($this->items($snapshot))['base_plan'];
     }
 
     /**
@@ -439,17 +715,13 @@ class StripeSubscriptionSynchronizer
     }
 
     /**
-     * @param  array<string, mixed>  $snapshot
      * @param  array<string, mixed>|null  $firstItem
      */
     private function periodTimestamp(
-        array $snapshot,
         ?array $firstItem,
         string $key,
     ): ?CarbonImmutable {
-        return $this->timestamp(
-            $snapshot[$key] ?? $firstItem[$key] ?? null,
-        );
+        return $this->timestamp($firstItem[$key] ?? null);
     }
 
     /**
@@ -481,12 +753,35 @@ class StripeSubscriptionSynchronizer
 
         return $timestamp === null
             ? null
-            : CarbonImmutable::createFromTimestamp($timestamp);
+            : CarbonImmutable::createFromTimestamp(
+                $timestamp,
+                config('app.timezone'),
+            );
     }
 
     private function integerOrNull(mixed $value): ?int
     {
         return is_numeric($value) ? (int) $value : null;
+    }
+
+    private function positiveIntegerOrNull(mixed $value, string $label): ?int
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $integer = filter_var(
+            $value,
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1]],
+        );
+        if (! is_int($integer)) {
+            throw new RuntimeException(
+                "Stripe hat keine gültige {$label} zurückgegeben.",
+            );
+        }
+
+        return $integer;
     }
 
     private function requiredExternalId(mixed $value, string $label): string

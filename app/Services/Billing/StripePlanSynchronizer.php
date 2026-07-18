@@ -15,6 +15,7 @@ class StripePlanSynchronizer
 {
     public function __construct(
         private readonly StripeCatalogGateway $gateway,
+        private readonly PlanStripePriceRegistry $prices,
     ) {}
 
     /**
@@ -65,7 +66,15 @@ class StripePlanSynchronizer
         }
 
         if ($actions === []) {
+            if ($apply) {
+                $this->prices->record($plan, 'catalog_sync');
+            }
+
             return ['status' => 'configured', 'actions' => []];
+        }
+
+        if ($apply) {
+            $this->prices->record($plan->refresh(), 'catalog_sync');
         }
 
         return [

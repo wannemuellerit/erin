@@ -47,7 +47,20 @@ class ScanSupportTicketAttachment implements ShouldQueue
 
         if ($result === 'infected') {
             Storage::disk($attachment->disk)->delete($attachment->path);
-            $attachment->message->update(['delivery_status' => 'failed']);
+            $attachment->message->update([
+                'delivery_status' => 'failed',
+                'external_reconcile_not_before' => null,
+            ]);
+            if (
+                $attachment->message->supportTicket->external_id === null
+                && $this->belongsToOpeningMessage($attachment)
+            ) {
+                $attachment->message->supportTicket->update([
+                    'sync_status' => 'failed',
+                    'sync_error' => 'Ein Supportanhang wurde als unsicher erkannt.',
+                    'external_reconcile_not_before' => null,
+                ]);
+            }
             SupportTicketMessageCreated::dispatch(
                 $attachment->message->fresh(['files']) ?? $attachment->message,
             );
@@ -71,7 +84,9 @@ class ScanSupportTicketAttachment implements ShouldQueue
 
     public function failed(Throwable $exception): void
     {
-        $attachment = SupportTicketAttachment::query()->find($this->attachmentId);
+        $attachment = SupportTicketAttachment::query()
+            ->with('message.supportTicket')
+            ->find($this->attachmentId);
         if ($attachment === null) {
             return;
         }
@@ -83,9 +98,34 @@ class ScanSupportTicketAttachment implements ShouldQueue
             'scan_result' => 'scan_failed',
             'scan_completed_at' => now(),
         ]);
-        $attachment->message()->update(['delivery_status' => 'failed']);
+        $attachment->message->update([
+            'delivery_status' => 'failed',
+            'external_reconcile_not_before' => null,
+        ]);
+        if (
+            $attachment->message->supportTicket->external_id === null
+            && $this->belongsToOpeningMessage($attachment)
+        ) {
+            $attachment->message->supportTicket->update([
+                'sync_status' => 'failed',
+                'sync_error' => 'Ein Supportanhang konnte nicht sicherheitsgeprüft werden.',
+                'external_reconcile_not_before' => null,
+            ]);
+        }
         SupportTicketMessageCreated::dispatch(
             $attachment->message()->with('files')->firstOrFail(),
         );
+    }
+
+    private function belongsToOpeningMessage(
+        SupportTicketAttachment $attachment,
+    ): bool {
+        $openingMessageId = $attachment->message
+            ->supportTicket
+            ->messages()
+            ->min('id');
+
+        return is_numeric($openingMessageId)
+            && (int) $openingMessageId === $attachment->support_ticket_message_id;
     }
 }

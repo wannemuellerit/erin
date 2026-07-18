@@ -35,6 +35,7 @@ return [
             'video/webm',
         ],
         'signed_url_minutes' => (int) env('SUPPORT_ATTACHMENT_URL_MINUTES', 10),
+        'orphan_grace_hours' => (int) env('SUPPORT_ATTACHMENT_ORPHAN_GRACE_HOURS', 24),
     ],
     'sync' => [
         'lock_seconds' => (int) env('SUPPORT_SYNC_LOCK_SECONDS', 300),

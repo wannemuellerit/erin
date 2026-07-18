@@ -218,7 +218,8 @@ final class SecurityBaselineAudit
     private function validCommitSha(mixed $value): bool
     {
         return is_string($value)
-            && preg_match('/\A[0-9a-f]{40}\z/', $value) === 1;
+            && preg_match('/\A[0-9a-f]{40}\z/', $value) === 1
+            && preg_match('/\A([0-9a-f])\1{39}\z/', $value) !== 1;
     }
 
     private function validCidr(string $value, bool $requirePrefix = false): bool

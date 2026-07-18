@@ -18,6 +18,7 @@ class SupportAttachmentPayloadBuilder
     public function forMessage(SupportTicketMessage $message): array
     {
         $message->loadMissing('files');
+        $this->limits->assertFileCount($message->files->count());
         $allowedMimeTypes = config('support.attachments.allowed_mime_types', []);
         $payloads = [];
         $totalBytes = 0;

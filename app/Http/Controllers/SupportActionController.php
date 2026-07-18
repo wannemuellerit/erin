@@ -15,6 +15,7 @@ use App\Models\ModerationCase;
 use App\Models\SupportTicket;
 use App\Notifications\ActivityNotification;
 use App\Services\Activity\ActivityRecorder;
+use App\Services\Ticketing\SupportAttachmentLimits;
 use App\Services\Ticketing\SupportAttachmentManager;
 use App\Services\Ticketing\SupportTicketMessagePresenter;
 use App\Services\Trust\CompanyTrustMetricService;
@@ -33,6 +34,7 @@ class SupportActionController extends Controller
     public function index(
         Request $request,
         SupportTicketMessagePresenter $presenter,
+        SupportAttachmentLimits $attachmentLimits,
     ): Response {
         $user = $request->user();
         abort_if($user === null, 401);
@@ -74,6 +76,7 @@ class SupportActionController extends Controller
                 'provider' => 'zammad',
                 'enabled' => (bool) config('services.zammad.enabled'),
             ],
+            'attachmentLimits' => $attachmentLimits->forFrontend(),
         ]);
     }
 

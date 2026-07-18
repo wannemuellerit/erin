@@ -5,7 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property int $external_reconcile_attempts
+ * @property Carbon|null $external_reconcile_not_before
+ */
 class SupportTicketMessage extends Model
 {
     protected $guarded = ['id'];
@@ -16,6 +21,8 @@ class SupportTicketMessage extends Model
             'is_internal' => 'boolean',
             'attachments' => 'array',
             'delivered_at' => 'datetime',
+            'external_reconcile_attempts' => 'integer',
+            'external_reconcile_not_before' => 'datetime',
         ];
     }
 

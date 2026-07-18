@@ -381,6 +381,21 @@ export default {
             contractValue: 'Vertragswert',
             contractValueHint: 'aktive und überfällige Pakete',
         },
+        manualReview: {
+            title: '{count} Tarifwechsel benötigt eine manuelle Prüfung | {count} Tarifwechsel benötigen eine manuelle Prüfung',
+            description:
+                'Diese Stripe-Änderungen werden aus Sicherheitsgründen nicht automatisch erneut ausgeführt. Prüfe Subscription, Schedule und Zahlung direkt bei Stripe und dokumentiere die Auflösung.',
+            item: '{company} (Firma #{companyId}) · {type} · {attempts} Versuche · zuletzt {date}',
+            reason: 'Begründung der manuellen Entscheidung',
+            reasonPlaceholder:
+                'Was wurde bei Stripe geprüft und warum ist diese Aktion sicher?',
+            retry: 'Erneut sicher abgleichen',
+            close: 'Ohne Tarifänderung schließen',
+            type: {
+                upgrade: 'Upgrade',
+                downgrade: 'Downgrade',
+            },
+        },
         stripe: {
             title: 'Stripe-Konfigurationsstatus',
             description:

@@ -19,6 +19,8 @@ import SearchField from '@/components/product/SearchField.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
 import Textarea from '@/components/product/Textarea.vue';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import adminBilling from '@/routes/admin/billing';
 import { useAdminI18n } from './_i18n';
 import AdminPagination from './_components/AdminPagination.vue';
@@ -100,6 +102,16 @@ type StripeConfiguration = {
     }>;
 };
 
+type BillingManualReview = {
+    public_id: string;
+    resolve_url: string;
+    company_id: number;
+    company_name: string;
+    change_type: 'upgrade' | 'downgrade';
+    attempts: number;
+    updated_at: string | null;
+};
+
 const props = defineProps<{
     companies: AdminPaginator<BillingCompanyRow>;
     plans: PlanRow[];
@@ -108,9 +120,11 @@ const props = defineProps<{
         active: number;
         past_due: number;
         cancelling: number;
+        billing_manual_review: number;
         contract_value_cents: number;
     };
     stripe_configuration: StripeConfiguration;
+    billing_manual_reviews: BillingManualReview[];
 }>();
 const { t, formatCurrency, formatDate, formatNumber, humanize } =
     useAdminI18n();
@@ -150,6 +164,29 @@ const planForm = useForm({
 const firstPlanError = computed(
     () => Object.values(planForm.errors)[0] as string | undefined,
 );
+const manualReviewReasons = reactive<Record<string, string>>({});
+const selectedManualReview = ref<string | null>(null);
+const manualReviewForm = useForm({
+    action: 'retry' as 'retry' | 'close',
+    reason: '',
+});
+
+function resolveManualReview(
+    intent: BillingManualReview,
+    action: 'retry' | 'close',
+): void {
+    selectedManualReview.value = intent.public_id;
+    manualReviewForm.action = action;
+    manualReviewForm.reason = manualReviewReasons[intent.public_id] ?? '';
+    manualReviewForm.patch(intent.resolve_url, {
+        preserveScroll: true,
+        onSuccess: () => {
+            delete manualReviewReasons[intent.public_id];
+            selectedManualReview.value = null;
+            manualReviewForm.reset();
+        },
+    });
+}
 
 const featureLines = (features: PlanRow['features']): string[] => {
     if (!features) {
@@ -314,6 +351,96 @@ const configurationItems = computed(() => [
                 tone="teal"
             />
         </div>
+
+        <Alert
+            v-if="summary.billing_manual_review > 0"
+            variant="destructive"
+            class="border-orange-300 bg-orange-50 text-orange-950"
+        >
+            <TriangleAlert class="size-4 text-orange-600" />
+            <AlertTitle>
+                {{
+                    t('billing.manualReview.title', {
+                        count: summary.billing_manual_review,
+                    })
+                }}
+            </AlertTitle>
+            <AlertDescription class="text-orange-900">
+                <p>{{ t('billing.manualReview.description') }}</p>
+                <ul class="mt-3 space-y-3">
+                    <li
+                        v-for="intent in billing_manual_reviews"
+                        :key="intent.public_id"
+                        class="rounded-xl border border-orange-200 bg-white/80 p-3"
+                    >
+                        <p class="font-medium">
+                            {{
+                                t('billing.manualReview.item', {
+                                    company: intent.company_name,
+                                    companyId: intent.company_id,
+                                    type: t(
+                                        `billing.manualReview.type.${intent.change_type}`,
+                                    ),
+                                    attempts: intent.attempts,
+                                    date: formatDate(intent.updated_at),
+                                })
+                            }}
+                        </p>
+                        <label
+                            :for="`billing-review-reason-${intent.public_id}`"
+                            class="mt-3 block text-xs font-semibold text-orange-950"
+                        >
+                            {{ t('billing.manualReview.reason') }}
+                        </label>
+                        <Textarea
+                            :id="`billing-review-reason-${intent.public_id}`"
+                            v-model="manualReviewReasons[intent.public_id]"
+                            class="mt-1 min-h-20 bg-white"
+                            :placeholder="
+                                t('billing.manualReview.reasonPlaceholder')
+                            "
+                        />
+                        <p
+                            v-if="
+                                selectedManualReview === intent.public_id &&
+                                manualReviewForm.errors.reason
+                            "
+                            class="mt-1 text-xs font-medium text-red-700"
+                        >
+                            {{ manualReviewForm.errors.reason }}
+                        </p>
+                        <p
+                            v-if="
+                                selectedManualReview === intent.public_id &&
+                                manualReviewForm.errors.action
+                            "
+                            class="mt-1 text-xs font-medium text-red-700"
+                        >
+                            {{ manualReviewForm.errors.action }}
+                        </p>
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            <Button
+                                type="button"
+                                size="sm"
+                                :disabled="manualReviewForm.processing"
+                                @click="resolveManualReview(intent, 'retry')"
+                            >
+                                {{ t('billing.manualReview.retry') }}
+                            </Button>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                :disabled="manualReviewForm.processing"
+                                @click="resolveManualReview(intent, 'close')"
+                            >
+                                {{ t('billing.manualReview.close') }}
+                            </Button>
+                        </div>
+                    </li>
+                </ul>
+            </AlertDescription>
+        </Alert>
 
         <SectionCard
             :title="t('billing.stripe.title')"

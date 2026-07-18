@@ -39,9 +39,13 @@ return [
         'publishable_key' => env('STRIPE_PUBLISHABLE_KEY'),
         'secret_key' => env('STRIPE_SECRET_KEY'),
         'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+        'basic_product_id' => env('STRIPE_PRODUCT_BASIC'),
         'basic_price_id' => env('STRIPE_PRICE_BASIC'),
+        'business_product_id' => env('STRIPE_PRODUCT_BUSINESS'),
         'business_price_id' => env('STRIPE_PRICE_BUSINESS'),
+        'premium_product_id' => env('STRIPE_PRODUCT_PREMIUM'),
         'premium_price_id' => env('STRIPE_PRICE_PREMIUM'),
+        'seat_product_id' => env('STRIPE_PRODUCT_RECRUITER_SEAT'),
         'seat_price_id' => env('STRIPE_PRICE_RECRUITER_SEAT'),
         'visa_price_id' => env('STRIPE_PRICE_VISA_PACKAGE'),
     ],
@@ -74,6 +78,11 @@ return [
         'token' => env('ZAMMAD_TOKEN'),
         'group' => env('ZAMMAD_GROUP', 'Users'),
         'webhook_secret' => env('ZAMMAD_WEBHOOK_SECRET'),
+        'message_marker_secret' => env('ZAMMAD_MESSAGE_MARKER_SECRET'),
+        'previous_message_marker_secrets' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('ZAMMAD_PREVIOUS_MESSAGE_MARKER_SECRETS', '')),
+        ))),
         'webhook_callback_url' => env(
             'ZAMMAD_WEBHOOK_CALLBACK_URL',
             rtrim((string) env('APP_URL', ''), '/').'/integrations/zammad/webhook',
@@ -85,6 +94,19 @@ return [
         ))),
         'timeout' => (int) env('ZAMMAD_TIMEOUT', 10),
         'webhook_max_bytes' => (int) env('ZAMMAD_WEBHOOK_MAX_BYTES', 2 * 1024 * 1024),
+        'reconcile_initial_delay_seconds' => (int) env(
+            'ZAMMAD_RECONCILE_INITIAL_DELAY_SECONDS',
+            30,
+        ),
+        'reconcile_interval_seconds' => (int) env(
+            'ZAMMAD_RECONCILE_INTERVAL_SECONDS',
+            15,
+        ),
+        'reconcile_required_misses' => (int) env('ZAMMAD_RECONCILE_REQUIRED_MISSES', 3),
+        'unmatched_webhook_retention_hours' => (int) env(
+            'ZAMMAD_UNMATCHED_WEBHOOK_RETENTION_HOURS',
+            24,
+        ),
     ],
 
     'clamav' => [

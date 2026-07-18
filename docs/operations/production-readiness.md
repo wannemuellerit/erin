@@ -34,6 +34,9 @@ Build-Argument und Image-Tag:
 ```bash
 export ERIN_BUILD_SHA="$(git rev-parse HEAD)"
 export ERIN_APP_TAG="$ERIN_BUILD_SHA"
+export ERIN_GOVERNANCE_TRUST_ROOT_SHA256="$(
+  sha256sum "$ERIN_GOVERNANCE_TRUST_ROOT_FILE" | awk '{print $1}'
+)"
 docker compose -f compose.production.yaml build
 ```
 
@@ -42,6 +45,12 @@ root-owned nach `/app/.erin-build-sha` und setzt das OCI-Label
 `org.opencontainers.image.revision`. Der EntryPoint startet nicht, wenn
 eingebauter SHA, `ERIN_BUILD_SHA` und `ERIN_APP_TAG` voneinander abweichen.
 `latest`, `main`, `stable` oder andere bewegliche Tags erfüllen das Gate nicht.
+
+Der Build verlangt außerdem den 64-stelligen SHA-256 des separat verwalteten
+Governance-Trust-Roots und schreibt ihn read-only nach
+`/app/.erin-governance-trust-root-sha256`. Ein später gemounteter Root mit
+abweichenden Bytes wird abgewiesen; die Laufzeitkonfiguration kann diesen Pin
+nicht ersetzen.
 
 Die Freigabeevidenz wird gegen den eingebauten Wert geprüft, nicht nur gegen
 eine zur Laufzeit überschreibbare Umgebungsvariable. Damit bezieht sich der
@@ -124,7 +133,13 @@ ERIN_RESTORE_DRILL_CONFIRM=RESTORE_IN_TEMP_DATABASE \
   /sicherer/temporärer/pfad/erin-YYYYMMDDTHHMMSSZ.sql
 ```
 
-Der erfolgreiche Lauf prüft Prüfsumme, Import und Migrationstabelle. Fachliche Stichproben, Entschlüsselung, Berechtigungen, Wiederanlauf der Anwendung sowie die tatsächlich erreichten RPO-/RTO-Ziele müssen im Drillprotokoll ergänzt werden.
+Der einfache Datenbanklauf prüft Prüfsumme, Import und Migrationstabelle. Der
+vollständige lokale Drill in
+`scripts/ops/local-encrypted-restore-drill.sh` prüft zusätzlich verschlüsselte
+MySQL-/MinIO-Artefakte, kanonische Inhalte und Struktur, vollständige
+DB-zu-Objekt-Referenzen, Negativkontrollen, Quell-Quiesce, Wiederanlauf sowie
+RPO/RTO. Er bleibt synthetische lokale Evidenz und ersetzt weder einen
+Produktions-Restore noch unabhängige Prüfung.
 
 ## Backup-Matrix
 
@@ -139,6 +154,12 @@ Pilot anhand der dokumentierten Risiko- und Datenschutzentscheidung
 festgelegt. Ziel- und Messwerte für MySQL und MinIO/S3 müssen danach im
 strukturierten Restore-Gate hinterlegt sein; ein Ziel darf nicht erst nach der
 Messung passend gewählt werden.
+
+Der private S3-Datenträger verwendet `PRIVATE_FILESYSTEM_PREFIX` ausschließlich
+als relativen Bucket-Präfix. Ein lokaler absoluter Pfad darf dort nicht stehen,
+weil er sonst Bestandteil jedes S3-Objektschlüssels würde. Nur beim
+`PRIVATE_FILESYSTEM_DRIVER=local` setzt Erin automatisch
+`storage/app/private` als lokales Root-Verzeichnis.
 
 ## Aufbewahrung und Löschung
 

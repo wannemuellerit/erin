@@ -5,14 +5,17 @@ import type { Page } from '@playwright/test';
 const password = 'password';
 
 const demoAccounts = [
-    'admin@wannemueller.dev',
-    'unternehmen.mueller@wannemueller.dev',
-    'unternehmen.rheincargo@wannemueller.dev',
-    ...Array.from(
-        { length: 10 },
-        (_, index) =>
-            `candidate${String(index + 1).padStart(2, '0')}@wannemueller.dev`,
-    ),
+    { id: 'superadmin', email: 'admin@wannemueller.dev' },
+    { id: 'mueller', email: 'unternehmen.mueller@wannemueller.dev' },
+    {
+        id: 'rheincargo',
+        email: 'unternehmen.rheincargo@wannemueller.dev',
+    },
+    ...Array.from({ length: 10 }, (_, index) => {
+        const id = `candidate${String(index + 1).padStart(2, '0')}`;
+
+        return { id, email: `${id}@wannemueller.dev` };
+    }),
 ] as const;
 
 const accounts = {
@@ -138,6 +141,16 @@ test.describe('Login und Rollenbereiche', () => {
     test('zeigt alle Demo-Zugänge und setzt jeden Zugang barrierearm ein', async ({
         page,
     }) => {
+        const vueWarnings: string[] = [];
+        page.on('console', (message) => {
+            if (
+                message.type() === 'warning' &&
+                message.text().includes('[Vue warn]')
+            ) {
+                vueWarnings.push(message.text());
+            }
+        });
+
         await page.goto('/login');
 
         await expect(page.getByRole('main')).toHaveCount(1);
@@ -168,8 +181,13 @@ test.describe('Login und Rollenbereiche', () => {
 
         for (const demoAccount of demoAccounts) {
             await expect(
-                page.getByText(demoAccount, { exact: true }),
+                page.getByText(demoAccount.email, { exact: true }),
             ).toBeVisible();
+            await page
+                .getByTestId(`insert-demo-account-${demoAccount.id}`)
+                .click();
+            await expect(email).toHaveValue(demoAccount.email);
+            await expect(loginPassword).toHaveValue(password);
         }
 
         await expect(email).toHaveAccessibleName('E-Mail-Adresse');
@@ -186,6 +204,7 @@ test.describe('Login und Rollenbereiche', () => {
             'unternehmen.rheincargo@wannemueller.dev',
         );
         await expect(loginPassword).toHaveValue(password);
+        expect(vueWarnings).toEqual([]);
     });
 
     test('meldet den Superadmin an und öffnet die Admin-Navigation', async ({
@@ -366,6 +385,85 @@ test.describe('Login und Rollenbereiche', () => {
         ).toBeVisible();
         await expectNoSeriousAccessibilityViolations(page);
     });
+
+    test('lehnt unbekannte Konten und falsche Passwörter gleichförmig ab', async ({
+        page,
+    }) => {
+        const attempts = [
+            {
+                email: 'nicht-vorhanden@wannemueller.dev',
+                password: 'Falsch-2026!',
+            },
+            {
+                email: 'candidate10@wannemueller.dev',
+                password: 'Falsch-2026!',
+            },
+        ];
+
+        for (const attempt of attempts) {
+            await page.goto('/login');
+            await page
+                .getByLabel('E-Mail-Adresse', { exact: true })
+                .fill(attempt.email);
+            await page
+                .getByLabel('Passwort', { exact: true })
+                .fill(attempt.password);
+            await page.getByTestId('login-button').click();
+
+            await expect(page).toHaveURL(/\/login$/);
+            await expect(
+                page.getByText(
+                    'Diese Zugangsdaten stimmen nicht mit unseren Aufzeichnungen überein.',
+                    { exact: true },
+                ),
+            ).toBeVisible();
+            await expect(page.getByRole('main')).toHaveCount(1);
+            await expect(page.getByTestId('sidebar-menu-button')).toHaveCount(
+                0,
+            );
+        }
+    });
+
+    test('leitet Gäste von sämtlichen Rollenbereichen zum Login um', async ({
+        page,
+    }) => {
+        for (const protectedPath of [
+            '/admin/users',
+            '/employer/jobs',
+            '/candidate/profile',
+        ]) {
+            await page.goto(protectedPath);
+            await expect(page).toHaveURL(/\/login$/);
+            await expect(
+                page.getByRole('heading', {
+                    level: 1,
+                    name: 'Schön, Sie wiederzusehen',
+                }),
+            ).toBeVisible();
+        }
+    });
+
+    test('blockiert rollenfremde Direktzugriffe eines Unternehmens', async ({
+        page,
+    }) => {
+        await logIn(page, accounts.company.email);
+
+        for (const forbiddenPath of ['/admin/users', '/candidate/profile']) {
+            const response = await page.goto(forbiddenPath);
+            expect(response?.status()).toBe(403);
+        }
+    });
+
+    test('blockiert rollenfremde Direktzugriffe einer Fachkraft', async ({
+        page,
+    }) => {
+        await logIn(page, accounts.candidate.email);
+
+        for (const forbiddenPath of ['/admin/users', '/employer/jobs']) {
+            const response = await page.goto(forbiddenPath);
+            expect(response?.status()).toBe(403);
+        }
+    });
 });
 
 test.describe('Onboarding und Abrechnung', () => {
@@ -528,9 +626,7 @@ test.describe('Englische Oberfläche', () => {
         ).toBeVisible();
 
         await page.goto('/login');
-        await page
-            .getByRole('button', { name: 'German', exact: true })
-            .click();
+        await page.getByRole('button', { name: 'German', exact: true }).click();
 
         await expect(
             page.getByRole('heading', {
@@ -570,6 +666,30 @@ test.describe('Englische Oberfläche', () => {
                 exact: true,
             }),
         ).toBeVisible();
+    });
+
+    test('zeigt einen fehlgeschlagenen Login nach Sprachwechsel vollständig auf Englisch', async ({
+        page,
+    }) => {
+        await page.goto('/login');
+        await page
+            .getByRole('button', { name: 'Englisch', exact: true })
+            .click();
+        await page
+            .getByLabel('Email address', { exact: true })
+            .fill('unknown@wannemueller.dev');
+        await page.getByLabel('Password', { exact: true }).fill('Wrong-2026!');
+        await page.getByTestId('login-button').click();
+
+        await expect(page).toHaveURL(/\/login$/);
+        await expect(
+            page.getByText('These credentials do not match our records.', {
+                exact: true,
+            }),
+        ).toBeVisible();
+        await expect(page.getByTestId('login-button')).toHaveAccessibleName(
+            'Sign in',
+        );
     });
 });
 
@@ -656,6 +776,37 @@ test.describe('Mobile Abnahme', () => {
             }),
         ).toBeVisible();
         await expectNoHorizontalOverflow(page);
+    });
+
+    test('hält Demo-Zugänge und Login bei 320 Pixeln vollständig bedienbar', async ({
+        page,
+    }) => {
+        await page.setViewportSize({ width: 320, height: 760 });
+        await page.goto('/login');
+
+        await expect(page.getByTestId('demo-account-picker')).toBeVisible();
+        await expect(
+            page.getByTestId('insert-demo-account-candidate10'),
+        ).toBeVisible();
+        const lastAccount = page.getByTestId('insert-demo-account-candidate10');
+        await lastAccount.scrollIntoViewIfNeeded();
+        await expect(lastAccount).toBeInViewport();
+        await lastAccount.click();
+        await expect(
+            page.getByLabel('E-Mail-Adresse', { exact: true }),
+        ).toHaveValue('candidate10@wannemueller.dev');
+        await expect(page.getByLabel('Passwort', { exact: true })).toHaveValue(
+            password,
+        );
+
+        const submit = page.getByTestId('login-button');
+        await submit.scrollIntoViewIfNeeded();
+        await expect(submit).toBeInViewport();
+        await expectNoHorizontalOverflow(page);
+        await expectNoSeriousAccessibilityViolations(page);
+        await submit.click();
+        await expect(page).toHaveURL(/\/dashboard(?:\?.*)?$/);
+        await expect(page.getByRole('main')).toBeVisible();
     });
 });
 

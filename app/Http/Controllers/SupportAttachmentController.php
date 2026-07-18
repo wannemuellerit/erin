@@ -21,6 +21,11 @@ class SupportAttachmentController extends Controller
         abort_if($request->user() === null, 401);
         $attachment->loadMissing('message.supportTicket');
         Gate::authorize('view', $attachment->message->supportTicket);
+        abort_if(
+            $attachment->message->is_internal
+                && ! $request->user()->isPlatformStaff(),
+            403,
+        );
         abort_unless(
             $attachment->scan_result === 'clean',
             423,

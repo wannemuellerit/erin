@@ -1,5 +1,6 @@
 ARG PHP_VERSION=8.4
 ARG ERIN_BUILD_SHA
+ARG ERIN_GOVERNANCE_TRUST_ROOT_SHA256
 
 FROM php:${PHP_VERSION}-fpm-bookworm AS php-base
 
@@ -81,6 +82,7 @@ RUN npm ci --no-audit --no-fund \
 FROM php-base AS php
 
 ARG ERIN_BUILD_SHA
+ARG ERIN_GOVERNANCE_TRUST_ROOT_SHA256
 
 ENV APP_ENV=production \
     APP_DEBUG=false \
@@ -94,8 +96,11 @@ COPY --from=frontend-builder --chown=www-data:www-data /app/public/build /app/pu
 COPY --chown=www-data:www-data docker/production/entrypoint.sh /usr/local/bin/erin-entrypoint
 
 RUN printf '%s' "${ERIN_BUILD_SHA}" | grep -Eq '^[0-9a-f]{40}$' \
+    && printf '%s' "${ERIN_GOVERNANCE_TRUST_ROOT_SHA256}" | grep -Eq '^[0-9a-f]{64}$' \
     && printf '%s\n' "${ERIN_BUILD_SHA}" > /app/.erin-build-sha \
+    && printf '%s\n' "${ERIN_GOVERNANCE_TRUST_ROOT_SHA256}" > /app/.erin-governance-trust-root-sha256 \
     && chmod 0444 /app/.erin-build-sha \
+    && chmod 0444 /app/.erin-governance-trust-root-sha256 \
     && chmod +x /usr/local/bin/erin-entrypoint \
     && mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
     && chown -R www-data:www-data storage bootstrap/cache
@@ -108,10 +113,12 @@ CMD ["php-fpm", "--nodaemonize"]
 FROM nginx:1.28-alpine AS nginx
 
 ARG ERIN_BUILD_SHA
+ARG ERIN_GOVERNANCE_TRUST_ROOT_SHA256
 
 LABEL org.opencontainers.image.revision="${ERIN_BUILD_SHA}"
 
 COPY docker/production/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=php /app/public /app/public
 
-RUN printf '%s' "${ERIN_BUILD_SHA}" | grep -Eq '^[0-9a-f]{40}$'
+RUN printf '%s' "${ERIN_BUILD_SHA}" | grep -Eq '^[0-9a-f]{40}$' \
+    && printf '%s' "${ERIN_GOVERNANCE_TRUST_ROOT_SHA256}" | grep -Eq '^[0-9a-f]{64}$'

@@ -13,6 +13,7 @@ use App\Models\ModerationCase;
 use App\Models\SupportTicket;
 use App\Models\User;
 use App\Notifications\ActivityNotification;
+use App\Services\Ticketing\SupportAttachmentLimits;
 use App\Services\Ticketing\SupportAttachmentManager;
 use App\Services\Ticketing\SupportTicketMessagePresenter;
 use Illuminate\Database\Eloquent\Builder;
@@ -28,6 +29,7 @@ class SupportController extends AdminController
     public function index(
         Request $request,
         SupportTicketMessagePresenter $presenter,
+        SupportAttachmentLimits $attachmentLimits,
     ): Response {
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:120'],
@@ -103,6 +105,7 @@ class SupportController extends AdminController
                 'open_cases' => ModerationCase::query()->where('status', 'open')->count(),
                 'pending_feedback' => Feedback::query()->where('status', 'pending')->count(),
             ],
+            'attachmentLimits' => $attachmentLimits->forFrontend(),
         ]);
     }
 

@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Contracts\AiProvider;
+use App\Contracts\StripeBillingChangeGateway;
 use App\Contracts\StripeCatalogGateway;
 use App\Contracts\StripeSubscriptionGateway;
 use App\Contracts\TicketingProvider;
@@ -10,6 +11,7 @@ use App\Contracts\VideoProvider;
 use App\Http\Controllers\Integrations\StripeWebhookController;
 use App\Models\Company;
 use App\Services\Ai\OpenAiResponsesProvider;
+use App\Services\Billing\StripeApiBillingChangeGateway;
 use App\Services\Billing\StripeApiCatalogGateway;
 use App\Services\Billing\StripeApiSubscriptionGateway;
 use App\Services\Ticketing\NullTicketingProvider;
@@ -22,6 +24,7 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Cashier\Cashier;
 use Laravel\Cashier\Http\Controllers\WebhookController as CashierWebhookController;
+use Stripe\Stripe;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -31,6 +34,10 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(AiProvider::class, OpenAiResponsesProvider::class);
+        $this->app->bind(
+            StripeBillingChangeGateway::class,
+            static fn (): StripeApiBillingChangeGateway => new StripeApiBillingChangeGateway,
+        );
         $this->app->bind(StripeCatalogGateway::class, StripeApiCatalogGateway::class);
         $this->app->bind(
             StripeSubscriptionGateway::class,
@@ -56,6 +63,9 @@ class AppServiceProvider extends ServiceProvider
     {
         Cashier::useCustomerModel(Company::class);
         Cashier::calculateTaxes();
+        Stripe::setMaxNetworkRetries(
+            (int) config('cashier.network_retries', 2),
+        );
 
         $this->configureDefaults();
     }

@@ -3,6 +3,7 @@
 namespace App\Services\Billing;
 
 use App\Contracts\StripeCatalogGateway;
+use Laravel\Cashier\Cashier;
 use LogicException;
 use Stripe\StripeClient;
 
@@ -46,6 +47,6 @@ class StripeApiCatalogGateway implements StripeCatalogGateway
             throw new LogicException('Der Stripe Secret Key ist nicht konfiguriert.');
         }
 
-        return new StripeClient($secret);
+        return Cashier::stripe();
     }
 }

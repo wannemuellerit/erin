@@ -115,7 +115,7 @@ const accountGroups = computed(() =>
                             type="button"
                             variant="outline"
                             size="sm"
-                            class="shrink-0 self-center"
+                            class="shrink-0 self-center hover:text-slate-950"
                             :aria-label="
                                 t('auth.insertDemoAccount', {
                                     name: account.name,

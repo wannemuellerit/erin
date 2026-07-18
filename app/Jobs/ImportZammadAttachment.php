@@ -14,7 +14,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
 
@@ -59,6 +58,9 @@ class ImportZammadAttachment implements ShouldBeUnique, ShouldQueue
             throw new RuntimeException('Der Zammad-Anhang konnte nicht sicher zwischengespeichert werden.');
         }
 
+        $storedDisk = null;
+        $storedPath = null;
+        $storageReferencePersisted = false;
         try {
             try {
                 $download = $provider->downloadAttachment(
@@ -120,10 +122,9 @@ class ImportZammadAttachment implements ShouldBeUnique, ShouldQueue
             }
 
             $disk = (string) config('support.attachments.disk', 'private');
-            $path = sprintf(
-                'support-tickets/%d/zammad/%s.%s',
+            $path = $this->storagePath(
                 $ticket->getKey(),
-                Str::uuid()->toString(),
+                $attachment->getKey(),
                 $extension,
             );
             rewind($temporary);
@@ -132,6 +133,8 @@ class ImportZammadAttachment implements ShouldBeUnique, ShouldQueue
                 RuntimeException::class,
                 'Der Zammad-Anhang konnte nicht privat gespeichert werden.',
             );
+            $storedDisk = $disk;
+            $storedPath = $path;
 
             $stream = Storage::disk($disk)->readStream($path);
             if (! is_resource($stream)) {
@@ -161,7 +164,18 @@ class ImportZammadAttachment implements ShouldBeUnique, ShouldQueue
                 'scan_result' => $scanResult,
                 'scan_completed_at' => now(),
             ]);
+            $storageReferencePersisted = true;
             $this->broadcastMessage($attachment);
+        } catch (Throwable $exception) {
+            if (
+                ! $storageReferencePersisted
+                && $storedDisk !== null
+                && $storedPath !== null
+            ) {
+                Storage::disk($storedDisk)->delete($storedPath);
+            }
+
+            throw $exception;
         } finally {
             fclose($temporary);
         }
@@ -169,12 +183,30 @@ class ImportZammadAttachment implements ShouldBeUnique, ShouldQueue
 
     public function failed(Throwable $exception): void
     {
-        $attachment = SupportTicketAttachment::query()->find($this->attachmentId);
+        $attachment = SupportTicketAttachment::query()
+            ->with('message.supportTicket')
+            ->find($this->attachmentId);
         if ($attachment === null) {
             return;
         }
         if (filled($attachment->disk) && filled($attachment->path)) {
             Storage::disk($attachment->disk)->delete($attachment->path);
+        }
+        $extension = mb_strtolower((string) pathinfo(
+            $attachment->original_name,
+            PATHINFO_EXTENSION,
+        ));
+        if (
+            $attachment->source === 'zammad'
+            && $extension !== ''
+            && $attachment->message !== null
+        ) {
+            Storage::disk((string) config('support.attachments.disk', 'private'))
+                ->delete($this->storagePath(
+                    $attachment->message->support_ticket_id,
+                    $attachment->getKey(),
+                    $extension,
+                ));
         }
         $attachment->update([
             'disk' => null,
@@ -226,6 +258,19 @@ class ImportZammadAttachment implements ShouldBeUnique, ShouldQueue
     {
         SupportTicketMessageCreated::dispatch(
             $attachment->message()->with('files')->firstOrFail(),
+        );
+    }
+
+    private function storagePath(
+        int $supportTicketId,
+        int $attachmentId,
+        string $extension,
+    ): string {
+        return sprintf(
+            'support-tickets/%d/zammad/%d.%s',
+            $supportTicketId,
+            $attachmentId,
+            $extension,
         );
     }
 }

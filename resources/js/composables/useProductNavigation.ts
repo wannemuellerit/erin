@@ -57,10 +57,6 @@ export function useProductNavigation() {
             return roleAliases[rawRole];
         }
 
-        if (user?.email === 'admin@wannemueller.dev') {
-            return 'super_admin';
-        }
-
         return 'employer';
     });
 

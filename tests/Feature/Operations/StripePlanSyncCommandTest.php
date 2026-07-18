@@ -2,6 +2,8 @@
 
 use App\Contracts\StripeCatalogGateway;
 use App\Models\Plan;
+use App\Models\StripeAddonPrice;
+use App\Services\Billing\StripeSubscriptionItemClassifier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Tests\Support\ErinStripeCatalogGateway;
@@ -74,6 +76,120 @@ it('creates test mode products and immutable recurring prices only with apply', 
         ->and($plan->fresh()?->stripe_price_id)->toBe('price_created');
 });
 
+it('keeps historical recruiter seat Prices allowed after a configured rotation', function () {
+    config()->set('cashier.secret', 'sk_test_addon_rotation');
+    config()->set(
+        'services.stripe.seat_product_id',
+        'prod_recruiter_seat_v1',
+    );
+    config()->set(
+        'services.stripe.seat_price_id',
+        'price_recruiter_seat_v1',
+    );
+    app()->instance(StripeCatalogGateway::class, new ErinStripeCatalogGateway);
+    $plan = Plan::factory()->create([
+        'slug' => 'addon-rotation-plan',
+        'stripe_product_id' => 'prod_addon_rotation_base',
+        'stripe_price_id' => 'price_addon_rotation_base',
+    ]);
+
+    expect(Artisan::call('erin:stripe:sync-plans', [
+        '--plan' => [$plan->slug],
+        '--apply' => true,
+    ]))->toBe(0);
+
+    config()->set(
+        'services.stripe.seat_product_id',
+        'prod_recruiter_seat_v2',
+    );
+    config()->set(
+        'services.stripe.seat_price_id',
+        'price_recruiter_seat_v2',
+    );
+    expect(Artisan::call('erin:stripe:sync-plans', [
+        '--plan' => [$plan->slug],
+        '--apply' => true,
+    ]))->toBe(0);
+
+    $old = StripeAddonPrice::query()
+        ->where('stripe_price_id', 'price_recruiter_seat_v1')
+        ->sole();
+    $current = StripeAddonPrice::query()
+        ->where('stripe_price_id', 'price_recruiter_seat_v2')
+        ->sole();
+    expect($old->is_enabled)->toBeTrue()
+        ->and($old->retired_at)->not->toBeNull()
+        ->and($current->is_enabled)->toBeTrue()
+        ->and($current->retired_at)->toBeNull();
+
+    $classification = app(StripeSubscriptionItemClassifier::class)->classify([
+        [
+            'id' => 'si_addon_rotation_base',
+            'quantity' => 1,
+            'price' => [
+                'id' => $plan->stripe_price_id,
+                'product' => $plan->stripe_product_id,
+            ],
+        ],
+        [
+            'id' => 'si_addon_rotation_old',
+            'quantity' => 2,
+            'price' => [
+                'id' => $old->stripe_price_id,
+                'product' => $old->stripe_product_id,
+            ],
+        ],
+    ]);
+    expect($classification['base_plan']?->is($plan))->toBeTrue()
+        ->and($classification['add_ons'])->toHaveCount(1)
+        ->and($classification['add_ons'][0]['price'])
+        ->toBe('price_recruiter_seat_v1');
+});
+
+it('fails closed when a configured add-on Price contradicts its stored Product', function () {
+    config()->set('cashier.secret', 'sk_test_addon_conflict');
+    config()->set(
+        'services.stripe.seat_product_id',
+        'prod_recruiter_seat_conflict_new',
+    );
+    config()->set(
+        'services.stripe.seat_price_id',
+        'price_recruiter_seat_conflict',
+    );
+    StripeAddonPrice::query()->create([
+        'code' => 'recruiter_seat',
+        'stripe_product_id' => 'prod_recruiter_seat_conflict_original',
+        'stripe_price_id' => 'price_recruiter_seat_conflict',
+        'is_enabled' => true,
+        'activated_at' => now(),
+    ]);
+    $gateway = new ErinStripeCatalogGateway;
+    app()->instance(StripeCatalogGateway::class, $gateway);
+    $plan = Plan::factory()->create([
+        'slug' => 'addon-conflict-plan',
+        'stripe_product_id' => null,
+        'stripe_price_id' => null,
+    ]);
+
+    $exitCode = Artisan::call('erin:stripe:sync-plans', [
+        '--plan' => [$plan->slug],
+        '--apply' => true,
+    ]);
+
+    expect($exitCode)->toBe(1)
+        ->and(Artisan::output())->toContain('widersprüchlich registriert')
+        ->and($gateway->productCalls)->toBeEmpty()
+        ->and($gateway->priceCalls)->toBeEmpty()
+        ->and($plan->fresh()?->stripe_product_id)->toBeNull()
+        ->and(StripeAddonPrice::query()
+            ->where(
+                'stripe_price_id',
+                'price_recruiter_seat_conflict',
+            )
+            ->value('stripe_product_id'))
+        ->toBe('prod_recruiter_seat_conflict_original');
+});
+
 it('refuses live Stripe mutations outside a known production deployment', function () {
     config()->set('cashier.secret', 'sk_live_command_key');
     config()->set('app.url', 'https://erin.example');
@@ -140,3 +256,76 @@ it('rejects an orphaned Price ID instead of guessing its Stripe product', functi
         ->and($gateway->productCalls)->toBeEmpty()
         ->and($gateway->priceCalls)->toBeEmpty();
 });
+
+it('refuses ambiguous Stripe secrets before any catalog mutation', function (
+    string $secret,
+) {
+    config()->set('cashier.secret', $secret);
+    $gateway = new ErinStripeCatalogGateway;
+    app()->instance(StripeCatalogGateway::class, $gateway);
+    $plan = Plan::factory()->create([
+        'slug' => 'ambiguous-key-guard',
+        'stripe_product_id' => null,
+        'stripe_price_id' => null,
+    ]);
+
+    $exitCode = Artisan::call('erin:stripe:sync-plans', [
+        '--plan' => [$plan->slug],
+        '--apply' => true,
+    ]);
+
+    expect($exitCode)->toBe(1)
+        ->and(Artisan::output())
+        ->toContain('eindeutig erkannten Test- oder Live-Secret-Key')
+        ->not->toContain($secret)
+        ->and($gateway->productCalls)->toBeEmpty()
+        ->and($gateway->priceCalls)->toBeEmpty()
+        ->and($plan->fresh()?->stripe_product_id)->toBeNull();
+})->with([
+    'falscher Prefix' => 'secret_not_stripe',
+    'nur Publishable Key' => 'pk_test_not_a_secret',
+    'abgeschnittener Test-Key' => 'sk_test',
+]);
+
+it('does not leak Stripe timeout rate-limit or server-error details', function (
+    string $providerFailure,
+) {
+    config()->set('cashier.secret', 'sk_test_catalog_failure');
+    $gateway = new class($providerFailure) extends ErinStripeCatalogGateway
+    {
+        public function __construct(private readonly string $failure)
+        {
+            parent::__construct();
+        }
+
+        public function createProduct(
+            array $parameters,
+            string $idempotencyKey,
+        ): string {
+            throw new RuntimeException($this->failure);
+        }
+    };
+    app()->instance(StripeCatalogGateway::class, $gateway);
+    $plan = Plan::factory()->create([
+        'slug' => 'provider-failure',
+        'stripe_product_id' => null,
+        'stripe_price_id' => null,
+    ]);
+
+    $exitCode = Artisan::call('erin:stripe:sync-plans', [
+        '--plan' => [$plan->slug],
+        '--apply' => true,
+    ]);
+
+    expect($exitCode)->toBe(1)
+        ->and(Artisan::output())
+        ->toContain('Details stehen ausschließlich im geschützten Log')
+        ->not->toContain($providerFailure)
+        ->not->toContain('sk_test_provider_secret')
+        ->and($plan->fresh()?->stripe_product_id)->toBeNull()
+        ->and($plan->fresh()?->stripe_price_id)->toBeNull();
+})->with([
+    'Timeout' => 'Timeout; sk_test_provider_secret',
+    'Rate Limit' => 'HTTP 429; sk_test_provider_secret',
+    'Serverfehler' => 'HTTP 500; sk_test_provider_secret',
+]);

@@ -123,12 +123,55 @@ Pflichtfelder:
 - `ERIN_PILOT_DEPUTY`
 - `ERIN_PILOT_DECISION_BY`
 - `ERIN_PILOT_DECISION_AT`
+- `ERIN_PILOT_STARTED_AT`
 - `ERIN_PILOT_RELEASE_ID`
 - `ERIN_PILOT_PLAN_REFERENCE`
 - `ERIN_PILOT_DECISION_REFERENCE`
 - `ERIN_PILOT_ACCEPTANCE_REFERENCE`
 - `ERIN_PILOT_ROLLBACK_REFERENCE`
 - `ERIN_PILOT_STATUS=approved`
+- `ERIN_PILOT_SYNTHETIC=false`
+- `ERIN_PILOT_PARTICIPANT_CONSENT_VERIFIED=true`
+- `ERIN_PILOT_STOP_CRITERIA_TESTED=true`
+- `ERIN_PILOT_ROLLBACK_TESTED=true`
 
 Das Setzen dieser Werte ist erst nach tatsächlichem Pilot und realer
 Go-Entscheidung zulässig.
+
+## Lokales synthetisches Pilot-Kontrollmodell
+
+Das technische Stop- und Gate-Regelwerk kann vor dem echten Pilot rein
+synthetisch mit der geplanten Obergrenze von zwei Firmen und zehn Fachkräften
+modelliert werden. Der Befehl greift bewusst nicht auf Konten,
+Datenbankinhalte, Integrationen oder reale Teilnehmer zu. Er führt weder
+Rollback noch Wartungsmodus, Monitoring, Audit-Logging oder Benachrichtigungen
+wirklich aus und ist deshalb kein Drill und kein End-to-End-Pilot:
+
+```bash
+ERIN_PILOT_DRILL_CONFIRM=SYNTHETIC_LOCAL_ONLY \
+  scripts/ops/pilot-drill.sh pass
+```
+
+Ein Stop-Kriterium wird beispielsweise so geprüft:
+
+```bash
+ERIN_PILOT_DRILL_CONFIRM=SYNTHETIC_LOCAL_ONLY \
+  scripts/ops/pilot-drill.sh tenant-leak
+```
+
+Das zweite Kommando muss mit einem Fehlercode enden und
+`result.status=stopped` sowie `tenant_data_leak.none` als fehlgeschlagene
+Stop-Prüfung ausgeben. Weitere Szenarien prüfen Dokumentleck, autonome
+KI-Statusänderung, Webhook-Duplikation, Support-Desynchronisation,
+Rollenkollision, Kandidaten- und Firmenüberschreitung, modelliertes
+Rollback-/Wartungsmodusversagen, Monitoring- und Audit-Ausfall, versehentlich
+aktive externe Benachrichtigungen, Interview-Autorisierung, kritische
+Incidents, Timeline-Inkonsistenz und geschützte Matching-Faktoren.
+
+Die lokal nicht überschreibend angelegte JSON-Evidenz und ihre SHA-256-Datei
+liegen unter `storage/app/operations/evidence/pilot/`. Das macht spätere
+Änderungen erkennbar, ist aber keine unveränderliche WORM-Ablage. Die Evidenz
+trägt `evidence_type=synthetic_local_pilot_control_model` und
+`execution_mode=rule_model_only`, ist immer als
+`LOCAL_SYNTHETIC_NOT_PRODUCTION_EVIDENCE` klassifiziert, enthält
+`production_gate_eligible=false` und lässt alle formalen Freigaben offen.

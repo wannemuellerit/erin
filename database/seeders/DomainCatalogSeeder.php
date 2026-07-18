@@ -24,6 +24,9 @@ class DomainCatalogSeeder extends Seeder
                 'ai_credits_monthly' => 0,
                 'job_boosts_per_term' => 0,
                 'visa_credits_per_term' => 0,
+                ...(filled(config('services.stripe.basic_product_id'))
+                    ? ['stripe_product_id' => config('services.stripe.basic_product_id')]
+                    : []),
                 ...(filled(config('services.stripe.basic_price_id'))
                     ? ['stripe_price_id' => config('services.stripe.basic_price_id')]
                     : []),
@@ -40,6 +43,9 @@ class DomainCatalogSeeder extends Seeder
                 'ai_credits_monthly' => 250,
                 'job_boosts_per_term' => 1,
                 'visa_credits_per_term' => 5,
+                ...(filled(config('services.stripe.business_product_id'))
+                    ? ['stripe_product_id' => config('services.stripe.business_product_id')]
+                    : []),
                 ...(filled(config('services.stripe.business_price_id'))
                     ? ['stripe_price_id' => config('services.stripe.business_price_id')]
                     : []),
@@ -56,6 +62,9 @@ class DomainCatalogSeeder extends Seeder
                 'ai_credits_monthly' => 750,
                 'job_boosts_per_term' => 3,
                 'visa_credits_per_term' => 15,
+                ...(filled(config('services.stripe.premium_product_id'))
+                    ? ['stripe_product_id' => config('services.stripe.premium_product_id')]
+                    : []),
                 ...(filled(config('services.stripe.premium_price_id'))
                     ? ['stripe_price_id' => config('services.stripe.premium_price_id')]
                     : []),

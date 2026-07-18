@@ -79,7 +79,9 @@ return [
 
         'private' => [
             'driver' => env('PRIVATE_FILESYSTEM_DRIVER', 's3'),
-            'root' => storage_path('app/private'),
+            'root' => env('PRIVATE_FILESYSTEM_DRIVER', 's3') === 'local'
+                ? storage_path('app/private')
+                : (string) env('PRIVATE_FILESYSTEM_PREFIX', ''),
             'key' => env('DOCUMENTS_AWS_ACCESS_KEY_ID', env('AWS_ACCESS_KEY_ID')),
             'secret' => env('DOCUMENTS_AWS_SECRET_ACCESS_KEY', env('AWS_SECRET_ACCESS_KEY')),
             'region' => env('DOCUMENTS_AWS_DEFAULT_REGION', env('AWS_DEFAULT_REGION', 'eu-central-1')),

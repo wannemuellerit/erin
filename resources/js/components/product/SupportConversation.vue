@@ -25,11 +25,21 @@ const props = withDefaults(
         allowInternal?: boolean;
         readOnly?: boolean;
         messageField?: 'message' | 'body';
+        attachmentLimits?: {
+            maxFiles: number;
+            maxFileMegabytes: number;
+            maxTotalMegabytes: number;
+        };
     }>(),
     {
         allowInternal: false,
         readOnly: false,
         messageField: 'message',
+        attachmentLimits: () => ({
+            maxFiles: 8,
+            maxFileMegabytes: 10,
+            maxTotalMegabytes: 15,
+        }),
     },
 );
 
@@ -264,6 +274,11 @@ const send = () => {
                     class="mt-1 text-xs text-red-600"
                 >
                     {{ form.errors.attachments }}
+                </p>
+                <p class="mt-1 text-xs text-slate-500">
+                    {{
+                        t('operations.support.attachmentHint', attachmentLimits)
+                    }}
                 </p>
             </div>
             <div

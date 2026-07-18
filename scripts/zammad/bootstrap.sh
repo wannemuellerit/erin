@@ -28,6 +28,18 @@ if [[ -z "${group_name}" || -z "${callback_url}" || ${#webhook_secret} -lt 32 ]]
     echo "Gruppe, Callback oder Webhook-Secret sind unvollständig." >&2
     exit 1
 fi
+if [[ "${group_name}" == *$'\n'* || "${group_name}" == *$'\r'* ]]; then
+    echo "Der Zammad-Gruppenname darf keinen Zeilenumbruch enthalten." >&2
+    exit 1
+fi
+
+dotenv_quote() {
+    local value="$1"
+
+    value="${value//\\/\\\\}"
+    value="${value//\"/\\\"}"
+    printf '"%s"' "${value}"
+}
 
 bootstrap_output="$(
     zammad_compose exec -T \
@@ -40,9 +52,10 @@ bootstrap_output="$(
         bundle exec rails runner /opt/erin/bootstrap.rb
 )"
 token="$(printf '%s\n' "${bootstrap_output}" | sed -n 's/^ERIN_ZAMMAD_TOKEN=//p' | tail -n 1)"
+token_id="$(printf '%s\n' "${bootstrap_output}" | sed -n 's/^ERIN_ZAMMAD_TOKEN_ID=//p' | tail -n 1)"
 unset bootstrap_output
 
-if [[ -z "${token}" ]]; then
+if [[ -z "${token}" || ! "${token_id}" =~ ^[1-9][0-9]*$ ]]; then
     echo "Zammad hat kein API-Token für Erin zurückgegeben." >&2
     exit 1
 fi
@@ -56,7 +69,7 @@ umask 077
     printf 'ZAMMAD_ENABLED=true\n'
     printf 'ZAMMAD_URL=http://zammad:8080\n'
     printf 'ZAMMAD_TOKEN=%s\n' "${token}"
-    printf 'ZAMMAD_GROUP=%s\n' "${group_name}"
+    printf 'ZAMMAD_GROUP=%s\n' "$(dotenv_quote "${group_name}")"
     printf 'ZAMMAD_WEBHOOK_SECRET=%s\n' "${webhook_secret}"
     printf 'ZAMMAD_TIMEOUT=10\n'
     printf 'ZAMMAD_ALLOW_LOCAL_HTTP=true\n'
@@ -80,6 +93,31 @@ unset token
 docker compose --project-directory "${ERIN_ROOT}" exec -T laravel php artisan optimize:clear
 docker compose --project-directory "${ERIN_ROOT}" restart laravel queue
 
+if ! docker compose --project-directory "${ERIN_ROOT}" exec -T \
+    laravel php artisan erin:zammad:smoke; then
+    echo "Der neue Token konnte nicht bestätigt werden; bisherige Erin-Tokens bleiben als Rückfall erhalten." >&2
+    echo "Nach Behebung erneut scripts/zammad/bootstrap.sh ausführen." >&2
+    exit 1
+fi
+
+finalize_output="$(
+    zammad_compose exec -T \
+        -e ERIN_ZAMMAD_BOOTSTRAP_ACTION=finalize \
+        -e ERIN_ZAMMAD_ADMIN_EMAIL="${admin_email}" \
+        -e ERIN_ZAMMAD_INTEGRATION_EMAIL="${integration_email}" \
+        -e ERIN_ZAMMAD_KEEP_TOKEN_ID="${token_id}" \
+        zammad-railsserver \
+        bundle exec rails runner /opt/erin/bootstrap.rb
+)"
+unset token_id
+if [[ "${finalize_output}" != *"ERIN_ZAMMAD_TOKEN_FINALIZED=true"* ]]; then
+    unset finalize_output
+    echo "Der neue Token funktioniert, aber ältere Erin-Tokens konnten nicht bereinigt werden." >&2
+    echo "Führe den Bootstrap erneut aus oder bereinige die alten Tokens in Zammad." >&2
+    exit 1
+fi
+unset finalize_output
+
 echo "Zammad-Gruppe, technischer Benutzer, API-Token, Webhook und Trigger sind eingerichtet."
 echo "Erin wurde lokal konfiguriert; sensible Werte stehen nur in ignorierten Dateien."
-echo "Prüfung: docker compose exec -T laravel php artisan erin:zammad:smoke"
+echo "Der neue Token wurde geprüft; erst danach wurden ältere Erin-Tokens entfernt."

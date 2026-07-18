@@ -3,6 +3,9 @@
 use App\Enums\CandidateDocumentStatus;
 use App\Models\CandidateDocument;
 use App\Models\JobInvitation;
+use App\Services\Ticketing\SupportOutboundReconciliationDispatcher;
+use App\Services\Ticketing\SupportWebhookOutboxDispatcher;
+use App\Services\Ticketing\SupportZammadWebhookInboxDispatcher;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -52,5 +55,38 @@ Schedule::command('erin:ops:queue-health --json')
 
 Schedule::command('erin:ops:prune --execute --json')
     ->dailyAt('03:15')
+    ->onOneServer()
+    ->withoutOverlapping();
+
+Schedule::command('erin:stripe:reconcile-billing --limit=100')
+    ->everyFiveMinutes()
+    ->onOneServer()
+    ->withoutOverlapping();
+
+Schedule::call(
+    fn (): int => app(SupportWebhookOutboxDispatcher::class)->dispatchPending(100),
+)->name('erin:support:dispatch-webhook-outbox')
+    ->everyMinute()
+    ->onOneServer()
+    ->withoutOverlapping();
+
+Schedule::call(
+    fn (): array => app(SupportOutboundReconciliationDispatcher::class)
+        ->dispatchDue(100),
+)->name('erin:support:reconcile-zammad-writes')
+    ->everyMinute()
+    ->onOneServer()
+    ->withoutOverlapping();
+
+Schedule::call(
+    fn (): int => app(SupportZammadWebhookInboxDispatcher::class)
+        ->dispatchPending(100),
+)->name('erin:support:replay-unmatched-zammad-webhooks')
+    ->everyMinute()
+    ->onOneServer()
+    ->withoutOverlapping();
+
+Schedule::command('erin:support:prune-orphan-attachments --execute --json')
+    ->dailyAt('03:45')
     ->onOneServer()
     ->withoutOverlapping();

@@ -13,6 +13,17 @@ if [ "${APP_ENV:-production}" = "production" ]; then
         exit 1
     fi
 
+    if [ ! -r /app/.erin-governance-trust-root-sha256 ]; then
+        echo "Der eingebettete Governance-Trust-Root-Fingerprint fehlt." >&2
+        exit 1
+    fi
+
+    governance_trust_root_sha256="$(cat /app/.erin-governance-trust-root-sha256)"
+    if ! printf '%s' "$governance_trust_root_sha256" | grep -Eq '^[0-9a-f]{64}$'; then
+        echo "Der eingebettete Governance-Trust-Root-Fingerprint ist ungültig." >&2
+        exit 1
+    fi
+
     image_build_sha="$(cat /app/.erin-build-sha)"
     if ! printf '%s' "$image_build_sha" | grep -Eq '^[0-9a-f]{40}$'; then
         echo "Der eingebettete Build-SHA ist ungültig." >&2

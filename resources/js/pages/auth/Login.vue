@@ -21,6 +21,10 @@ import PasskeyVerify from '@/components/PasskeyVerify.vue';
 /* @end-chisel-passkeys */
 import type { DemoAccount } from '@/types/demo';
 
+defineOptions({
+    inheritAttrs: false,
+});
+
 withDefaults(
     defineProps<{
         status?: string;

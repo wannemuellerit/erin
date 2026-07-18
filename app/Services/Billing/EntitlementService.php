@@ -12,6 +12,7 @@ use App\Models\Plan;
 use Carbon\CarbonInterface;
 use DomainException;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 class EntitlementService
 {
@@ -202,21 +203,69 @@ class EntitlementService
             throw new DomainException(__('Das Visumpaket muss mindestens einen Credit enthalten.'));
         }
 
-        $existing = EntitlementLedger::query()
-            ->where('company_id', $company->getKey())
-            ->where('resource', 'visa')
-            ->where('source', 'stripe_purchase')
-            ->where('metadata->stripe_reference', $stripeReference)
-            ->first();
+        if (
+            strlen($stripeReference) > 255
+            || preg_match('/\Api_[A-Za-z0-9_]+\z/', $stripeReference) !== 1
+        ) {
+            throw new DomainException(__('Die Stripe-Zahlungsreferenz ist ungültig.'));
+        }
 
-        return $existing ?? EntitlementLedger::query()->create([
-            'company_id' => $company->getKey(),
-            'resource' => 'visa',
-            'amount' => $credits,
-            'source' => 'stripe_purchase',
-            'reference_type' => 'stripe_payment',
-            'metadata' => ['stripe_reference' => $stripeReference],
-        ]);
+        return DB::transaction(function () use (
+            $company,
+            $credits,
+            $stripeReference,
+        ): EntitlementLedger {
+            $now = now();
+
+            EntitlementLedger::query()->insertOrIgnore([
+                'company_id' => $company->getKey(),
+                'resource' => 'visa',
+                'amount' => $credits,
+                'source' => 'stripe_purchase',
+                'reference_type' => 'stripe_payment',
+                'metadata' => json_encode(
+                    ['stripe_reference' => $stripeReference],
+                    JSON_THROW_ON_ERROR,
+                ),
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+
+            $ledger = EntitlementLedger::query()
+                ->where('stripe_payment_intent_id', $stripeReference)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $ledger instanceof EntitlementLedger) {
+                throw new RuntimeException(
+                    'Der Stripe-Visakauf konnte nicht atomar gespeichert werden.',
+                );
+            }
+
+            $metadata = $ledger->metadata;
+            $metadataReference = is_array($metadata)
+                ? ($metadata['stripe_reference'] ?? null)
+                : null;
+
+            if (
+                $ledger->company_id !== (int) $company->getKey()
+                || $ledger->resource !== 'visa'
+                || $ledger->amount !== $credits
+                || $ledger->source !== 'stripe_purchase'
+                || $ledger->reference_type !== 'stripe_payment'
+                || $ledger->reference_id !== null
+                || $ledger->expires_at !== null
+                || $ledger->stripe_payment_intent_id !== $stripeReference
+                || ! is_string($metadataReference)
+                || ! hash_equals($stripeReference, $metadataReference)
+            ) {
+                throw new DomainException(
+                    __('Die Stripe-Zahlungsreferenz wurde bereits für einen abweichenden Visakauf verwendet.'),
+                );
+            }
+
+            return $ledger;
+        }, 3);
     }
 
     private function monthlyUsage(Company $company, bool $lock): ?CompanyUsagePeriod

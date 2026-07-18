@@ -21,11 +21,21 @@ const props = withDefaults(
             provider: string;
             enabled: boolean;
         };
+        attachmentLimits?: {
+            maxFiles: number;
+            maxFileMegabytes: number;
+            maxTotalMegabytes: number;
+        };
     }>(),
     {
         tickets: () => [],
         selected: null,
         ticketing: () => ({ provider: 'zammad', enabled: false }),
+        attachmentLimits: () => ({
+            maxFiles: 8,
+            maxFileMegabytes: 10,
+            maxTotalMegabytes: 15,
+        }),
     },
 );
 
@@ -195,7 +205,12 @@ const toneFor = (status: string): StatusTone =>
                         {{ form.errors.attachments }}
                     </p>
                     <p class="mt-1 text-xs text-slate-500">
-                        {{ t('operations.support.attachmentHint') }}
+                        {{
+                            t(
+                                'operations.support.attachmentHint',
+                                attachmentLimits,
+                            )
+                        }}
                     </p>
                 </div>
                 <div class="lg:col-span-2 lg:text-right">
@@ -273,6 +288,7 @@ const toneFor = (status: string): StatusTone =>
                 :ticket="selectedTicket"
                 :reply-url="`/support/tickets/${selectedTicket.id}/reply`"
                 :current-user-id="userId"
+                :attachment-limits="attachmentLimits"
             />
         </div>
 

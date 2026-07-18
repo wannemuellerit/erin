@@ -32,7 +32,7 @@ export default {
         attachments: 'Attach files',
         removeAttachment: 'Remove file',
         attachmentHint:
-            'Up to 8 files with 20 MB each. Every file is malware-scanned before release.',
+            'Up to {maxFiles} files with {maxFileMegabytes} MB each and {maxTotalMegabytes} MB in total. Every file is malware-scanned before release.',
         attachmentStatus: {
             pending: 'Scan pending',
             clean: 'Verified',

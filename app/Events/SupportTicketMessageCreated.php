@@ -14,7 +14,10 @@ class SupportTicketMessageCreated implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public function __construct(public readonly SupportTicketMessage $message) {}
+    public function __construct(
+        public readonly SupportTicketMessage $message,
+        public readonly ?string $deliveryId = null,
+    ) {}
 
     public function broadcastOn(): PrivateChannel
     {
@@ -39,6 +42,7 @@ class SupportTicketMessageCreated implements ShouldBroadcastNow
         return [
             'message' => app(SupportTicketMessagePresenter::class)
                 ->present($this->message),
+            'delivery_id' => $this->deliveryId,
         ];
     }
 }
