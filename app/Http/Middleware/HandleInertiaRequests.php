@@ -78,10 +78,6 @@ class HandleInertiaRequests extends Middleware
             'platform' => fn (): array => [
                 'demo_mode' => (bool) config('app.demo_mode'),
                 'locale' => app()->getLocale(),
-                'demo_credentials' => config('app.demo_mode') ? [
-                    'email' => 'admin@wannemueller.dev',
-                    'password' => 'password',
-                ] : null,
                 'supported_locales' => ['de', 'en'],
             ],
             'impersonation' => fn (): ?array => $request->session()->has('impersonation_session_id') ? [

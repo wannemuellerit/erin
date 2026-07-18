@@ -14,14 +14,20 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 it('maps configured Stripe prices onto the launch packages', function () {
+    config()->set('services.stripe.basic_product_id', 'prod_basic_configured');
     config()->set('services.stripe.basic_price_id', 'price_basic_configured');
+    config()->set('services.stripe.business_product_id', 'prod_business_configured');
     config()->set('services.stripe.business_price_id', 'price_business_configured');
+    config()->set('services.stripe.premium_product_id', 'prod_premium_configured');
     config()->set('services.stripe.premium_price_id', 'price_premium_configured');
 
     $this->seed(DomainCatalogSeeder::class);
 
-    expect(Plan::query()->where('slug', 'basic')->value('stripe_price_id'))->toBe('price_basic_configured')
+    expect(Plan::query()->where('slug', 'basic')->value('stripe_product_id'))->toBe('prod_basic_configured')
+        ->and(Plan::query()->where('slug', 'basic')->value('stripe_price_id'))->toBe('price_basic_configured')
+        ->and(Plan::query()->where('slug', 'business')->value('stripe_product_id'))->toBe('prod_business_configured')
         ->and(Plan::query()->where('slug', 'business')->value('stripe_price_id'))->toBe('price_business_configured')
+        ->and(Plan::query()->where('slug', 'premium')->value('stripe_product_id'))->toBe('prod_premium_configured')
         ->and(Plan::query()->where('slug', 'premium')->value('stripe_price_id'))->toBe('price_premium_configured')
         ->and(Plan::query()->where('slug', 'enterprise')->value('stripe_price_id'))->toBeNull()
         ->and(config('cashier.webhook.events'))->toContain('checkout.session.completed');

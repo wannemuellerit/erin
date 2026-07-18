@@ -5,7 +5,12 @@ namespace App\Http\Controllers;
 use App\Enums\CompanyMemberRole;
 use App\Models\Company;
 use App\Models\Plan;
+use App\Services\Billing\BillingPlanChangeManager;
 use App\Services\Billing\EntitlementService;
+use App\Services\Billing\PlanStripePriceRegistry;
+use App\Services\Billing\StripeAddonPriceRegistry;
+use App\Services\Billing\StripePurchaseSignature;
+use App\Services\Billing\SubscriptionChangePolicy;
 use App\Services\Companies\CurrentCompany;
 use App\Services\Platform\PlatformSettings;
 use Illuminate\Http\RedirectResponse;
@@ -97,6 +102,7 @@ class BillingController extends Controller
         Request $request,
         Plan $plan,
         CurrentCompany $currentCompany,
+        PlanStripePriceRegistry $priceRegistry,
     ): Checkout|RedirectResponse {
         $company = $currentCompany->forRequest($request);
         $this->assertCanManage($request, $currentCompany);
@@ -120,6 +126,8 @@ class BillingController extends Controller
         if ($company->subscribed('default')) {
             return back()->with('warning', __('Bitte nutze für bestehende Abonnements den Tarifwechsel.'));
         }
+
+        $priceRegistry->record($plan, 'checkout');
 
         $subscriptionGeneration = DB::transaction(function () use ($company): int {
             /** @var Company $lockedCompany */
@@ -193,63 +201,67 @@ class BillingController extends Controller
         Request $request,
         Plan $plan,
         CurrentCompany $currentCompany,
+        BillingPlanChangeManager $changes,
     ): RedirectResponse {
         $company = $currentCompany->forRequest($request);
         $this->assertCanManage($request, $currentCompany);
-        abort_if($plan->is_enterprise || ! $plan->stripe_price_id, 422);
+        abort_if(
+            ! $plan->is_active
+            || $plan->is_enterprise
+            || ! $plan->stripe_price_id,
+            422,
+            __('Dieses Paket kann nicht direkt gebucht werden.'),
+        );
 
         $subscription = $company->billingSubscription();
         abort_if($subscription === null, 422, __('Es besteht noch kein aktives Abonnement.'));
 
         $company->loadMissing('plan');
         $currentPlan = $company->getRelation('plan');
-        $currentPrice = $currentPlan instanceof Plan ? ($currentPlan->price_cents ?? 0) : 0;
-        $isUpgrade = ($plan->price_cents ?? PHP_INT_MAX) > $currentPrice;
-
-        if ($isUpgrade) {
-            $subscription->swapAndInvoice($plan->stripe_price_id);
-
-            return back()->with('success', __('Das Upgrade wurde sofort beauftragt und anteilig abgerechnet.'));
+        abort_unless(
+            $currentPlan instanceof Plan,
+            422,
+            __('Das aktuelle Paket konnte nicht ermittelt werden.'),
+        );
+        abort_if(
+            $currentPlan->is($plan),
+            422,
+            __('Dieses Paket ist bereits aktiv.'),
+        );
+        $effectiveAt = $company->subscription_renews_at ?? now()->addMonth();
+        $intent = $changes->request(
+            $company,
+            $currentPlan,
+            $plan,
+            $request->user()?->getKey(),
+            $effectiveAt,
+        );
+        if ($intent->status === 'manual_review') {
+            return back()->with(
+                'warning',
+                __('Der Tarifwechsel wurde bei Stripe extern verändert und nicht automatisch übernommen. Der Support wurde zur manuellen Prüfung vorgemerkt.'),
+            );
+        }
+        if ($intent->status !== 'applied') {
+            return back()->with(
+                'warning',
+                __('Der Tarifwechsel wurde sicher vorgemerkt und wird automatisch mit Stripe abgeglichen.'),
+            );
         }
 
-        $effectiveAt = $company->subscription_renews_at ?? now()->addMonth();
-        $stripeSubscription = $subscription->asStripeSubscription();
-        $currentItem = $stripeSubscription->items->data[0] ?? null;
-        abort_if($currentItem === null, 422, __('Die Stripe-Position konnte nicht geladen werden.'));
-
-        $schedule = $stripeSubscription->schedule
-            ? $company->stripe()->subscriptionSchedules->retrieve($stripeSubscription->schedule)
-            : $company->stripe()->subscriptionSchedules->create(['from_subscription' => $subscription->stripe_id]);
-
-        $company->stripe()->subscriptionSchedules->update($schedule->id, [
-            'end_behavior' => 'release',
-            'phases' => [
-                [
-                    'start_date' => $schedule->current_phase->start_date,
-                    'end_date' => $schedule->current_phase->end_date,
-                    'items' => [[
-                        'price' => $currentItem->price->id,
-                        'quantity' => $currentItem->quantity ?? 1,
-                    ]],
-                    'proration_behavior' => 'none',
-                ],
-                [
-                    'items' => [['price' => $plan->stripe_price_id, 'quantity' => 1]],
-                    'proration_behavior' => 'none',
-                ],
-            ],
-        ]);
-
-        $company->update([
-            'pending_plan_id' => $plan->getKey(),
-            'pending_plan_effective_at' => $effectiveAt,
-        ]);
-
-        return back()->with('success', __('Der Downgrade wird zur nächsten Verlängerung wirksam.'));
+        return back()->with(
+            'success',
+            $intent->change_type === 'upgrade'
+                ? __('Das Upgrade wurde sofort beauftragt und anteilig abgerechnet.')
+                : __('Der Downgrade wird zur nächsten Verlängerung wirksam.'),
+        );
     }
 
-    public function cancel(Request $request, CurrentCompany $currentCompany): RedirectResponse
-    {
+    public function cancel(
+        Request $request,
+        CurrentCompany $currentCompany,
+        SubscriptionChangePolicy $changes,
+    ): RedirectResponse {
         $company = $currentCompany->forRequest($request);
         $this->assertCanManage($request, $currentCompany);
         $company->loadMissing('plan');
@@ -262,9 +274,11 @@ class BillingController extends Controller
 
         $currentPlan = $company->getRelation('plan');
         $termMonths = $currentPlan instanceof Plan ? ($currentPlan->term_months ?? 1) : 1;
-        $cancelAt = now()->lte($renewsAt->copy()->subDays(14))
-            ? $renewsAt
-            : $renewsAt->copy()->addMonths($termMonths);
+        $cancelAt = $changes->cancellationDate(
+            $renewsAt,
+            $termMonths,
+            now(),
+        );
 
         $subscription->cancelAt($cancelAt);
         $company->update(['cancel_at_period_end' => true, 'subscription_ends_at' => $cancelAt]);
@@ -278,16 +292,20 @@ class BillingController extends Controller
         Request $request,
         CurrentCompany $currentCompany,
         PlatformSettings $settings,
+        StripePurchaseSignature $purchaseSignature,
+        StripeAddonPriceRegistry $addOnPrices,
     ): Checkout {
         $company = $currentCompany->forRequest($request);
         $this->assertCanManage($request, $currentCompany);
         $validated = $request->validate(['credits' => ['required', 'integer', 'min:1', 'max:100']]);
 
-        $priceId = config('services.stripe.visa_price_id');
+        $priceId = (string) config('services.stripe.visa_price_id');
         abort_unless($settings->get('billing.visa_credit_enabled', false) && filled($priceId), 422, __('Der Zusatzkauf ist noch nicht konfiguriert.'));
+        $addOnPrices->synchronizeConfiguredVisaPackage();
+        $credits = (int) $validated['credits'];
 
         return Checkout::customer($company)->create(
-            [$priceId => $validated['credits']],
+            [$priceId => $credits],
             [
                 'success_url' => route('employer.billing').'?purchase=success',
                 'cancel_url' => route('employer.billing'),
@@ -295,7 +313,14 @@ class BillingController extends Controller
                 'metadata' => [
                     'purchase_type' => 'visa_credits',
                     'company_id' => (string) $company->getKey(),
-                    'credits' => (string) $validated['credits'],
+                    'credits' => (string) $credits,
+                    'price_id' => $priceId,
+                    'erin_signature_version' => StripePurchaseSignature::VERSION,
+                    'erin_purchase_signature' => $purchaseSignature->sign(
+                        (int) $company->getKey(),
+                        $credits,
+                        $priceId,
+                    ),
                 ],
             ],
         );
@@ -305,6 +330,7 @@ class BillingController extends Controller
         Request $request,
         CurrentCompany $currentCompany,
         PlatformSettings $settings,
+        StripeAddonPriceRegistry $addOnPrices,
     ): RedirectResponse {
         $company = $currentCompany->forRequest($request);
         $this->assertCanManage($request, $currentCompany);
@@ -318,6 +344,7 @@ class BillingController extends Controller
             422,
             __('Zusätzliche Recruiter-Sitze sind noch nicht konfiguriert.'),
         );
+        $addOnPrices->synchronizeConfiguredRecruiterSeat();
 
         $subscription = $company->billingSubscription();
         abort_if($subscription === null, 422, __('Es besteht noch kein aktives Abonnement.'));

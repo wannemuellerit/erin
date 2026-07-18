@@ -7,22 +7,22 @@ use Inertia\Testing\AssertableInertia as Assert;
 
 uses(RefreshDatabase::class);
 
-it('serves the public home and pricing pages with the negotiated locale', function () {
+it('uses German for new guests until they explicitly choose another locale', function () {
     $this->withHeader('Accept-Language', 'en')
         ->get(route('home'))
         ->assertOk()
-        ->assertSessionHas('locale', 'en')
+        ->assertSessionHas('locale', 'de')
         ->assertInertia(fn (Assert $page) => $page
             ->component('Welcome')
-            ->where('platform.locale', 'en'));
+            ->where('platform.locale', 'de'));
 
-    $this->withSession(['locale' => 'de'])
+    $this->withSession(['locale' => 'en'])
         ->get(route('pricing'))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('Pricing')
             ->has('plans')
-            ->where('platform.locale', 'de'));
+            ->where('platform.locale', 'en'));
 });
 
 it('lets guests persist a supported locale and rejects unsupported locales', function () {

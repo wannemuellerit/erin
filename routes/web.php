@@ -25,6 +25,7 @@ use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\PublicPageController;
 use App\Http\Controllers\ReferralController;
 use App\Http\Controllers\SupportActionController;
+use App\Http\Controllers\SupportAttachmentController;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
@@ -42,7 +43,7 @@ Route::post('integrations/zammad/webhook', ZammadWebhookController::class)
     ->middleware('throttle:120,1')
     ->name('integrations.zammad.webhook');
 
-Route::middleware(['auth', 'verified'])->group(function (): void {
+Route::middleware(['auth', 'verified', 'staff.2fa'])->group(function (): void {
     Route::get('onboarding', [OnboardingController::class, 'show'])->name('onboarding.show');
     Route::put('onboarding/candidate', [OnboardingController::class, 'candidate'])
         ->name('onboarding.candidate');
@@ -100,6 +101,9 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         ->name('support.tickets.store');
     Route::post('support/tickets/{ticket}/reply', [SupportActionController::class, 'replyTicket'])
         ->name('support.tickets.reply');
+    Route::get('support/attachments/{attachment}', SupportAttachmentController::class)
+        ->middleware(['signed', 'throttle:60,1'])
+        ->name('support.attachments.download');
     Route::post('applications/{application}/feedback', [SupportActionController::class, 'feedback'])
         ->name('feedback.store');
 
@@ -121,13 +125,25 @@ Route::middleware(['auth', 'verified', 'role:company', 'company.member', 'onboar
     ->group(function (): void {
         Route::get('billing', [BillingController::class, 'show'])->name('billing');
         Route::patch('billing/details', [BillingController::class, 'updateDetails'])->name('billing.details');
-        Route::post('billing/checkout/{plan}', [BillingController::class, 'checkout'])->name('billing.checkout');
+        Route::post('billing/checkout/{plan}', [BillingController::class, 'checkout'])
+            ->middleware('throttle:10,1')
+            ->name('billing.checkout');
         Route::get('billing/success', [BillingController::class, 'success'])->name('billing.success');
-        Route::post('billing/portal', [BillingController::class, 'portal'])->name('billing.portal');
-        Route::post('billing/change/{plan}', [BillingController::class, 'changePlan'])->name('billing.change');
-        Route::post('billing/cancel', [BillingController::class, 'cancel'])->name('billing.cancel');
-        Route::post('billing/visa-credits', [BillingController::class, 'buyVisaCredits'])->name('billing.visa-credits');
-        Route::post('billing/seats', [BillingController::class, 'addSeats'])->name('billing.seats');
+        Route::post('billing/portal', [BillingController::class, 'portal'])
+            ->middleware('throttle:10,1')
+            ->name('billing.portal');
+        Route::post('billing/change/{plan}', [BillingController::class, 'changePlan'])
+            ->middleware('throttle:10,1')
+            ->name('billing.change');
+        Route::post('billing/cancel', [BillingController::class, 'cancel'])
+            ->middleware('throttle:10,1')
+            ->name('billing.cancel');
+        Route::post('billing/visa-credits', [BillingController::class, 'buyVisaCredits'])
+            ->middleware('throttle:5,1')
+            ->name('billing.visa-credits');
+        Route::post('billing/seats', [BillingController::class, 'addSeats'])
+            ->middleware('throttle:5,1')
+            ->name('billing.seats');
 
         Route::middleware('company.subscribed')->group(function (): void {
             Route::get('candidates', [EmployerCandidateController::class, 'index'])->name('candidates.index');

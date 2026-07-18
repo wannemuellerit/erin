@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Plan;
+use App\Services\Billing\StripeAddonPriceRegistry;
 use App\Services\Billing\StripePlanSynchronizer;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
@@ -18,8 +19,10 @@ class SyncStripePlansCommand extends Command
 
     protected $description = 'Prüft den Stripe-Produktkatalog; ohne --apply bleibt der Befehl immer im sicheren Dry-Run.';
 
-    public function handle(StripePlanSynchronizer $synchronizer): int
-    {
+    public function handle(
+        StripePlanSynchronizer $synchronizer,
+        StripeAddonPriceRegistry $addOnPrices,
+    ): int {
         $apply = (bool) $this->option('apply');
 
         if ($apply && ! $this->canApply()) {
@@ -47,6 +50,23 @@ class SyncStripePlansCommand extends Command
         $this->components->info($apply
             ? 'Stripe-Katalogabgleich wird ausdrücklich angewendet.'
             : 'DRY-RUN: Es werden keine Stripe- oder Datenbankwerte verändert.');
+
+        if ($apply) {
+            try {
+                $addOnPrices->synchronizeConfiguredAddOns();
+            } catch (LogicException $exception) {
+                $this->error($exception->getMessage());
+
+                return self::FAILURE;
+            } catch (Throwable $exception) {
+                report($exception);
+                $this->error(
+                    'Die Stripe-Add-on-Price konnte nicht sicher registriert werden.',
+                );
+
+                return self::FAILURE;
+            }
+        }
 
         $failed = false;
         $rows = [];
@@ -95,8 +115,16 @@ class SyncStripePlansCommand extends Command
             return false;
         }
 
-        if (! Str::startsWith($secret, 'sk_live_')) {
+        if (Str::startsWith($secret, 'sk_test_')) {
             return true;
+        }
+
+        if (! Str::startsWith($secret, 'sk_live_')) {
+            $this->error(
+                'Stripe-Mutationen benötigen einen eindeutig erkannten Test- oder Live-Secret-Key.',
+            );
+
+            return false;
         }
 
         if (! $this->option('allow-live')) {

@@ -138,13 +138,7 @@ it('blocks strict release readiness when security, DPO, legal, backup and pilot 
         'filesystems.disks.private.driver' => 's3',
         'filesystems.disks.private.visibility' => 'private',
         'filesystems.disks.private.throw' => true,
-        'operations.gates' => [
-            'backup_restore_verified_at' => null,
-            'security_review_reference' => null,
-            'dpo_approval_reference' => null,
-            'legal_approval_reference' => null,
-            'pilot_owner' => null,
-        ],
+        'operations.launch_evidence' => [],
     ]);
 
     $exitCode = Artisan::call('erin:ops:readiness', [
@@ -159,7 +153,8 @@ it('blocks strict release readiness when security, DPO, legal, backup and pilot 
         ->toContain('"id": "dpo.approval"')
         ->toContain('"id": "legal.approval"')
         ->toContain('"id": "backup.restore_drill"')
-        ->toContain('"id": "pilot.owner"');
+        ->toContain('"id": "pilot.approval"')
+        ->toContain('"id": "evidence.release"');
 })->group('ops');
 
 it('rejects incomplete Stripe launch prices and unsafe Zammad URLs in production readiness', function () {
@@ -188,6 +183,9 @@ it('rejects incomplete Stripe launch prices and unsafe Zammad URLs in production
         'cashier.webhook.secret' => 'whsec_readiness',
         'services.zammad.enabled' => true,
         'services.zammad.url' => 'http://127.0.0.1:8080',
+        'services.zammad.webhook_callback_url' => 'http://laravel:8000/integrations/zammad/webhook',
+        'services.zammad.allow_local_http' => true,
+        'services.zammad.local_http_hosts' => ['zammad', 'laravel'],
         'services.zammad.token' => 'must-not-appear',
         'services.zammad.group' => 'Users',
         'services.zammad.webhook_secret' => str_repeat('x', 32),
@@ -203,7 +201,7 @@ it('rejects incomplete Stripe launch prices and unsafe Zammad URLs in production
         ->and($output)->toContain('"id": "stripe.configured"')
         ->toContain('Product-/Price-IDs')
         ->toContain('"id": "zammad.configured"')
-        ->toContain('sichere HTTPS-URL')
+        ->toContain('sicher freigegebene Endpunkte')
         ->not->toContain('must-not-appear');
 })->group('ops');
 

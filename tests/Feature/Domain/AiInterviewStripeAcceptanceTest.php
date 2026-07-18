@@ -26,6 +26,7 @@ use App\Models\JobPosting;
 use App\Models\Plan;
 use App\Models\User;
 use App\Services\Billing\EntitlementService;
+use App\Services\Billing\StripePurchaseSignature;
 use App\Services\Billing\StripeSubscriptionSynchronizer;
 use App\Services\Billing\StripeWebhookEventProcessor;
 use Carbon\Carbon;
@@ -408,6 +409,8 @@ it('handles duplicate Stripe subscription events once and preserves active and p
 });
 
 it('identifies the base plan beside seat add-ons and never reactivates an administratively blocked company', function () {
+    config()->set('services.stripe.seat_product_id', 'prod_recruiter_seat');
+    config()->set('services.stripe.seat_price_id', 'price_recruiter_seat');
     $plan = Plan::factory()->create([
         'stripe_product_id' => 'prod_base_business',
         'stripe_price_id' => 'price_base_business',
@@ -464,19 +467,29 @@ it('identifies the base plan beside seat add-ons and never reactivates an admini
 });
 
 it('does not grant purchased visa credits twice for a duplicate Stripe checkout event', function () {
+    config()->set('cashier.secret', 'sk_test_visa_purchase_acceptance');
     $company = Company::factory()->create();
     $listener = app(SyncStripePurchase::class);
+    $priceId = 'price_visa_purchase_acceptance';
+    $credits = 5;
     $payload = [
         'id' => 'evt_visa_purchase_acceptance',
         'type' => 'checkout.session.completed',
+        'livemode' => false,
         'data' => ['object' => [
             'id' => 'cs_visa_purchase_acceptance',
+            'mode' => 'payment',
             'payment_status' => 'paid',
             'payment_intent' => 'pi_visa_purchase_acceptance',
             'metadata' => [
                 'purchase_type' => 'visa_credits',
                 'company_id' => (string) $company->getKey(),
-                'credits' => '5',
+                'credits' => (string) $credits,
+                'price_id' => $priceId,
+                'erin_signature_version' => StripePurchaseSignature::VERSION,
+                'erin_purchase_signature' => app(
+                    StripePurchaseSignature::class,
+                )->sign((int) $company->getKey(), $credits, $priceId),
             ],
         ]],
     ];

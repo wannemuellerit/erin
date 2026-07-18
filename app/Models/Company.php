@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\CompanyStatus;
 use Database\Factories\CompanyFactory;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -39,6 +40,7 @@ use Laravel\Cashier\Subscription;
  * @property-read Plan|null $pendingPlan
  * @property-read CompanyMedia|null $logoMedia
  * @property-read CompanyTrustMetric|null $trustMetric
+ * @property-read Collection<int, BillingChangeIntent> $billingChangeIntents
  */
 class Company extends Model
 {
@@ -237,6 +239,14 @@ class Company extends Model
     public function entitlementLedger(): HasMany
     {
         return $this->hasMany(EntitlementLedger::class);
+    }
+
+    /**
+     * @return HasMany<BillingChangeIntent, $this>
+     */
+    public function billingChangeIntents(): HasMany
+    {
+        return $this->hasMany(BillingChangeIntent::class);
     }
 
     /**

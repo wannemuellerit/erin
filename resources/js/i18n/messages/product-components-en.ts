@@ -96,6 +96,7 @@ export default {
         attachmentPending: 'Review in progress',
         translations: 'Translations are stored in the conversation.',
         attachFiles: 'Attach files',
+        removeAttachment: 'Remove file',
         messagePlaceholder: 'Write a message …',
         send: 'Send message',
         noSelectionTitle: 'No message selected',

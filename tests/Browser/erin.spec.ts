@@ -4,6 +4,20 @@ import type { Page } from '@playwright/test';
 
 const password = 'password';
 
+const demoAccounts = [
+    { id: 'superadmin', email: 'admin@wannemueller.dev' },
+    { id: 'mueller', email: 'unternehmen.mueller@wannemueller.dev' },
+    {
+        id: 'rheincargo',
+        email: 'unternehmen.rheincargo@wannemueller.dev',
+    },
+    ...Array.from({ length: 10 }, (_, index) => {
+        const id = `candidate${String(index + 1).padStart(2, '0')}`;
+
+        return { id, email: `${id}@wannemueller.dev` };
+    }),
+] as const;
+
 const accounts = {
     admin: {
         email: 'admin@wannemueller.dev',
@@ -124,9 +138,19 @@ async function expectNoHorizontalOverflow(page: Page): Promise<void> {
 }
 
 test.describe('Login und Rollenbereiche', () => {
-    test('zeigt den Demo-Zugang und setzt die Zugangsdaten barrierearm ein', async ({
+    test('zeigt alle Demo-Zugänge und setzt jeden Zugang barrierearm ein', async ({
         page,
     }) => {
+        const vueWarnings: string[] = [];
+        page.on('console', (message) => {
+            if (
+                message.type() === 'warning' &&
+                message.text().includes('[Vue warn]')
+            ) {
+                vueWarnings.push(message.text());
+            }
+        });
+
         await page.goto('/login');
 
         await expect(page.getByRole('main')).toHaveCount(1);
@@ -140,26 +164,47 @@ test.describe('Login und Rollenbereiche', () => {
 
         const email = page.getByLabel('E-Mail-Adresse', { exact: true });
         const loginPassword = page.getByLabel('Passwort', { exact: true });
-        const insert = page.getByTestId('insert-demo-credentials');
+        const insert = page.getByTestId('insert-demo-account-rheincargo');
         const submit = page.getByTestId('login-button');
 
         await expect(
-            page.getByText('Demo-Zugang', { exact: true }),
+            page.getByText('Demo-Zugänge', { exact: true }),
         ).toBeVisible();
-        await expect(page.getByTestId('demo-email')).toHaveText(
-            accounts.admin.email,
-        );
+        await expect(page.getByTestId('demo-account-picker')).toBeVisible();
         await expect(page.getByTestId('demo-password')).toHaveText(password);
+        await expect(
+            page.locator('li[data-test^="demo-account-"]'),
+        ).toHaveCount(13);
+        await expect(
+            page.locator('[data-test^="insert-demo-account-"]'),
+        ).toHaveCount(13);
+
+        for (const demoAccount of demoAccounts) {
+            await expect(
+                page.getByText(demoAccount.email, { exact: true }),
+            ).toBeVisible();
+            await page
+                .getByTestId(`insert-demo-account-${demoAccount.id}`)
+                .click();
+            await expect(email).toHaveValue(demoAccount.email);
+            await expect(loginPassword).toHaveValue(password);
+        }
+
         await expect(email).toHaveAccessibleName('E-Mail-Adresse');
         await expect(loginPassword).toHaveAccessibleName('Passwort');
-        await expect(insert).toHaveAccessibleName('Einsetzen');
+        await expect(insert).toHaveAccessibleName(
+            'Zugangsdaten für Daniel Schneider einsetzen',
+        );
         await expect(submit).toHaveAccessibleName('Anmelden');
         await expectNoSeriousAccessibilityViolations(page);
 
         await insert.click();
 
-        await expect(email).toHaveValue(accounts.admin.email);
+        await expect(email).toHaveValue(
+            'unternehmen.rheincargo@wannemueller.dev',
+        );
         await expect(loginPassword).toHaveValue(password);
+        expect(vueWarnings).toEqual([]);
     });
 
     test('meldet den Superadmin an und öffnet die Admin-Navigation', async ({
@@ -340,6 +385,85 @@ test.describe('Login und Rollenbereiche', () => {
         ).toBeVisible();
         await expectNoSeriousAccessibilityViolations(page);
     });
+
+    test('lehnt unbekannte Konten und falsche Passwörter gleichförmig ab', async ({
+        page,
+    }) => {
+        const attempts = [
+            {
+                email: 'nicht-vorhanden@wannemueller.dev',
+                password: 'Falsch-2026!',
+            },
+            {
+                email: 'candidate10@wannemueller.dev',
+                password: 'Falsch-2026!',
+            },
+        ];
+
+        for (const attempt of attempts) {
+            await page.goto('/login');
+            await page
+                .getByLabel('E-Mail-Adresse', { exact: true })
+                .fill(attempt.email);
+            await page
+                .getByLabel('Passwort', { exact: true })
+                .fill(attempt.password);
+            await page.getByTestId('login-button').click();
+
+            await expect(page).toHaveURL(/\/login$/);
+            await expect(
+                page.getByText(
+                    'Diese Zugangsdaten stimmen nicht mit unseren Aufzeichnungen überein.',
+                    { exact: true },
+                ),
+            ).toBeVisible();
+            await expect(page.getByRole('main')).toHaveCount(1);
+            await expect(page.getByTestId('sidebar-menu-button')).toHaveCount(
+                0,
+            );
+        }
+    });
+
+    test('leitet Gäste von sämtlichen Rollenbereichen zum Login um', async ({
+        page,
+    }) => {
+        for (const protectedPath of [
+            '/admin/users',
+            '/employer/jobs',
+            '/candidate/profile',
+        ]) {
+            await page.goto(protectedPath);
+            await expect(page).toHaveURL(/\/login$/);
+            await expect(
+                page.getByRole('heading', {
+                    level: 1,
+                    name: 'Schön, Sie wiederzusehen',
+                }),
+            ).toBeVisible();
+        }
+    });
+
+    test('blockiert rollenfremde Direktzugriffe eines Unternehmens', async ({
+        page,
+    }) => {
+        await logIn(page, accounts.company.email);
+
+        for (const forbiddenPath of ['/admin/users', '/candidate/profile']) {
+            const response = await page.goto(forbiddenPath);
+            expect(response?.status()).toBe(403);
+        }
+    });
+
+    test('blockiert rollenfremde Direktzugriffe einer Fachkraft', async ({
+        page,
+    }) => {
+        await logIn(page, accounts.candidate.email);
+
+        for (const forbiddenPath of ['/admin/users', '/employer/jobs']) {
+            const response = await page.goto(forbiddenPath);
+            expect(response?.status()).toBe(403);
+        }
+    });
 });
 
 test.describe('Onboarding und Abrechnung', () => {
@@ -453,10 +577,20 @@ test.describe('Support und Mandantentrennung', () => {
 test.describe('Englische Oberfläche', () => {
     test.use({ locale: 'en-GB' });
 
-    test('übersetzt den Gast-Login anhand der Browsersprache', async ({
+    test('startet trotz englischer Browsersprache auf Deutsch und lässt sich umstellen', async ({
         page,
     }) => {
         await page.goto('/login');
+
+        await expect(
+            page.getByRole('heading', {
+                level: 1,
+                name: 'Schön, Sie wiederzusehen',
+            }),
+        ).toBeVisible();
+        await page
+            .getByRole('button', { name: 'Englisch', exact: true })
+            .click();
 
         await expect(
             page.getByRole('heading', {
@@ -465,11 +599,11 @@ test.describe('Englische Oberfläche', () => {
             }),
         ).toBeVisible();
         await expect(
-            page.getByText('Demo access', { exact: true }),
+            page.getByText('Demo accounts', { exact: true }),
         ).toBeVisible();
-        await expect(page.getByTestId('insert-demo-credentials')).toHaveText(
-            'Insert',
-        );
+        await expect(
+            page.getByTestId('insert-demo-account-superadmin'),
+        ).toHaveText('Insert');
         await expect(page.getByTestId('login-button')).toHaveAccessibleName(
             'Sign in',
         );
@@ -481,26 +615,26 @@ test.describe('Englische Oberfläche', () => {
     }) => {
         await page.goto('/');
 
-        await page.getByRole('button', { name: 'German', exact: true }).click();
+        await page
+            .getByRole('button', { name: 'Englisch', exact: true })
+            .click();
         await expect(
             page.getByRole('heading', {
                 level: 1,
-                name: 'Die besten Fachkräfte. Grenzenlos gefunden.',
+                name: 'The best professionals. Found without borders.',
             }),
         ).toBeVisible();
 
         await page.goto('/login');
-        await page
-            .getByRole('button', { name: 'Englisch', exact: true })
-            .click();
+        await page.getByRole('button', { name: 'German', exact: true }).click();
 
         await expect(
             page.getByRole('heading', {
                 level: 1,
-                name: 'Welcome back',
+                name: 'Schön, Sie wiederzusehen',
             }),
         ).toBeVisible();
-        await expect(page.getByTestId('locale-en')).toHaveAttribute(
+        await expect(page.getByTestId('locale-de')).toHaveAttribute(
             'aria-pressed',
             'true',
         );
@@ -511,6 +645,9 @@ test.describe('Englische Oberfläche', () => {
         page,
     }) => {
         await page.goto('/login');
+        await page
+            .getByRole('button', { name: 'Englisch', exact: true })
+            .click();
         await page
             .getByLabel('Email address', { exact: true })
             .fill(accounts.candidate.email);
@@ -529,6 +666,30 @@ test.describe('Englische Oberfläche', () => {
                 exact: true,
             }),
         ).toBeVisible();
+    });
+
+    test('zeigt einen fehlgeschlagenen Login nach Sprachwechsel vollständig auf Englisch', async ({
+        page,
+    }) => {
+        await page.goto('/login');
+        await page
+            .getByRole('button', { name: 'Englisch', exact: true })
+            .click();
+        await page
+            .getByLabel('Email address', { exact: true })
+            .fill('unknown@wannemueller.dev');
+        await page.getByLabel('Password', { exact: true }).fill('Wrong-2026!');
+        await page.getByTestId('login-button').click();
+
+        await expect(page).toHaveURL(/\/login$/);
+        await expect(
+            page.getByText('These credentials do not match our records.', {
+                exact: true,
+            }),
+        ).toBeVisible();
+        await expect(page.getByTestId('login-button')).toHaveAccessibleName(
+            'Sign in',
+        );
     });
 });
 
@@ -615,6 +776,37 @@ test.describe('Mobile Abnahme', () => {
             }),
         ).toBeVisible();
         await expectNoHorizontalOverflow(page);
+    });
+
+    test('hält Demo-Zugänge und Login bei 320 Pixeln vollständig bedienbar', async ({
+        page,
+    }) => {
+        await page.setViewportSize({ width: 320, height: 760 });
+        await page.goto('/login');
+
+        await expect(page.getByTestId('demo-account-picker')).toBeVisible();
+        await expect(
+            page.getByTestId('insert-demo-account-candidate10'),
+        ).toBeVisible();
+        const lastAccount = page.getByTestId('insert-demo-account-candidate10');
+        await lastAccount.scrollIntoViewIfNeeded();
+        await expect(lastAccount).toBeInViewport();
+        await lastAccount.click();
+        await expect(
+            page.getByLabel('E-Mail-Adresse', { exact: true }),
+        ).toHaveValue('candidate10@wannemueller.dev');
+        await expect(page.getByLabel('Passwort', { exact: true })).toHaveValue(
+            password,
+        );
+
+        const submit = page.getByTestId('login-button');
+        await submit.scrollIntoViewIfNeeded();
+        await expect(submit).toBeInViewport();
+        await expectNoHorizontalOverflow(page);
+        await expectNoSeriousAccessibilityViolations(page);
+        await submit.click();
+        await expect(page).toHaveURL(/\/dashboard(?:\?.*)?$/);
+        await expect(page.getByRole('main')).toBeVisible();
     });
 });
 

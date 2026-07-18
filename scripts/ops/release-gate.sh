@@ -12,6 +12,12 @@ docker compose -f "$compose_file" exec -T "$app_service" \
     php artisan erin:ops:readiness --strict --probe --json
 
 docker compose -f "$compose_file" exec -T "$app_service" \
+    php artisan erin:ops:security-audit --json
+
+docker compose -f "$compose_file" exec -T "$app_service" \
+    php artisan erin:ops:governance-adversarial --json
+
+docker compose -f "$compose_file" exec -T "$app_service" \
     php artisan erin:stripe:staging-check --remote
 
 docker compose -f "$compose_file" exec -T "$app_service" \
@@ -20,4 +26,4 @@ docker compose -f "$compose_file" exec -T "$app_service" \
 docker compose -f "$compose_file" exec -T "$app_service" \
     php artisan erin:ops:queue-health --json
 
-echo "Technische Release-Gates sind grün. Externe Freigaben bleiben anhand der referenzierten Evidenz zu prüfen."
+echo "Technische Release-Gates und strukturierte Evidenzprüfung sind grün."

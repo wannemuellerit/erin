@@ -154,6 +154,7 @@ return [
     'url' => 'The :attribute field must be a valid URL.',
     'ulid' => 'The :attribute field must be a valid ULID.',
     'uuid' => 'The :attribute field must be a valid UUID.',
+    'support_attachments_total' => 'The attachments may have a combined size of at most :size MB.',
     'custom' => [],
     'attributes' => [
         'email' => 'email address',

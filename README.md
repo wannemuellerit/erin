@@ -69,8 +69,9 @@ uses the password `password`:
 | RheinCargo Logistik | `unternehmen.rheincargo@wannemueller.dev` |
 | Candidates 1–10 | `candidate01@wannemueller.dev` through `candidate10@wannemueller.dev` |
 
-The login page can insert the Superadmin credentials automatically while demo
-mode is active. Demo credentials and the seeder are disabled in production.
+The login page lists all 13 demo accounts grouped by role and can insert the
+selected credentials automatically while demo mode is active. Demo credentials
+and the seeder are disabled in production.
 
 ## Isolated tools
 
@@ -167,15 +168,25 @@ Cashier to these project variables:
 STRIPE_PUBLISHABLE_KEY=
 STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
+STRIPE_MAX_NETWORK_RETRIES=2
+STRIPE_PRODUCT_BASIC=
 STRIPE_PRICE_BASIC=
+STRIPE_PRODUCT_BUSINESS=
 STRIPE_PRICE_BUSINESS=
+STRIPE_PRODUCT_PREMIUM=
 STRIPE_PRICE_PREMIUM=
+STRIPE_PRICE_RECRUITER_SEAT=
+STRIPE_PRICE_VISA_PACKAGE=
 ```
 
 Never enable paid access from the browser redirect alone. The application must
 wait for a verified, idempotently processed Stripe webhook. Subscription
 webhooks are serialized per customer and reloaded from Stripe before Cashier is
 mutated; opaque event IDs are used only for exact deduplication.
+Signed events are additionally rejected when their `livemode` does not match
+the configured Secret Key. One-time visa purchases carry an Erin HMAC over
+company, quantity and immutable Price reference, so paid sessions created
+outside the application cannot forge credits through metadata alone.
 
 The catalog command is a dry-run unless `--apply` is explicitly provided. It
 stores newly created immutable Product and recurring Price IDs on the plan and
@@ -217,8 +228,12 @@ docker compose --profile stripe run --rm stripe-cli trigger customer.subscriptio
 ```
 
 The automated test suite does not call Stripe and uses signed local webhook
-payloads. Production products, prices, webhook endpoints and keys must be
-configured through the protected deployment process.
+payloads. It covers invalid and expired signatures, wrong event modes, replay
+and ordering, Product/Price drift, throttling, provider timeouts/429/5xx,
+cancellation boundaries and entitlement exhaustion. The operational matrix is
+documented in `docs/operations/stripe-staging.md`; production products, prices,
+webhook endpoints and keys must be configured through the protected deployment
+process.
 
 Zammad remains an external managed service. Erin stores every support message
 locally first and then synchronizes tickets and public replies through queued,
@@ -232,6 +247,9 @@ ZAMMAD_URL=https://support.example.com
 ZAMMAD_TOKEN=
 ZAMMAD_GROUP=Users
 ZAMMAD_WEBHOOK_SECRET=
+ZAMMAD_WEBHOOK_CALLBACK_URL=https://app.example.com/integrations/zammad/webhook
+ZAMMAD_ALLOW_LOCAL_HTTP=false
+ZAMMAD_LOCAL_HTTP_HOSTS=
 ZAMMAD_TIMEOUT=10
 ```
 

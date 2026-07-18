@@ -31,7 +31,10 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $trustedProxies = Env::get('TRUSTED_PROXIES');
         if (is_string($trustedProxies) && $trustedProxies !== '') {
-            $middleware->trustProxies(at: $trustedProxies);
+            $middleware->trustProxies(at: array_values(array_filter(array_map(
+                'trim',
+                explode(',', $trustedProxies),
+            ))));
         }
 
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);

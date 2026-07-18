@@ -378,6 +378,21 @@ export default {
             contractValue: 'Contract value',
             contractValueHint: 'active and overdue plans',
         },
+        manualReview: {
+            title: '{count} plan change requires manual review | {count} plan changes require manual review',
+            description:
+                'For safety, these Stripe changes are not retried automatically. Verify the subscription, schedule and payment directly in Stripe and document the resolution.',
+            item: '{company} (company #{companyId}) · {type} · {attempts} attempts · last update {date}',
+            reason: 'Reason for the manual decision',
+            reasonPlaceholder:
+                'What was verified in Stripe and why is this action safe?',
+            retry: 'Reconcile safely again',
+            close: 'Close without changing plan',
+            type: {
+                upgrade: 'Upgrade',
+                downgrade: 'Downgrade',
+            },
+        },
         stripe: {
             title: 'Stripe configuration status',
             description:

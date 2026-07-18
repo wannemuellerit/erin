@@ -26,12 +26,23 @@ return [
         'events' => [
             ...WebhookCommand::DEFAULT_EVENTS,
             'checkout.session.completed',
+            'customer.subscription.pending_update_applied',
+            'customer.subscription.pending_update_expired',
+            'subscription_schedule.canceled',
+            'subscription_schedule.completed',
+            'subscription_schedule.released',
+            'subscription_schedule.updated',
         ],
     ],
 
     'currency' => env('CASHIER_CURRENCY', 'eur'),
 
     'currency_locale' => env('CASHIER_CURRENCY_LOCALE', 'de_DE'),
+
+    'network_retries' => min(
+        5,
+        max(0, (int) env('STRIPE_MAX_NETWORK_RETRIES', 2)),
+    ),
 
     'payment_notification' => env('CASHIER_PAYMENT_NOTIFICATION'),
 

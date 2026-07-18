@@ -29,6 +29,17 @@ export default {
         replyPlaceholder: 'Write a reply …',
         send: 'Send',
         sending: 'Sending …',
+        attachments: 'Attach files',
+        removeAttachment: 'Remove file',
+        attachmentHint:
+            'Up to {maxFiles} files with {maxFileMegabytes} MB each and {maxTotalMegabytes} MB in total. Every file is malware-scanned before release.',
+        attachmentStatus: {
+            pending: 'Scan pending',
+            clean: 'Verified',
+            infected: 'Malware detected',
+            scan_failed: 'Scan failed',
+            rejected: 'File rejected',
+        },
         internal: 'Internal note',
         supportTeam: 'Erin support',
         you: 'You',

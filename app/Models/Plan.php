@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Database\Factories\PlanFactory;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -24,6 +25,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property bool $is_active
  * @property string|null $stripe_product_id
  * @property string|null $stripe_price_id
+ * @property-read Collection<int, PlanStripePrice> $stripePrices
  */
 class Plan extends Model
 {
@@ -56,6 +58,14 @@ class Plan extends Model
     public function companies(): HasMany
     {
         return $this->hasMany(Company::class, 'current_plan_id');
+    }
+
+    /**
+     * @return HasMany<PlanStripePrice, $this>
+     */
+    public function stripePrices(): HasMany
+    {
+        return $this->hasMany(PlanStripePrice::class);
     }
 
     public function isUnlimited(string $attribute): bool

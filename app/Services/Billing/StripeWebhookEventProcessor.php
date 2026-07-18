@@ -72,7 +72,7 @@ class StripeWebhookEventProcessor
                 } catch (Throwable $exception) {
                     $receipt->forceFill([
                         'status' => 'failed',
-                        'error_message' => $exception->getMessage(),
+                        'error_message' => 'Die Stripe-Verarbeitung ist fehlgeschlagen; technische Details stehen ausschließlich im geschützten Anwendungslog.',
                     ])->save();
 
                     throw $exception;

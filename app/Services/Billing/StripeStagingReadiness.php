@@ -3,6 +3,7 @@
 namespace App\Services\Billing;
 
 use App\Models\Plan;
+use App\Models\PlanStripePrice;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -247,13 +248,34 @@ class StripeStagingReadiness
             return;
         }
 
-        $valid = is_string($priceId) && Str::startsWith($priceId, 'price_');
+        $isPriceId = is_string($priceId)
+            && Str::startsWith($priceId, 'price_');
+        $collidesWithPlan = $isPriceId
+            && (
+                Plan::query()
+                    ->where('stripe_price_id', $priceId)
+                    ->exists()
+                || PlanStripePrice::query()
+                    ->where('stripe_price_id', $priceId)
+                    ->exists()
+            );
+        $otherConfigurationKey = $configurationKey === 'seat_price_id'
+            ? 'visa_price_id'
+            : 'seat_price_id';
+        $collidesWithOtherAddOn = $isPriceId
+            && config("services.stripe.{$otherConfigurationKey}") === $priceId;
+        $valid = $isPriceId
+            && ! $collidesWithPlan
+            && ! $collidesWithOtherAddOn;
         $this->add(
             $label,
             $valid ? 'passed' : 'failed',
-            $valid
-                ? 'Eine Price-ID ist lokal konfiguriert.'
-                : 'Die konfigurierte Price-ID besitzt kein gültiges Format.',
+            match (true) {
+                $valid => 'Eine eigenständige Price-ID ist lokal konfiguriert.',
+                $collidesWithPlan => 'Die konfigurierte Add-on-Price ist bereits einem Erin-Basispaket zugeordnet.',
+                $collidesWithOtherAddOn => 'Dieselbe Stripe-Price darf nicht mehreren Add-on-Rollen zugeordnet werden.',
+                default => 'Die konfigurierte Price-ID besitzt kein gültiges Format.',
+            },
         );
     }
 
@@ -625,8 +647,14 @@ class StripeStagingReadiness
         return [
             'checkout.session.completed',
             'customer.subscription.created',
+            'customer.subscription.pending_update_applied',
+            'customer.subscription.pending_update_expired',
             'customer.subscription.updated',
             'customer.subscription.deleted',
+            'subscription_schedule.canceled',
+            'subscription_schedule.completed',
+            'subscription_schedule.released',
+            'subscription_schedule.updated',
         ];
     }
 

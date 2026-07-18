@@ -75,6 +75,11 @@ const props = defineProps<{
         open_cases: number;
         pending_feedback: number;
     };
+    attachmentLimits: {
+        maxFiles: number;
+        maxFileMegabytes: number;
+        maxTotalMegabytes: number;
+    };
 }>();
 const page = usePage();
 const currentUserId = computed(() => Number(page.props.auth?.user?.id ?? 0));
@@ -400,6 +405,7 @@ function startImpersonation(): void {
                                         )
                                     "
                                     :current-user-id="currentUserId"
+                                    :attachment-limits="attachmentLimits"
                                     allow-internal
                                     message-field="body"
                                 />

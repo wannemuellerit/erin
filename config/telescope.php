@@ -123,10 +123,12 @@ return [
         'stripe*',
         'documents/*/download*',
         'messages/attachments/*',
+        'support/attachments/*',
         'interviews/*/calendar.ics*',
         'join/*',
         'company-invitations/*',
         'employer/billing/success*',
+        'integrations/zammad/webhook',
     ],
 
     'ignore_commands' => [

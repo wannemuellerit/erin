@@ -28,11 +28,11 @@ class CheckZammadReadinessCommand extends Command
         $this->failed = false;
 
         $enabled = (bool) config('services.zammad.enabled');
-        $baseUrl = ZammadEndpoint::secureBaseUrl(config('services.zammad.url'));
+        $baseUrl = ZammadEndpoint::configuredBaseUrl();
         $token = trim((string) config('services.zammad.token'));
         $group = trim((string) config('services.zammad.group'));
         $webhookSecret = (string) config('services.zammad.webhook_secret');
-        $callbackUrl = ZammadEndpoint::secureBaseUrl(config('app.url'));
+        $callbackUrl = ZammadEndpoint::configuredCallbackUrl();
 
         $this->required(
             'Integration',
@@ -43,8 +43,8 @@ class CheckZammadReadinessCommand extends Command
         $this->required(
             'API-URL',
             $baseUrl !== null,
-            'Die Zammad-Basis-URL ist eine sichere HTTPS-URL.',
-            'ZAMMAD_URL muss eine HTTPS-URL ohne Zugangsdaten, Query, Fragment oder IP-Literal sein.',
+            'Die Zammad-Basis-URL ist sicher freigegeben.',
+            'ZAMMAD_URL muss HTTPS verwenden oder lokal explizit per Host-Allowlist freigegeben sein.',
         );
         $this->required(
             'API-Token',
@@ -67,8 +67,8 @@ class CheckZammadReadinessCommand extends Command
         $this->required(
             'Erin-Callback',
             $callbackUrl !== null && route('integrations.zammad.webhook', [], false) === '/integrations/zammad/webhook',
-            'APP_URL ist für einen öffentlichen HTTPS-Webhook geeignet.',
-            'APP_URL muss für Staging eine öffentliche HTTPS-URL sein; die Callback-Route muss registriert sein.',
+            'Der Zammad-Callback ist sicher freigegeben.',
+            'ZAMMAD_WEBHOOK_CALLBACK_URL muss HTTPS verwenden oder lokal explizit per Host-Allowlist freigegeben sein.',
         );
 
         if (strlen($webhookSecret) >= 32) {

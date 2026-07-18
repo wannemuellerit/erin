@@ -13,17 +13,24 @@ use App\Models\ModerationCase;
 use App\Models\SupportTicket;
 use App\Models\User;
 use App\Notifications\ActivityNotification;
+use App\Services\Ticketing\SupportAttachmentLimits;
+use App\Services\Ticketing\SupportAttachmentManager;
+use App\Services\Ticketing\SupportTicketMessagePresenter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class SupportController extends AdminController
 {
-    public function index(Request $request): Response
-    {
+    public function index(
+        Request $request,
+        SupportTicketMessagePresenter $presenter,
+        SupportAttachmentLimits $attachmentLimits,
+    ): Response {
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:120'],
             'status' => ['nullable', 'string'],
@@ -37,7 +44,7 @@ class SupportController extends AdminController
                 'company:id,name,slug',
                 'assignee:id,name,email',
                 'messages' => fn ($query) => $query
-                    ->with('author:id,name,role')
+                    ->with(['author:id,name,role', 'files'])
                     ->oldest(),
             ])
             ->withCount('messages')
@@ -72,6 +79,15 @@ class SupportController extends AdminController
             ->latest()
             ->paginate(20)
             ->withQueryString();
+        $tickets->through(function (SupportTicket $ticket) use ($presenter): array {
+            $serialized = $ticket->toArray();
+            $serialized['messages'] = $ticket->messages
+                ->map(fn ($message): array => $presenter->present($message))
+                ->values()
+                ->all();
+
+            return $serialized;
+        });
 
         return Inertia::render('admin/Support', [
             'tickets' => $tickets,
@@ -89,6 +105,7 @@ class SupportController extends AdminController
                 'open_cases' => ModerationCase::query()->where('status', 'open')->count(),
                 'pending_feedback' => Feedback::query()->where('status', 'pending')->count(),
             ],
+            'attachmentLimits' => $attachmentLimits->forFrontend(),
         ]);
     }
 
@@ -136,15 +153,38 @@ class SupportController extends AdminController
     public function reply(
         ReplyToSupportTicketRequest $request,
         SupportTicket $ticket,
+        SupportAttachmentManager $attachmentManager,
     ): RedirectResponse {
         $validated = $request->validated();
+        $message = DB::transaction(function () use (
+            $ticket,
+            $request,
+            $validated,
+            $attachmentManager,
+        ) {
+            $message = $ticket->messages()->create([
+                'author_id' => $request->user()?->getKey(),
+                'body' => $validated['body'] ?? '',
+                'is_internal' => (bool) ($validated['is_internal'] ?? false),
+            ]);
+            $files = $request->file('attachments', []);
+            $attachmentManager->storeUploads(
+                $message,
+                is_array($files) ? array_values($files) : [],
+                $request->user()?->getKey(),
+            );
+            $ticket->update([
+                'assigned_to' => $ticket->assigned_to ?? $request->user()?->getKey(),
+                'status' => ($validated['is_internal'] ?? false)
+                    ? SupportTicketStatus::InProgress
+                    : SupportTicketStatus::WaitingForCustomer,
+                'last_reply_at' => now(),
+                'resolved_at' => null,
+            ]);
 
-        $message = $ticket->messages()->create([
-            'author_id' => $request->user()?->getKey(),
-            'body' => $validated['body'],
-            'is_internal' => (bool) ($validated['is_internal'] ?? false),
-        ]);
-        SupportTicketMessageCreated::dispatch($message);
+            return $message;
+        });
+        SupportTicketMessageCreated::dispatch($message->load('files'));
         if ($ticket->external_id === null) {
             Bus::chain([
                 new SyncSupportTicketToProvider($ticket->getKey()),
@@ -153,15 +193,6 @@ class SupportController extends AdminController
         } else {
             SyncSupportMessageToProvider::dispatch($message->getKey());
         }
-
-        $ticket->update([
-            'assigned_to' => $ticket->assigned_to ?? $request->user()?->getKey(),
-            'status' => ($validated['is_internal'] ?? false)
-                ? SupportTicketStatus::InProgress
-                : SupportTicketStatus::WaitingForCustomer,
-            'last_reply_at' => now(),
-            'resolved_at' => null,
-        ]);
 
         $this->audit(
             $request,

@@ -154,6 +154,7 @@ return [
     'url' => ':attribute muss eine gültige URL sein.',
     'ulid' => ':attribute muss eine gültige ULID sein.',
     'uuid' => ':attribute muss eine gültige UUID sein.',
+    'support_attachments_total' => 'Die Anhänge dürfen zusammen höchstens :size MB groß sein.',
     'custom' => [],
     'attributes' => [
         'email' => 'E-Mail-Adresse',

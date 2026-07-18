@@ -3,6 +3,7 @@
 namespace App\Services\Billing;
 
 use Illuminate\Support\Str;
+use Laravel\Cashier\Cashier;
 use LogicException;
 use Stripe\StripeClient;
 
@@ -153,7 +154,7 @@ class StripeReadinessProbe
             );
         }
 
-        return new StripeClient($secret);
+        return Cashier::stripe();
     }
 
     private function stringOrNull(mixed $value): ?string

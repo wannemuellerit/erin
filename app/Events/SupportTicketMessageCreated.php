@@ -3,6 +3,7 @@
 namespace App\Events;
 
 use App\Models\SupportTicketMessage;
+use App\Services\Ticketing\SupportTicketMessagePresenter;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
@@ -13,7 +14,10 @@ class SupportTicketMessageCreated implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public function __construct(public readonly SupportTicketMessage $message) {}
+    public function __construct(
+        public readonly SupportTicketMessage $message,
+        public readonly ?string $deliveryId = null,
+    ) {}
 
     public function broadcastOn(): PrivateChannel
     {
@@ -35,19 +39,10 @@ class SupportTicketMessageCreated implements ShouldBroadcastNow
      */
     public function broadcastWith(): array
     {
-        $this->message->loadMissing('author:id,name,role');
-
         return [
-            'message' => [
-                'id' => $this->message->getKey(),
-                'author_id' => $this->message->author_id,
-                'author' => $this->message->author?->only(['id', 'name', 'role']),
-                'body' => $this->message->body,
-                'is_internal' => $this->message->is_internal,
-                'source' => $this->message->source,
-                'delivery_status' => $this->message->delivery_status,
-                'created_at' => $this->message->created_at?->toIso8601String(),
-            ],
+            'message' => app(SupportTicketMessagePresenter::class)
+                ->present($this->message),
+            'delivery_id' => $this->deliveryId,
         ];
     }
 }

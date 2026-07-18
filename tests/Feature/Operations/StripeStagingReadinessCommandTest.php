@@ -18,8 +18,14 @@ function configureErinStripeStaging(): void
     config()->set('cashier.webhook.events', [
         'checkout.session.completed',
         'customer.subscription.created',
+        'customer.subscription.pending_update_applied',
+        'customer.subscription.pending_update_expired',
         'customer.subscription.updated',
         'customer.subscription.deleted',
+        'subscription_schedule.canceled',
+        'subscription_schedule.completed',
+        'subscription_schedule.released',
+        'subscription_schedule.updated',
     ]);
     config()->set('services.stripe.seat_price_id');
     config()->set('services.stripe.visa_price_id');
@@ -99,8 +105,14 @@ function erinReadinessWebhookEndpoint(
         'enabled_events' => $events ?? [
             'checkout.session.completed',
             'customer.subscription.created',
+            'customer.subscription.pending_update_applied',
+            'customer.subscription.pending_update_expired',
             'customer.subscription.updated',
             'customer.subscription.deleted',
+            'subscription_schedule.canceled',
+            'subscription_schedule.completed',
+            'subscription_schedule.released',
+            'subscription_schedule.updated',
         ],
     ];
 }
@@ -129,6 +141,25 @@ it('checks the local Stripe staging configuration without external calls or muta
         ->and($probe->webhookListCalls)->toBe(0)
         ->and($plan->fresh()?->stripe_product_id)->toBe('prod_basic-readiness')
         ->and($plan->fresh()?->stripe_price_id)->toBe('price_basic-readiness');
+});
+
+it('fails locally when seat and visa add-ons reuse the same Stripe price', function () {
+    createErinReadinessPlan('basic-addon-collision', 299_900, 2);
+    config()->set('services.stripe.seat_price_id', 'price_shared_addon');
+    config()->set('services.stripe.visa_price_id', 'price_shared_addon');
+    $probe = new ErinStripeReadinessProbe;
+    app()->instance(StripeReadinessProbe::class, $probe);
+
+    $exitCode = Artisan::call('erin:stripe:staging-check');
+    $output = Artisan::output();
+
+    expect($exitCode)->toBe(1)
+        ->and(substr_count(
+            $output,
+            'Dieselbe Stripe-Price darf nicht mehreren Add-on-Rollen zugeordnet werden.',
+        ))->toBe(2)
+        ->and($probe->retrieved)->toBeEmpty()
+        ->and($probe->webhookListCalls)->toBe(0);
 });
 
 it('verifies configured plan prices through read-only test mode probes', function () {
@@ -173,6 +204,109 @@ it('fails safely when a remote price differs from the local package configuratio
         ->toContain('Betrag')
         ->not->toContain($secret);
 });
+
+it('reports every relevant Price and Product drift without exposing provider data', function (
+    Closure $mutate,
+    string $expectedProblem,
+) {
+    $plan = createErinReadinessPlan('catalog-drift', 499_900, 6);
+    $probe = new ErinStripeReadinessProbe;
+    $snapshot = erinReadinessPrice($plan);
+    $mutate($snapshot);
+    $probe->prices[(string) $plan->stripe_price_id] = $snapshot;
+    $probe->webhookEndpoints = [erinReadinessWebhookEndpoint()];
+    app()->instance(StripeReadinessProbe::class, $probe);
+
+    $exitCode = Artisan::call('erin:stripe:staging-check', ['--remote' => true]);
+    $output = Artisan::output();
+
+    expect($exitCode)->toBe(1)
+        ->and($output)->toContain('Abweichung im Testkonto')
+        ->toContain($expectedProblem)
+        ->not->toContain((string) config('cashier.secret'));
+})->with([
+    'falsche Price-ID' => [
+        function (array &$snapshot): void {
+            $snapshot['id'] = 'price_other';
+        },
+        'Price-ID',
+    ],
+    'deaktivierte Price' => [
+        function (array &$snapshot): void {
+            $snapshot['active'] = false;
+        },
+        'Aktivität',
+    ],
+    'falsche Währung' => [
+        function (array &$snapshot): void {
+            $snapshot['currency'] = 'usd';
+        },
+        'Währung',
+    ],
+    'falscher Betrag' => [
+        function (array &$snapshot): void {
+            $snapshot['unit_amount'] = 1;
+        },
+        'Betrag',
+    ],
+    'falsches Produkt' => [
+        function (array &$snapshot): void {
+            $snapshot['product_id'] = 'prod_other';
+        },
+        'Produkt',
+    ],
+    'einmalig statt wiederkehrend' => [
+        function (array &$snapshot): void {
+            $snapshot['recurring'] = null;
+        },
+        'Laufzeit',
+    ],
+    'falsches Intervall' => [
+        function (array &$snapshot): void {
+            $snapshot['recurring']['interval'] = 'year';
+        },
+        'Laufzeit',
+    ],
+    'falsche Laufzeit' => [
+        function (array &$snapshot): void {
+            $snapshot['recurring']['interval_count'] = 5;
+        },
+        'Laufzeit',
+    ],
+]);
+
+it('fails closed and redacts messages for Stripe timeouts and 429 or 5xx responses', function (
+    string $providerFailure,
+) {
+    $plan = createErinReadinessPlan('remote-failure', 299_900, 2);
+    $probe = new class($providerFailure) extends ErinStripeReadinessProbe
+    {
+        public function __construct(private readonly string $failure) {}
+
+        public function retrievePrice(string $priceId): array
+        {
+            $this->retrieved[] = $priceId;
+
+            throw new RuntimeException($this->failure);
+        }
+    };
+    $probe->webhookEndpoints = [erinReadinessWebhookEndpoint()];
+    app()->instance(StripeReadinessProbe::class, $probe);
+
+    $exitCode = Artisan::call('erin:stripe:staging-check', ['--remote' => true]);
+    $output = Artisan::output();
+
+    expect($exitCode)->toBe(1)
+        ->and($output)
+        ->toContain('konnte nicht lesend aus dem Stripe-Testkonto abgerufen werden')
+        ->not->toContain($providerFailure)
+        ->not->toContain('sk_test_provider_secret')
+        ->and($probe->retrieved)->toBe([(string) $plan->stripe_price_id]);
+})->with([
+    'Timeout' => 'Timeout nach 80 Sekunden; sk_test_provider_secret',
+    'Rate Limit' => 'HTTP 429 rate_limit; sk_test_provider_secret',
+    'Serverfehler' => 'HTTP 503 service_unavailable; sk_test_provider_secret',
+]);
 
 it('rejects mixed or live keys before running a remote probe', function () {
     createErinReadinessPlan('live-refusal', 299_900, 2);

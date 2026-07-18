@@ -95,6 +95,7 @@ export default {
         attachmentPending: 'Prüfung läuft',
         translations: 'Übersetzungen werden in der Konversation gespeichert.',
         attachFiles: 'Dateien anhängen',
+        removeAttachment: 'Datei entfernen',
         messagePlaceholder: 'Nachricht schreiben …',
         send: 'Nachricht senden',
         noSelectionTitle: 'Keine Nachricht ausgewählt',
