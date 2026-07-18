@@ -371,7 +371,6 @@ function isAllowedVisibleText(value) {
     }
 
     const withoutBrands = text
-        .replace(/Recruiting OS/gu, '')
         .replace(/\b(?:Erin|erin|Laravel|PHP|ER)\b/gu, '')
         .replace(/[\d\s\p{P}\p{S}\p{M}]/gu, '');
 

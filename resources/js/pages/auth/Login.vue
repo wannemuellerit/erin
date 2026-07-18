@@ -67,9 +67,9 @@ const insertDemoCredentials = () => {
         v-bind="store.form()"
         :reset-on-success="['password']"
         v-slot="{ errors, processing }"
-        class="flex flex-col gap-6"
+        class="flex min-w-0 flex-col gap-6"
     >
-        <div class="grid gap-6">
+        <div class="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
             <div
                 v-if="demoMode"
                 class="flex items-center justify-between gap-4 rounded-lg border bg-muted/50 p-4"

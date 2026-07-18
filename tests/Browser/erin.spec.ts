@@ -68,10 +68,20 @@ async function expectAccessibleAppChrome(page: Page): Promise<void> {
 
 async function expectNoSeriousAccessibilityViolations(
     page: Page,
+    include?: string,
 ): Promise<void> {
-    const results = await new AxeBuilder({ page })
-        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-        .analyze();
+    let audit = new AxeBuilder({ page }).withTags([
+        'wcag2a',
+        'wcag2aa',
+        'wcag21a',
+        'wcag21aa',
+    ]);
+
+    if (include) {
+        audit = audit.include(include);
+    }
+
+    const results = await audit.analyze();
     const violations = results.violations
         .filter(
             (violation) =>
@@ -466,6 +476,37 @@ test.describe('Englische Oberfläche', () => {
         await expectNoSeriousAccessibilityViolations(page);
     });
 
+    test('wechselt die Sprache auf Startseite und Login manuell', async ({
+        page,
+    }) => {
+        await page.goto('/');
+
+        await page.getByRole('button', { name: 'German', exact: true }).click();
+        await expect(
+            page.getByRole('heading', {
+                level: 1,
+                name: 'Die besten Fachkräfte. Grenzenlos gefunden.',
+            }),
+        ).toBeVisible();
+
+        await page.goto('/login');
+        await page
+            .getByRole('button', { name: 'Englisch', exact: true })
+            .click();
+
+        await expect(
+            page.getByRole('heading', {
+                level: 1,
+                name: 'Welcome back',
+            }),
+        ).toBeVisible();
+        await expect(page.getByTestId('locale-en')).toHaveAttribute(
+            'aria-pressed',
+            'true',
+        );
+        await expectNoSeriousAccessibilityViolations(page);
+    });
+
     test('übernimmt nach dem SPA-Login die hinterlegte Kontosprache', async ({
         page,
     }) => {
@@ -501,6 +542,52 @@ test.describe('Mobile Abnahme', () => {
         isMobile: true,
     });
 
+    test('zeigt die Sprachwahl auf der mobilen Startseite direkt an', async ({
+        page,
+    }) => {
+        await page.goto('/');
+
+        await expect(
+            page.getByRole('group', { name: 'Sprache', exact: true }),
+        ).toBeVisible();
+        await page
+            .getByRole('button', { name: 'Englisch', exact: true })
+            .click();
+        await expect(
+            page.getByRole('heading', {
+                level: 1,
+                name: 'The best professionals. Found without borders.',
+            }),
+        ).toBeVisible();
+        await expectNoHorizontalOverflow(page);
+    });
+
+    test('wechselt die Sprache auf dem mobilen Login ohne horizontalen Overflow', async ({
+        page,
+    }) => {
+        await page.goto('/login');
+
+        await expect(
+            page.getByRole('group', { name: 'Sprache', exact: true }),
+        ).toBeVisible();
+        await page
+            .getByRole('button', { name: 'Englisch', exact: true })
+            .click();
+
+        await expect(
+            page.getByRole('heading', {
+                level: 1,
+                name: 'Welcome back',
+            }),
+        ).toBeVisible();
+        await expect(page.getByTestId('locale-en')).toHaveAttribute(
+            'aria-pressed',
+            'true',
+        );
+        await expectNoHorizontalOverflow(page);
+        await expectNoSeriousAccessibilityViolations(page);
+    });
+
     test('bleibt im Firmen-Dashboard und in der Stellenliste ohne horizontalen Overflow', async ({
         page,
     }) => {
@@ -529,4 +616,52 @@ test.describe('Mobile Abnahme', () => {
         ).toBeVisible();
         await expectNoHorizontalOverflow(page);
     });
+});
+
+test.describe('Tablet-Navigation', () => {
+    for (const width of [640, 1023]) {
+        test(`hält die öffentliche Navigation bei ${width} Pixeln vollständig erreichbar`, async ({
+            page,
+        }) => {
+            await page.setViewportSize({ width, height: 900 });
+            await page.goto('/');
+
+            const menuButton = page.getByRole('button', {
+                name: 'Menü öffnen',
+            });
+            await expect(menuButton).toBeVisible();
+            await expect(
+                page.getByRole('group', { name: 'Sprache', exact: true }),
+            ).toBeVisible();
+            await expect(
+                page.getByRole('link', { name: 'Preise', exact: true }),
+            ).toHaveCount(0);
+
+            await menuButton.click();
+
+            await expect(
+                page.getByRole('link', {
+                    name: 'Für Unternehmen',
+                    exact: true,
+                }),
+            ).toBeVisible();
+            await expect(
+                page.getByRole('link', {
+                    name: 'Für Fachkräfte',
+                    exact: true,
+                }),
+            ).toBeVisible();
+            await expect(
+                page.getByRole('link', {
+                    name: 'So funktioniert’s',
+                    exact: true,
+                }),
+            ).toBeVisible();
+            await expect(
+                page.getByRole('link', { name: 'Preise', exact: true }),
+            ).toBeVisible();
+            await expectNoHorizontalOverflow(page);
+            await expectNoSeriousAccessibilityViolations(page, 'header');
+        });
+    }
 });

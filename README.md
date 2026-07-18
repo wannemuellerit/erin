@@ -187,6 +187,18 @@ docker compose exec laravel php artisan erin:stripe:sync-plans --plan=basic
 docker compose exec laravel php artisan erin:stripe:sync-plans --apply
 ```
 
+Before accepting a staging deployment, run the dedicated non-mutating check.
+Without `--remote` it validates keys, locally handled webhook events, the HTTPS
+staging URL and all local package mappings. With `--remote` it additionally
+retrieves the configured test Prices and registered webhook endpoints. It
+compares Price data as well as the expected Cashier path, endpoint status and
+required remote event types; it never creates or updates Stripe objects:
+
+```bash
+docker compose exec laravel php artisan erin:stripe:staging-check
+docker compose exec laravel php artisan erin:stripe:staging-check --remote
+```
+
 Use `--apply` only with a Stripe test key during setup. Live mutations additionally
 require `--allow-live`, `APP_ENV=production`, a public HTTPS `APP_URL` and an
 interactive confirmation. Non-interactive live runs are always rejected, including

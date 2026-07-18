@@ -14,7 +14,7 @@ class ZammadTicketingProvider implements TicketingProvider
     public function enabled(): bool
     {
         return (bool) config('services.zammad.enabled')
-            && filled(config('services.zammad.url'))
+            && ZammadEndpoint::secureBaseUrl(config('services.zammad.url')) !== null
             && filled(config('services.zammad.token'));
     }
 
@@ -212,12 +212,18 @@ class ZammadTicketingProvider implements TicketingProvider
             throw new RuntimeException('Die Zammad-Integration ist nicht vollständig konfiguriert.');
         }
 
-        $request = Http::baseUrl(rtrim((string) config('services.zammad.url'), '/'))
+        $baseUrl = ZammadEndpoint::secureBaseUrl(config('services.zammad.url'));
+        if ($baseUrl === null) {
+            throw new RuntimeException('Die Zammad-URL erfüllt die Sicherheitsanforderungen nicht.');
+        }
+
+        $request = Http::baseUrl($baseUrl)
             ->acceptJson()
             ->asJson()
             ->withHeaders([
                 'Authorization' => 'Token token='.(string) config('services.zammad.token'),
             ])
+            ->withoutRedirecting()
             ->timeout((int) config('services.zammad.timeout', 10));
 
         return $retry

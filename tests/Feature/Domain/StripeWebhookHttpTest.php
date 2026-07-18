@@ -150,6 +150,107 @@ it('accepts a signed Cashier webhook and processes a duplicate only once', funct
             ->count())->toBe(1);
 });
 
+it('rejects a replayed event ID with a changed payload without mutating billing again', function () {
+    $plan = Plan::factory()->create([
+        'stripe_product_id' => 'prod_http_replay',
+        'stripe_price_id' => 'price_http_replay',
+    ]);
+    $company = Company::factory()->create([
+        'current_plan_id' => null,
+        'stripe_id' => 'cus_http_replay',
+        'status' => CompanyStatus::Pending,
+        'subscription_status' => 'incomplete',
+    ]);
+    $payload = erinStripeSubscriptionPayload(
+        'evt_http_replay',
+        'customer.subscription.created',
+        $company,
+        $plan,
+    );
+    erinPostSignedStripeWebhook($payload, 'whsec_http_acceptance')->assertOk();
+
+    $changedReplay = erinStripeSubscriptionPayload(
+        'evt_http_replay',
+        'customer.subscription.deleted',
+        $company,
+        $plan,
+        'canceled',
+    );
+    $this->withoutExceptionHandling();
+
+    expect(
+        fn () => erinPostSignedStripeWebhook(
+            $changedReplay,
+            'whsec_http_acceptance',
+        ),
+    )->toThrow(RuntimeException::class, 'reused with a different payload');
+
+    expect($company->fresh()?->subscription_status)->toBe('active')
+        ->and($company->fresh()?->current_plan_id)->toBe($plan->getKey())
+        ->and(IntegrationReceipt::query()
+            ->where('provider', 'stripe:handled')
+            ->where('event_id', 'evt_http_replay')
+            ->where('status', 'processed')
+            ->count())->toBe(1);
+});
+
+it('can safely retry an identical webhook after a transient canonical lookup failure', function () {
+    $plan = Plan::factory()->create([
+        'stripe_product_id' => 'prod_http_retry',
+        'stripe_price_id' => 'price_http_retry',
+    ]);
+    $company = Company::factory()->create([
+        'current_plan_id' => null,
+        'stripe_id' => 'cus_http_retry',
+        'status' => CompanyStatus::Pending,
+        'subscription_status' => 'incomplete',
+    ]);
+    $gateway = new class extends ErinStripeSubscriptionGateway
+    {
+        public bool $available = false;
+
+        public function retrieve(string $subscriptionId): array
+        {
+            if (! $this->available) {
+                throw new RuntimeException('Simulierter temporärer Stripe-Ausfall.');
+            }
+
+            return parent::retrieve($subscriptionId);
+        }
+    };
+    app()->instance(StripeSubscriptionGateway::class, $gateway);
+    $payload = erinStripeSubscriptionPayload(
+        'evt_http_retry',
+        'customer.subscription.created',
+        $company,
+        $plan,
+    );
+    $this->withoutExceptionHandling();
+
+    expect(
+        fn () => erinPostSignedStripeWebhook(
+            $payload,
+            'whsec_http_acceptance',
+        ),
+    )->toThrow(RuntimeException::class, 'temporärer Stripe-Ausfall');
+
+    expect(IntegrationReceipt::query()
+        ->where('provider', 'stripe:handled')
+        ->where('event_id', 'evt_http_retry')
+        ->value('status'))->toBe('failed')
+        ->and($company->fresh()?->current_plan_id)->toBeNull();
+
+    $gateway->available = true;
+    erinPostSignedStripeWebhook($payload, 'whsec_http_acceptance')->assertOk();
+
+    expect(IntegrationReceipt::query()
+        ->where('provider', 'stripe:handled')
+        ->where('event_id', 'evt_http_retry')
+        ->value('status'))->toBe('processed')
+        ->and($company->fresh()?->subscription_status)->toBe('active')
+        ->and($company->fresh()?->current_plan_id)->toBe($plan->getKey());
+});
+
 it('rejects a webhook with an invalid Stripe signature without changing billing state', function () {
     $plan = Plan::factory()->create([
         'stripe_product_id' => 'prod_http_invalid',
@@ -455,6 +556,7 @@ it('keeps an active replacement subscription authoritative when an old event arr
     $gateway->put($oldCanceled['data']['object']);
 
     erinPostSignedStripeWebhook($lateOldEvent, 'whsec_http_acceptance')->assertOk();
+    erinPostSignedStripeWebhook($lateOldEvent, 'whsec_http_acceptance')->assertOk();
 
     $company->refresh();
     /** @var Subscription $oldSubscription */
@@ -480,5 +582,10 @@ it('keeps an active replacement subscription authoritative when an old event arr
         ->and($oldSubscription->items()->sole()->stripe_price)->toBe($oldPlan->stripe_price_id)
         ->and($oldSubscription->items()->where('stripe_id', 'si_replacement_corrupt')->exists())
         ->toBeFalse()
-        ->and(app(EntitlementService::class)->hasPortalAccess($company))->toBeTrue();
+        ->and(app(EntitlementService::class)->hasPortalAccess($company))->toBeTrue()
+        ->and(IntegrationReceipt::query()
+            ->where('provider', 'stripe:handled')
+            ->where('event_id', 'evt_replacement_old_late_update')
+            ->where('status', 'processed')
+            ->count())->toBe(1);
 });

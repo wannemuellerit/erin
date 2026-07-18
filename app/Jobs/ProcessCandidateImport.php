@@ -6,6 +6,7 @@ use App\Models\CandidateImport;
 use App\Models\CandidateImportRow;
 use App\Services\Activity\ActivityRecorder;
 use App\Services\Imports\CandidateImportReader;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
@@ -14,18 +15,28 @@ use Illuminate\Support\Facades\Validator;
 use RuntimeException;
 use Throwable;
 
-class ProcessCandidateImport implements ShouldQueue
+class ProcessCandidateImport implements ShouldBeUnique, ShouldQueue
 {
     use Queueable;
 
     public int $tries = 3;
+
+    public int $uniqueFor = 3600;
 
     /**
      * @var list<int>
      */
     public array $backoff = [30, 180];
 
-    public function __construct(public readonly int $importId) {}
+    public function __construct(public readonly int $importId)
+    {
+        $this->onQueue('low');
+    }
+
+    public function uniqueId(): string
+    {
+        return (string) $this->importId;
+    }
 
     public function handle(
         CandidateImportReader $reader,
@@ -219,7 +230,15 @@ class ProcessCandidateImport implements ShouldQueue
 
     private function localCopy(CandidateImport $import): string
     {
-        $source = Storage::disk($import->disk)->readStream($import->storage_path);
+        try {
+            $source = Storage::disk($import->disk)->readStream($import->storage_path);
+        } catch (Throwable $exception) {
+            throw new RuntimeException(
+                'Die private Importdatei konnte nicht geöffnet werden.',
+                previous: $exception,
+            );
+        }
+
         if (! is_resource($source)) {
             throw new RuntimeException('Die private Importdatei konnte nicht geöffnet werden.');
         }

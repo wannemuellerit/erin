@@ -11,6 +11,7 @@ use App\Models\SupportTicketMessage;
 use App\Notifications\ActivityNotification;
 use App\Services\Activity\ActivityRecorder;
 use App\Services\Billing\IntegrationEventGuard;
+use App\Services\Ticketing\ZammadWebhookSignature;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,13 +24,17 @@ class ZammadWebhookController extends Controller
         TicketingProvider $provider,
         IntegrationEventGuard $guard,
         ActivityRecorder $activity,
+        ZammadWebhookSignature $signatures,
     ): JsonResponse {
         abort_unless($provider->enabled(), Response::HTTP_SERVICE_UNAVAILABLE);
         $secret = (string) config('services.zammad.webhook_secret');
         abort_if($secret === '', Response::HTTP_SERVICE_UNAVAILABLE);
-        $expected = 'sha1='.hash_hmac('sha1', $request->getContent(), $secret);
         abort_unless(
-            hash_equals($expected, (string) $request->header('X-Hub-Signature')),
+            $signatures->isValid(
+                $request->getContent(),
+                (string) $request->header('X-Hub-Signature'),
+                $secret,
+            ),
             Response::HTTP_UNAUTHORIZED,
         );
         $delivery = (string) $request->header('X-Zammad-Delivery');

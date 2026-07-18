@@ -157,6 +157,32 @@ it('synchronizes new tickets and replies with the authenticated Zammad API', fun
     });
 });
 
+it('refuses unsafe Zammad endpoints and never forwards the API token across redirects', function () {
+    erinConfigureZammad();
+    config()->set('services.zammad.url', 'http://zammad.example.test');
+
+    $provider = new ZammadTicketingProvider;
+
+    expect($provider->enabled())->toBeFalse();
+
+    config()->set('services.zammad.url', 'https://zammad.example.test');
+    Http::fake([
+        'https://zammad.example.test/api/v1/ticket_articles/44' => Http::response(
+            '',
+            302,
+            ['Location' => 'https://redirect.example.test/api/v1/ticket_articles/44'],
+        ),
+        '*' => Http::response(['id' => 44]),
+    ]);
+
+    expect(fn () => $provider->article('44'))->toThrow(RuntimeException::class);
+
+    Http::assertSentCount(1);
+    Http::assertNotSent(
+        fn (ClientRequest $request): bool => str_contains($request->url(), 'redirect.example.test'),
+    );
+});
+
 it('reconciles uncertain Zammad writes instead of creating duplicate tickets or articles', function () {
     erinConfigureZammad();
     $requester = User::factory()->create();
