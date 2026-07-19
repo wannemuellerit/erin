@@ -10,10 +10,12 @@ use App\Models\Plan;
 use App\Models\Referral;
 use App\Models\ReferralCode;
 use App\Models\User;
+use App\Notifications\ActivityNotification;
 use App\Services\Billing\BillingPlanChangeManager;
 use App\Services\Platform\PlatformSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia as Assert;
 
 uses(RefreshDatabase::class);
@@ -377,6 +379,7 @@ it('requires a new Stripe Price ID when a configured package price changes', fun
 });
 
 it('enforces the referral hold period before manual approval and payout', function () {
+    Notification::fake();
     $admin = User::factory()->create(['role' => UserRole::SuperAdmin]);
     $referrer = User::factory()->create();
     $code = ReferralCode::query()->create([
@@ -415,7 +418,122 @@ it('enforces the referral hold period before manual approval and payout', functi
     expect($referral->refresh()->status)->toBe(ReferralStatus::Paid)
         ->and($referral->approved_at)->not->toBeNull()
         ->and($referral->paid_at)->not->toBeNull()
-        ->and($referral->metadata['payout_reference'])->toBe('BANK-2026-0001');
+        ->and($referral->metadata['payout_reference'])->toBe('BANK-2026-0001')
+        ->and($referral->statusHistory()->pluck('to_status')->all())
+        ->toBe([
+            ReferralStatus::Holding->value,
+            ReferralStatus::Approved->value,
+            ReferralStatus::Paid->value,
+        ]);
+
+    Notification::assertSentToTimes($referrer, ActivityNotification::class, 2);
+});
+
+it('notifies an eligible referral exactly once after the hold period', function () {
+    Notification::fake();
+    $referrer = User::factory()->create();
+    $code = ReferralCode::query()->create([
+        'user_id' => $referrer->id,
+        'code' => 'ERIN-ELIGIBLE',
+        'commission_cents' => 50000,
+    ]);
+    $referral = Referral::query()->create([
+        'referral_code_id' => $code->id,
+        'status' => ReferralStatus::Holding,
+        'hold_until' => now()->subMinute(),
+        'commission_cents' => 50000,
+    ]);
+
+    $this->artisan('erin:referrals:notify-eligible')->assertSuccessful();
+    $this->artisan('erin:referrals:notify-eligible')->assertSuccessful();
+
+    expect($referral->refresh()->approval_notified_at)->not->toBeNull()
+        ->and($referral->status)->toBe(ReferralStatus::Holding);
+    Notification::assertSentToTimes($referrer, ActivityNotification::class, 1);
+});
+
+it('does not notify referrals before the hold period or after rejection', function () {
+    Notification::fake();
+    $referrer = User::factory()->create();
+    $code = ReferralCode::query()->create([
+        'user_id' => $referrer->id,
+        'code' => 'ERIN-NOT-ELIGIBLE',
+    ]);
+
+    Referral::query()->create([
+        'referral_code_id' => $code->id,
+        'status' => ReferralStatus::Holding,
+        'hold_until' => now()->addDay(),
+    ]);
+    Referral::query()->create([
+        'referral_code_id' => $code->id,
+        'status' => ReferralStatus::Rejected,
+        'hold_until' => now()->subDay(),
+    ]);
+
+    $this->artisan('erin:referrals:notify-eligible')->assertSuccessful();
+
+    Notification::assertNothingSent();
+});
+
+it('deduplicates repeated referral clicks and snapshots the original commission', function () {
+    $referrer = User::factory()->create();
+    $code = ReferralCode::query()->create([
+        'user_id' => $referrer->id,
+        'code' => 'ERIN-CLICK',
+        'commission_cents' => 42000,
+    ]);
+
+    $this->withCookie('erin_referral_visitor', 'stable-visitor')
+        ->get(route('referrals.track', ['code' => $code->code, 'utm_source' => 'mail']))
+        ->assertRedirect(route('register'));
+    $code->update(['commission_cents' => 99000]);
+    $this->withCookie('erin_referral_visitor', 'stable-visitor')
+        ->get(route('referrals.track', $code->code))
+        ->assertRedirect(route('register'));
+
+    $referral = Referral::query()->sole();
+    expect($referral->commission_cents)->toBe(42000)
+        ->and($referral->metadata['utm_source'])->toBe('mail')
+        ->and($referral->statusHistory()->pluck('to_status')->all())
+        ->toBe([ReferralStatus::Clicked->value]);
+});
+
+it('supports an audited referral reversal before payout', function () {
+    Notification::fake();
+    $admin = User::factory()->create(['role' => UserRole::SuperAdmin]);
+    $referrer = User::factory()->create();
+    $code = ReferralCode::query()->create([
+        'user_id' => $referrer->id,
+        'code' => 'ERIN-REVERSAL',
+        'commission_cents' => 50000,
+    ]);
+    $referral = Referral::query()->create([
+        'referral_code_id' => $code->id,
+        'status' => ReferralStatus::Holding,
+        'hold_until' => now()->subDay(),
+        'commission_cents' => 50000,
+    ]);
+
+    $this->actingAs($admin)
+        ->patch(route('admin.referrals.update', $referral), [
+            'status' => ReferralStatus::Rejected->value,
+            'reason' => 'Einstellung wurde innerhalb der Haltefrist storniert.',
+        ])
+        ->assertRedirect();
+
+    expect($referral->refresh()->status)->toBe(ReferralStatus::Rejected)
+        ->and($referral->metadata['admin_reason'])
+        ->toBe('Einstellung wurde innerhalb der Haltefrist storniert.')
+        ->and(AuditLog::query()->where('event', 'admin.referral.updated')->exists())->toBeTrue();
+    Notification::assertSentTo($referrer, ActivityNotification::class);
+
+    $this->actingAs($admin)
+        ->patch(route('admin.referrals.update', $referral), [
+            'status' => ReferralStatus::Paid->value,
+            'payout_reference' => 'BANK-INVALID',
+        ])
+        ->assertSessionHasErrors('status');
 });
 
 it('snapshots the configured referral commission when creating a personal code', function () {

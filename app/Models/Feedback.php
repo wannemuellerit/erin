@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $author_id
  * @property int|null $subject_user_id
  * @property int|null $subject_company_id
+ * @property string|null $subject_type
+ * @property int|null $subject_key
  * @property int|null $application_id
  * @property int|null $interview_id
  * @property string $sentiment

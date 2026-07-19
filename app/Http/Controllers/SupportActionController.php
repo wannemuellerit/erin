@@ -18,7 +18,7 @@ use App\Services\Activity\ActivityRecorder;
 use App\Services\Ticketing\SupportAttachmentLimits;
 use App\Services\Ticketing\SupportAttachmentManager;
 use App\Services\Ticketing\SupportTicketMessagePresenter;
-use App\Services\Trust\CompanyTrustMetricService;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Bus;
@@ -243,7 +243,6 @@ class SupportActionController extends Controller
     public function feedback(
         Request $request,
         JobApplication $application,
-        CompanyTrustMetricService $trustMetrics,
     ): RedirectResponse {
         $user = $request->user();
         abort_if($user === null, 401);
@@ -282,15 +281,32 @@ class SupportActionController extends Controller
             'metrics' => ['array'],
             'metrics.*' => ['boolean'],
         ]);
-        $feedback = Feedback::query()->create([
-            'author_id' => $user->getKey(),
-            'subject_user_id' => $isCompany ? $application->candidateProfile->user_id : null,
-            'subject_company_id' => $isCandidate ? $application->jobPosting->company_id : null,
-            'application_id' => $application->getKey(),
-            'interview_id' => $application->interviews()->latest()->value('id'),
-            ...$validated,
-            'status' => 'pending',
-        ]);
+        $subjectType = $isCompany ? 'user' : 'company';
+        $subjectKey = $isCompany
+            ? $application->candidateProfile->user_id
+            : $application->jobPosting->company_id;
+
+        try {
+            $feedback = Feedback::query()->create([
+                'author_id' => $user->getKey(),
+                'subject_user_id' => $isCompany ? $subjectKey : null,
+                'subject_company_id' => $isCandidate ? $subjectKey : null,
+                'subject_type' => $subjectType,
+                'subject_key' => $subjectKey,
+                'application_id' => $application->getKey(),
+                'interview_id' => $application->interviews()->latest()->value('id'),
+                ...$validated,
+                'status' => 'pending',
+            ]);
+        } catch (QueryException $exception) {
+            if ((string) $exception->getCode() !== '23000') {
+                throw $exception;
+            }
+
+            return back()->withErrors([
+                'feedback' => __('Du hast diese Person oder Firma für diese Bewerbung bereits bewertet.'),
+            ]);
+        }
 
         if ($validated['sentiment'] === 'negative') {
             $negativeCount = Feedback::query()
@@ -303,7 +319,7 @@ class SupportActionController extends Controller
                 ->count();
 
             if ($negativeCount >= 3) {
-                ModerationCase::query()->firstOrCreate(
+                $case = ModerationCase::query()->firstOrCreate(
                     [
                         'subject_user_id' => $feedback->subject_user_id,
                         'subject_company_id' => $feedback->subject_company_id,
@@ -315,11 +331,10 @@ class SupportActionController extends Controller
                         'severity' => $negativeCount >= 5 ? 'high' : 'medium',
                     ],
                 );
+                if ($negativeCount >= 5 && $case->severity !== 'high') {
+                    $case->update(['severity' => 'high', 'priority' => 'high']);
+                }
             }
-        }
-
-        if ($feedback->subject_company_id !== null) {
-            $trustMetrics->recalculate($application->jobPosting->company);
         }
 
         return back()->with('success', __('Danke. Das Feedback wird moderiert.'));

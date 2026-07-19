@@ -5,6 +5,8 @@ namespace App\Services\Ticketing;
 use App\Jobs\ScanSupportTicketAttachment;
 use App\Models\SupportTicketAttachment;
 use App\Models\SupportTicketMessage;
+use App\Models\User;
+use App\Services\Documents\UploadPolicy;
 use Closure;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -15,6 +17,7 @@ class SupportAttachmentManager
 {
     public function __construct(
         private readonly SupportAttachmentLimits $limits,
+        private readonly UploadPolicy $uploads,
     ) {}
 
     /**
@@ -23,7 +26,9 @@ class SupportAttachmentManager
     public static function validationRules(string $bodyField): array
     {
         $maxFiles = (int) config('support.attachments.max_files', 8);
-        $maxKilobytes = (int) config('support.attachments.max_kilobytes', 10240);
+        $maxKilobytes = app(UploadPolicy::class)->maxFileKilobytes(
+            (int) config('support.attachments.max_kilobytes', 10240),
+        );
         $maxTotalKilobytes = (int) config(
             'support.attachments.max_total_kilobytes',
             15360,
@@ -87,6 +92,9 @@ class SupportAttachmentManager
         }
 
         $this->limits->assertUploads($files);
+        if ($uploaderId !== null && ($uploader = User::query()->find($uploaderId)) !== null) {
+            $this->uploads->assertCanStore($uploader, $files, 'attachments');
+        }
         $disk = (string) config('support.attachments.disk', 'private');
         $storedPaths = [];
         $attachments = [];

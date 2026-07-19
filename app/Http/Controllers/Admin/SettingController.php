@@ -4,16 +4,32 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Requests\Admin\UpdatePlatformSettingsRequest;
 use App\Http\Requests\Admin\UpdateThemeRequest;
+use App\Models\AdCampaign;
 use App\Models\PlatformSetting;
+use App\Services\Documents\UploadPolicy;
+use App\Services\Platform\DashboardAdCampaignManager;
 use App\Services\Platform\PlatformSettings;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class SettingController extends AdminController
 {
-    public function index(PlatformSettings $settings): Response
-    {
+    public function index(
+        PlatformSettings $settings,
+        DashboardAdCampaignManager $campaigns,
+    ): Response {
+        $dashboardAd = array_replace(
+            PlatformSettings::DEFAULT_DASHBOARD_AD,
+            (array) $settings->get('ads.dashboard', []),
+        );
+        $campaign = $dashboardAd['campaign_id']
+            ? AdCampaign::query()->whereKey($dashboardAd['campaign_id'])->first()
+            : null;
+
         return Inertia::render('admin/Settings', [
             'colors' => $settings->colors(),
             'defaults' => PlatformSettings::DEFAULT_COLORS,
@@ -32,6 +48,25 @@ class SettingController extends AdminController
                 'seat_addon_price_cents' => $settings->get('billing.seat_addon_price_cents'),
                 'referral_commission_cents' => $settings->get('referrals.default_commission_cents'),
             ],
+            'uploads' => [
+                'max_file_size_mb' => (int) $settings->get(
+                    'uploads.max_file_size_mb',
+                    PlatformSettings::DEFAULT_UPLOAD_LIMITS['max_file_size_mb'],
+                ),
+                'user_quota_mb' => (int) $settings->get(
+                    'uploads.user_quota_mb',
+                    PlatformSettings::DEFAULT_UPLOAD_LIMITS['user_quota_mb'],
+                ),
+            ],
+            'retention' => collect(PlatformSettings::DEFAULT_RETENTION)
+                ->mapWithKeys(fn (int $default, string $key): array => [
+                    $key => (int) $settings->get("retention.{$key}", $default),
+                ]),
+            'dashboard_ad' => $dashboardAd,
+            'dashboard_ad_stats' => $campaigns->statistics($campaign?->getKey()),
+            'dashboard_ad_media_url' => $campaign?->media_path
+                ? URL::temporarySignedRoute('ads.media', now()->addMinutes(15), ['campaign' => $campaign])
+                : null,
         ]);
     }
 
@@ -65,6 +100,7 @@ class SettingController extends AdminController
     public function update(
         UpdatePlatformSettingsRequest $request,
         PlatformSettings $settings,
+        DashboardAdCampaignManager $campaigns,
     ): RedirectResponse {
         $validated = $request->validated();
         $before = [
@@ -76,6 +112,15 @@ class SettingController extends AdminController
                 'seat_addon_price_cents' => $settings->get('billing.seat_addon_price_cents'),
                 'referral_commission_cents' => $settings->get('referrals.default_commission_cents'),
             ],
+            'uploads' => [
+                'max_file_size_mb' => $settings->get('uploads.max_file_size_mb'),
+                'user_quota_mb' => $settings->get('uploads.user_quota_mb'),
+            ],
+            'dashboard_ad' => $settings->get('ads.dashboard'),
+            'retention' => collect(PlatformSettings::DEFAULT_RETENTION)
+                ->mapWithKeys(fn (int $default, string $key): array => [
+                    $key => (int) $settings->get("retention.{$key}", $default),
+                ]),
         ];
 
         $userId = $request->user()?->getKey();
@@ -121,6 +166,35 @@ class SettingController extends AdminController
             false,
             $userId,
         );
+        $settings->put(
+            'uploads.max_file_size_mb',
+            $validated['uploads']['max_file_size_mb'],
+            'uploads',
+            false,
+            $userId,
+        );
+        $settings->put(
+            'uploads.user_quota_mb',
+            $validated['uploads']['user_quota_mb'],
+            'uploads',
+            false,
+            $userId,
+        );
+        foreach ($validated['retention'] ?? [] as $key => $value) {
+            $settings->put("retention.{$key}", $value, 'retention', false, $userId);
+        }
+        $campaign = $campaigns->sync($validated['dashboard_ad'], $request->user());
+        $dashboardAd = [
+            ...$validated['dashboard_ad'],
+            'campaign_id' => $campaign->getKey(),
+        ];
+        $settings->put(
+            'ads.dashboard',
+            $dashboardAd,
+            'ads',
+            true,
+            $userId,
+        );
 
         $this->audit(
             $request,
@@ -130,5 +204,55 @@ class SettingController extends AdminController
         );
 
         return back()->with('success', __('Die Plattformkonfiguration wurde aktualisiert.'));
+    }
+
+    public function uploadAdMedia(
+        Request $request,
+        AdCampaign $campaign,
+        UploadPolicy $uploads,
+    ): RedirectResponse {
+        $request->validate([
+            'media' => [
+                'required',
+                'image',
+                'mimes:jpg,jpeg,png,gif,webp',
+                'max:'.$uploads->maxFileKilobytes(10 * 1024),
+            ],
+        ]);
+        $file = $request->file('media');
+        abort_if($file === null, 422);
+        $path = $file->store("ads/{$campaign->public_id}", 'private');
+        abort_if($path === false, 500);
+
+        if ($campaign->media_path && $campaign->media_disk) {
+            Storage::disk($campaign->media_disk)->delete($campaign->media_path);
+        }
+        $campaign->update([
+            'media_disk' => 'private',
+            'media_path' => $path,
+            'media_mime' => $file->getMimeType(),
+            'media_size_bytes' => $file->getSize(),
+            'updated_by' => $request->user()?->getKey(),
+        ]);
+        $this->audit($request, 'admin.ad.media_updated', $campaign);
+
+        return back()->with('success', __('Das Anzeigenmotiv wurde aktualisiert.'));
+    }
+
+    public function deleteAdMedia(Request $request, AdCampaign $campaign): RedirectResponse
+    {
+        if ($campaign->media_path && $campaign->media_disk) {
+            Storage::disk($campaign->media_disk)->delete($campaign->media_path);
+        }
+        $campaign->update([
+            'media_disk' => null,
+            'media_path' => null,
+            'media_mime' => null,
+            'media_size_bytes' => null,
+            'updated_by' => $request->user()?->getKey(),
+        ]);
+        $this->audit($request, 'admin.ad.media_deleted', $campaign);
+
+        return back()->with('success', __('Das Anzeigenmotiv wurde entfernt.'));
     }
 }

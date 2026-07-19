@@ -6,7 +6,9 @@ use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Http\Requests\Admin\UpdateUserRoleRequest;
 use App\Http\Requests\Admin\UpdateUserStatusRequest;
+use App\Http\Requests\Admin\UpdateUserStorageQuotaRequest;
 use App\Models\User;
+use App\Services\Documents\UploadPolicy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,7 +18,7 @@ use Inertia\Response;
 
 class UserController extends AdminController
 {
-    public function index(Request $request): Response
+    public function index(Request $request, UploadPolicy $uploadPolicy): Response
     {
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:120'],
@@ -35,6 +37,7 @@ class UserController extends AdminController
                 'status',
                 'locale',
                 'last_active_at',
+                'storage_quota_bytes',
                 'suspended_at',
                 'blocked_reason',
                 'created_at',
@@ -67,6 +70,11 @@ class UserController extends AdminController
             )
             ->paginate(20)
             ->withQueryString();
+
+        $usage = $uploadPolicy->usageForUsers($users->getCollection());
+        $users->getCollection()->each(function (User $user) use ($usage): void {
+            $user->setAttribute('storage_usage', $usage[$user->getKey()]);
+        });
 
         return Inertia::render('admin/Users', [
             'users' => $users,
@@ -150,6 +158,29 @@ class UserController extends AdminController
         );
 
         return back()->with('success', __('Die Plattformrolle wurde aktualisiert.'));
+    }
+
+    public function updateStorageQuota(
+        UpdateUserStorageQuotaRequest $request,
+        User $user,
+    ): RedirectResponse {
+        $before = ['storage_quota_bytes' => $user->storage_quota_bytes];
+        $megabytes = $request->validated('storage_quota_mb');
+        $user->update([
+            'storage_quota_bytes' => $megabytes === null
+                ? null
+                : (int) $megabytes * 1024 * 1024,
+        ]);
+
+        $this->audit(
+            $request,
+            'admin.user.storage_quota_updated',
+            $user,
+            $before,
+            ['storage_quota_bytes' => $user->storage_quota_bytes],
+        );
+
+        return back()->with('success', __('Das persönliche Speicherlimit wurde aktualisiert.'));
     }
 
     private function guardLastSuperAdmin(User $user, UserStatus $nextStatus, UserRole $nextRole): void

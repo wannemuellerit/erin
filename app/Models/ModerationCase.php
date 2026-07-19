@@ -11,7 +11,11 @@ class ModerationCase extends Model
 
     protected function casts(): array
     {
-        return ['resolved_at' => 'datetime'];
+        return [
+            'evidence' => 'array',
+            'resolved_at' => 'datetime',
+            'escalated_at' => 'datetime',
+        ];
     }
 
     /**
