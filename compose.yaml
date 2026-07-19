@@ -332,7 +332,7 @@ services:
 
   pest:
     <<: *php-service
-    command: ["vendor/bin/pest", "--colors=always"]
+    command: ["sh", "docker/php/test.sh"]
     profiles: ["tools"]
     restart: "no"
     environment:

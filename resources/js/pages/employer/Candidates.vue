@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
 import {
-    ListFilter,
+    BookmarkPlus,
+    ChevronLeft,
+    ChevronRight,
     MessageCircle,
     Send,
     SlidersHorizontal,
     Sparkles,
+    Trash2,
     UserRoundSearch,
     UsersRound,
 } from '@lucide/vue';
-import { computed, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import BulkActionBar from '@/components/product/BulkActionBar.vue';
 import CandidateCard from '@/components/product/CandidateCard.vue';
@@ -18,7 +21,10 @@ import FilterChip from '@/components/product/FilterChip.vue';
 import FilterToolbar from '@/components/product/FilterToolbar.vue';
 import PageHeader from '@/components/product/PageHeader.vue';
 import SearchField from '@/components/product/SearchField.vue';
+import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
+import { Button } from '@/components/ui/button';
+import { useCapabilities } from '@/composables/useCapabilities';
 import { index as candidatesIndex } from '@/routes/employer/candidates';
 
 type Candidate = {
@@ -44,7 +50,36 @@ type Candidate = {
 
 type JobOption = { id: number; title: string; status: string };
 type OccupationOption = { id: number; name_de?: string; name_en?: string };
-type TalentList = { id: number; name: string; members_count?: number };
+type TalentList = {
+    id: number;
+    name: string;
+    members_count?: number;
+    is_default?: boolean;
+};
+type NamedOption = {
+    id: number;
+    code?: string;
+    name_de?: string;
+    name_en?: string;
+};
+type SavedSearch = {
+    id: number;
+    name: string;
+    filters: Filters;
+};
+type PaginationLink = {
+    url?: string | null;
+    label: string;
+    active: boolean;
+};
+type CandidatePage = {
+    data: Candidate[];
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    links: PaginationLink[];
+};
 type Filters = {
     search?: string;
     country?: string;
@@ -53,28 +88,65 @@ type Filters = {
     employment_type?: string;
     relocation_ready?: boolean;
     work_permit?: boolean;
+    visa?: string;
+    weekly_hours?: string | number;
+    skill?: string | number;
+    language?: string;
+    language_level?: string;
+    driving_license?: string;
+    salary_max?: string | number;
+    available_before?: string;
+    documents_complete?: boolean;
     view?: string;
     job?: string | number;
+    sort?: string;
+    per_page?: string | number;
 };
 
 const props = withDefaults(
     defineProps<{
-        candidates?: Candidate[];
+        candidates?: CandidatePage;
         jobs?: JobOption[];
         occupations?: OccupationOption[];
+        skills?: NamedOption[];
+        languages?: NamedOption[];
+        countries?: string[];
         talent_lists?: TalentList[];
+        saved_searches?: SavedSearch[];
         filters?: Filters;
     }>(),
     {
-        candidates: () => [],
+        candidates: () => ({
+            data: [],
+            current_page: 1,
+            last_page: 1,
+            per_page: 24,
+            total: 0,
+            links: [],
+        }),
         jobs: () => [],
         occupations: () => [],
+        skills: () => [],
+        languages: () => [],
+        countries: () => [],
         talent_lists: () => [],
+        saved_searches: () => [],
         filters: () => ({}),
     },
 );
 const { t } = useI18n();
+const { can } = useCapabilities();
+const canManageCandidates = computed(() => can('candidates.manage'));
 const query = ref(props.filters.search ?? '');
+const filterPanelOpen = ref(false);
+const filterForm = reactive<Filters>({ ...props.filters });
+const savedSearchName = ref('');
+const newListName = ref('');
+const talentListNames = reactive(
+    Object.fromEntries(
+        props.talent_lists.map((list) => [list.id, list.name]),
+    ) as Record<number, string>,
+);
 const activeTab = ref(
     props.filters.view === 'favorites'
         ? 'favorites'
@@ -88,7 +160,18 @@ const bulkMessage = ref('');
 const bulkProcessing = ref(false);
 
 const visibleCandidateIds = computed(() =>
-    props.candidates.map((candidate) => Number(candidate.id)),
+    props.candidates.data.map((candidate) => Number(candidate.id)),
+);
+const activeFilterCount = computed(
+    () =>
+        Object.entries(props.filters).filter(
+            ([key, value]) =>
+                !['view', 'sort', 'per_page', 'job'].includes(key) &&
+                value !== undefined &&
+                value !== null &&
+                value !== '' &&
+                value !== false,
+        ).length,
 );
 const availableInviteJobs = computed(() =>
     props.jobs.filter((job) => job.status === 'published'),
@@ -132,6 +215,60 @@ const selectTab = (tab: 'all' | 'favorites' | 'matching') => {
 };
 
 const submitSearch = () => visit({ search: query.value || undefined });
+const applyFilters = () => {
+    filterPanelOpen.value = false;
+    visit({ ...filterForm, page: undefined });
+};
+const clearFilters = () => router.get(candidatesIndex.url());
+const applySavedSearch = (saved: SavedSearch) => {
+    Object.assign(filterForm, saved.filters);
+    router.get(candidatesIndex.url(), saved.filters);
+};
+const saveSearch = () => {
+    if (!savedSearchName.value.trim()) {
+        return;
+    }
+
+    router.post(
+        '/employer/candidate-saved-searches',
+        { name: savedSearchName.value, filters: props.filters },
+        { preserveScroll: true, onSuccess: () => (savedSearchName.value = '') },
+    );
+};
+const createTalentList = () => {
+    if (!newListName.value.trim()) {
+        return;
+    }
+
+    router.post(
+        '/employer/talent-lists',
+        { name: newListName.value },
+        { preserveScroll: true, onSuccess: () => (newListName.value = '') },
+    );
+};
+const updateTalentList = (list: TalentList) => {
+    const name = talentListNames[list.id]?.trim();
+
+    if (!name) {
+        return;
+    }
+
+    router.patch(
+        `/employer/talent-lists/${list.id}`,
+        { name },
+        { preserveScroll: true },
+    );
+};
+const deleteTalentList = (list: TalentList) => {
+    router.delete(`/employer/talent-lists/${list.id}`, {
+        preserveScroll: true,
+    });
+};
+const deleteSavedSearch = (saved: SavedSearch) => {
+    router.delete(`/employer/candidate-saved-searches/${saved.id}`, {
+        preserveScroll: true,
+    });
+};
 const setCandidateSelected = (
     candidateId: number | string,
     selected: boolean,
@@ -237,12 +374,13 @@ const tabs = computed(() => [
                 <button
                     type="button"
                     class="erin-focus inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                    @click="filterPanelOpen = !filterPanelOpen"
                 >
                     <SlidersHorizontal class="size-4" />
                     {{ t('employer.candidates.filters') }}
                     <span
                         class="rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] text-blue-700"
-                        >3</span
+                        >{{ activeFilterCount }}</span
                     >
                 </button>
             </template>
@@ -267,27 +405,436 @@ const tabs = computed(() => [
                     v-if="Object.values(filters).some(Boolean)"
                     type="button"
                     class="px-2 text-xs font-semibold text-slate-400 hover:text-red-600"
-                    @click="router.get(candidatesIndex.url())"
+                    @click="clearFilters"
                 >
                     {{ t('employer.candidates.clearAll') }}
                 </button>
             </template>
         </FilterToolbar>
 
+        <SectionCard
+            v-if="filterPanelOpen"
+            :title="t('employer.candidates.filterPanel.title')"
+            :description="t('employer.candidates.filterPanel.description')"
+        >
+            <form
+                class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+                @submit.prevent="applyFilters"
+            >
+                <label class="space-y-1 text-xs font-bold text-slate-600">
+                    <span>{{ t('employer.candidates.filterPanel.job') }}</span>
+                    <select
+                        v-model="filterForm.job"
+                        class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                    >
+                        <option value="">
+                            {{ t('employer.candidates.filterPanel.all') }}
+                        </option>
+                        <option
+                            v-for="job in jobs"
+                            :key="job.id"
+                            :value="job.id"
+                        >
+                            {{ job.title }}
+                        </option>
+                    </select>
+                </label>
+                <label class="space-y-1 text-xs font-bold text-slate-600">
+                    <span>{{
+                        t('employer.candidates.filterPanel.country')
+                    }}</span>
+                    <select
+                        v-model="filterForm.country"
+                        class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                    >
+                        <option value="">
+                            {{ t('employer.candidates.filterPanel.all') }}
+                        </option>
+                        <option
+                            v-for="country in countries"
+                            :key="country"
+                            :value="country"
+                        >
+                            {{ country }}
+                        </option>
+                    </select>
+                </label>
+                <label class="space-y-1 text-xs font-bold text-slate-600">
+                    <span>{{
+                        t('employer.candidates.filterPanel.occupation')
+                    }}</span>
+                    <select
+                        v-model="filterForm.occupation"
+                        class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                    >
+                        <option value="">
+                            {{ t('employer.candidates.filterPanel.all') }}
+                        </option>
+                        <option
+                            v-for="occupation in occupations"
+                            :key="occupation.id"
+                            :value="occupation.id"
+                        >
+                            {{ occupation.name_de || occupation.name_en }}
+                        </option>
+                    </select>
+                </label>
+                <label class="space-y-1 text-xs font-bold text-slate-600">
+                    <span>{{
+                        t('employer.candidates.filterPanel.skill')
+                    }}</span>
+                    <select
+                        v-model="filterForm.skill"
+                        class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                    >
+                        <option value="">
+                            {{ t('employer.candidates.filterPanel.all') }}
+                        </option>
+                        <option
+                            v-for="skill in skills"
+                            :key="skill.id"
+                            :value="skill.id"
+                        >
+                            {{ skill.name_de || skill.name_en }}
+                        </option>
+                    </select>
+                </label>
+                <label class="space-y-1 text-xs font-bold text-slate-600">
+                    <span>{{
+                        t('employer.candidates.filterPanel.language')
+                    }}</span>
+                    <select
+                        v-model="filterForm.language"
+                        class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                    >
+                        <option value="">
+                            {{ t('employer.candidates.filterPanel.all') }}
+                        </option>
+                        <option
+                            v-for="language in languages"
+                            :key="language.id"
+                            :value="language.code"
+                        >
+                            {{ language.name_de || language.name_en }}
+                        </option>
+                    </select>
+                </label>
+                <label class="space-y-1 text-xs font-bold text-slate-600">
+                    <span>{{
+                        t('employer.candidates.filterPanel.languageLevel')
+                    }}</span>
+                    <select
+                        v-model="filterForm.language_level"
+                        class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                    >
+                        <option value="">
+                            {{ t('employer.candidates.filterPanel.all') }}
+                        </option>
+                        <option
+                            v-for="level in [
+                                'A1',
+                                'A2',
+                                'B1',
+                                'B2',
+                                'C1',
+                                'C2',
+                            ]"
+                            :key="level"
+                            :value="level"
+                        >
+                            {{ level }}
+                        </option>
+                    </select>
+                </label>
+                <label class="space-y-1 text-xs font-bold text-slate-600">
+                    <span>{{
+                        t('employer.candidates.filterPanel.experience')
+                    }}</span>
+                    <input
+                        v-model.number="filterForm.experience"
+                        type="number"
+                        min="0"
+                        max="60"
+                        class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                    />
+                </label>
+                <label class="space-y-1 text-xs font-bold text-slate-600">
+                    <span>{{
+                        t('employer.candidates.filterPanel.employmentType')
+                    }}</span>
+                    <select
+                        v-model="filterForm.employment_type"
+                        class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                    >
+                        <option value="">
+                            {{ t('employer.candidates.filterPanel.all') }}
+                        </option>
+                        <option value="full_time">
+                            {{ t('employer.candidates.filterPanel.fullTime') }}
+                        </option>
+                        <option value="part_time">
+                            {{ t('employer.candidates.filterPanel.partTime') }}
+                        </option>
+                        <option value="temporary">
+                            {{ t('employer.candidates.filterPanel.temporary') }}
+                        </option>
+                        <option value="permanent">
+                            {{ t('employer.candidates.filterPanel.permanent') }}
+                        </option>
+                    </select>
+                </label>
+                <label class="space-y-1 text-xs font-bold text-slate-600">
+                    <span>{{
+                        t('employer.candidates.filterPanel.weeklyHours')
+                    }}</span>
+                    <input
+                        v-model.number="filterForm.weekly_hours"
+                        type="number"
+                        min="1"
+                        max="80"
+                        class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                    />
+                </label>
+                <label class="space-y-1 text-xs font-bold text-slate-600">
+                    <span>{{
+                        t('employer.candidates.filterPanel.drivingLicense')
+                    }}</span>
+                    <input
+                        v-model="filterForm.driving_license"
+                        maxlength="10"
+                        class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                    />
+                </label>
+                <label class="space-y-1 text-xs font-bold text-slate-600">
+                    <span>{{
+                        t('employer.candidates.filterPanel.salaryMax')
+                    }}</span>
+                    <input
+                        v-model.number="filterForm.salary_max"
+                        type="number"
+                        min="0"
+                        step="10000"
+                        class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                    />
+                </label>
+                <label class="space-y-1 text-xs font-bold text-slate-600">
+                    <span>{{
+                        t('employer.candidates.filterPanel.availableBefore')
+                    }}</span>
+                    <input
+                        v-model="filterForm.available_before"
+                        type="date"
+                        class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                    />
+                </label>
+                <label class="space-y-1 text-xs font-bold text-slate-600">
+                    <span>{{ t('employer.candidates.filterPanel.visa') }}</span>
+                    <select
+                        v-model="filterForm.visa"
+                        class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                    >
+                        <option value="">
+                            {{ t('employer.candidates.filterPanel.all') }}
+                        </option>
+                        <option value="required">
+                            {{
+                                t(
+                                    'employer.candidates.filterPanel.visaRequired',
+                                )
+                            }}
+                        </option>
+                        <option value="not_required">
+                            {{
+                                t(
+                                    'employer.candidates.filterPanel.visaNotRequired',
+                                )
+                            }}
+                        </option>
+                    </select>
+                </label>
+                <div
+                    class="grid gap-2 pt-5 text-sm sm:col-span-2 lg:col-span-3"
+                >
+                    <label class="inline-flex items-center gap-2">
+                        <input
+                            v-model="filterForm.relocation_ready"
+                            type="checkbox"
+                        />
+                        {{
+                            t('employer.candidates.filterPanel.relocationReady')
+                        }}
+                    </label>
+                    <label class="inline-flex items-center gap-2">
+                        <input
+                            v-model="filterForm.work_permit"
+                            type="checkbox"
+                        />
+                        {{ t('employer.candidates.filterPanel.workPermit') }}
+                    </label>
+                    <label class="inline-flex items-center gap-2">
+                        <input
+                            v-model="filterForm.documents_complete"
+                            type="checkbox"
+                        />
+                        {{
+                            t(
+                                'employer.candidates.filterPanel.documentsComplete',
+                            )
+                        }}
+                    </label>
+                </div>
+                <div class="flex items-end gap-2 sm:col-span-2 lg:col-span-4">
+                    <Button type="submit">
+                        {{ t('employer.candidates.filterPanel.apply') }}
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        @click="clearFilters"
+                    >
+                        {{ t('employer.candidates.clearAll') }}
+                    </Button>
+                </div>
+            </form>
+
+            <div
+                v-if="canManageCandidates"
+                class="mt-6 grid gap-4 border-t border-slate-100 pt-5 lg:grid-cols-2"
+            >
+                <div>
+                    <p class="text-sm font-extrabold text-slate-800">
+                        {{ t('employer.candidates.savedSearches') }}
+                    </p>
+                    <div class="mt-2 flex gap-2">
+                        <input
+                            v-model="savedSearchName"
+                            class="erin-focus h-10 min-w-0 flex-1 rounded-xl border border-slate-200 px-3 text-sm"
+                            :placeholder="
+                                t('employer.candidates.savedSearchName')
+                            "
+                        />
+                        <Button type="button" @click="saveSearch">
+                            <BookmarkPlus class="size-4" />
+                            {{ t('employer.candidates.saveSearch') }}
+                        </Button>
+                    </div>
+                    <div class="mt-2 flex flex-wrap gap-2">
+                        <div
+                            v-for="saved in saved_searches"
+                            :key="saved.id"
+                            class="inline-flex overflow-hidden rounded-lg bg-blue-50 text-xs font-bold text-blue-700"
+                        >
+                            <button
+                                type="button"
+                                class="px-3 py-2"
+                                @click="applySavedSearch(saved)"
+                            >
+                                {{ saved.name }}
+                            </button>
+                            <button
+                                type="button"
+                                class="border-l border-blue-100 px-2 hover:bg-red-50 hover:text-red-600"
+                                :aria-label="
+                                    t('employer.candidates.deleteSavedSearch', {
+                                        name: saved.name,
+                                    })
+                                "
+                                @click="deleteSavedSearch(saved)"
+                            >
+                                <Trash2 class="size-3.5" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <p class="text-sm font-extrabold text-slate-800">
+                        {{ t('employer.candidates.talentLists') }}
+                    </p>
+                    <div class="mt-2 flex gap-2">
+                        <input
+                            v-model="newListName"
+                            class="erin-focus h-10 min-w-0 flex-1 rounded-xl border border-slate-200 px-3 text-sm"
+                            :placeholder="
+                                t('employer.candidates.talentListName')
+                            "
+                        />
+                        <Button type="button" @click="createTalentList">
+                            {{ t('employer.candidates.createList') }}
+                        </Button>
+                    </div>
+                    <div class="mt-2 space-y-2">
+                        <div
+                            v-for="list in talent_lists"
+                            :key="list.id"
+                            class="flex items-center gap-2"
+                        >
+                            <input
+                                v-model="talentListNames[list.id]"
+                                class="erin-focus h-9 min-w-0 flex-1 rounded-lg border border-slate-200 px-3 text-xs font-semibold"
+                            />
+                            <span class="text-xs text-slate-500">
+                                {{ list.members_count ?? 0 }}
+                            </span>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                @click="updateTalentList(list)"
+                            >
+                                {{ t('employer.candidates.renameList') }}
+                            </Button>
+                            <Button
+                                v-if="!list.is_default"
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                :aria-label="
+                                    t('employer.candidates.deleteList', {
+                                        name: list.name,
+                                    })
+                                "
+                                @click="deleteTalentList(list)"
+                            >
+                                <Trash2 class="size-4 text-red-600" />
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </SectionCard>
+
         <div class="flex items-center justify-between">
             <p class="text-sm text-slate-500">
-                <strong class="text-slate-900">{{ candidates.length }}</strong>
+                <strong class="text-slate-900">{{ candidates.total }}</strong>
                 {{ t('employer.candidates.results') }}
             </p>
-            <button
-                type="button"
-                class="inline-flex items-center gap-2 text-xs font-semibold text-slate-500"
+            <select
+                :value="filters.sort || 'published_desc'"
+                class="erin-focus h-9 rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-600"
+                @change="
+                    visit({
+                        sort: ($event.target as HTMLSelectElement).value,
+                    })
+                "
             >
-                <ListFilter class="size-3.5" />
-                {{ t('employer.candidates.bestMatch') }}
-            </button>
+                <option value="published_desc">
+                    {{ t('employer.candidates.sortNewest') }}
+                </option>
+                <option value="experience_desc">
+                    {{ t('employer.candidates.sortExperience') }}
+                </option>
+                <option value="availability_asc">
+                    {{ t('employer.candidates.sortAvailability') }}
+                </option>
+                <option value="salary_asc">
+                    {{ t('employer.candidates.sortSalary') }}
+                </option>
+            </select>
         </div>
-        <div v-if="candidates.length" class="flex items-center gap-2">
+        <div
+            v-if="canManageCandidates && candidates.data.length"
+            class="flex items-center gap-2"
+        >
             <label
                 class="inline-flex cursor-pointer items-center gap-2 text-xs font-bold text-slate-600"
             >
@@ -300,7 +847,11 @@ const tabs = computed(() => [
                 {{ t('employer.candidates.selectAll') }}
             </label>
         </div>
-        <BulkActionBar :count="selectedIds.length" @clear="selectedIds = []">
+        <BulkActionBar
+            v-if="canManageCandidates"
+            :count="selectedIds.length"
+            @clear="selectedIds = []"
+        >
             <select
                 v-model="bulkJobId"
                 class="erin-focus h-9 min-w-44 rounded-xl border border-blue-200 bg-white px-3 text-xs font-bold text-slate-700"
@@ -344,14 +895,15 @@ const tabs = computed(() => [
             </button>
         </BulkActionBar>
         <div
-            v-if="candidates.length"
+            v-if="candidates.data.length"
             class="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3"
         >
             <CandidateCard
-                v-for="candidate in candidates"
+                v-for="candidate in candidates.data"
                 :key="candidate.id"
                 :candidate="candidate"
-                selectable
+                :selectable="canManageCandidates"
+                :can-manage="canManageCandidates"
                 :selected="selectedIds.includes(Number(candidate.id))"
                 @update:selected="setCandidateSelected(candidate.id, $event)"
             />
@@ -363,5 +915,37 @@ const tabs = computed(() => [
             :title="t('employer.candidates.emptyTitle')"
             :description="t('employer.candidates.emptyDescription')"
         />
+        <nav
+            v-if="candidates.last_page > 1"
+            class="flex items-center justify-center gap-2"
+            :aria-label="t('employer.candidates.pagination')"
+        >
+            <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                :disabled="candidates.current_page <= 1"
+                @click="visit({ page: candidates.current_page - 1 })"
+            >
+                <ChevronLeft class="size-4" />
+            </Button>
+            <span class="px-3 text-xs font-bold text-slate-600">
+                {{
+                    t('employer.candidates.pageOf', {
+                        current: candidates.current_page,
+                        last: candidates.last_page,
+                    })
+                }}
+            </span>
+            <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                :disabled="candidates.current_page >= candidates.last_page"
+                @click="visit({ page: candidates.current_page + 1 })"
+            >
+                <ChevronRight class="size-4" />
+            </Button>
+        </nav>
     </div>
 </template>

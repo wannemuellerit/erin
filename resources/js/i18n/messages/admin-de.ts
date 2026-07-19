@@ -208,6 +208,8 @@ export default {
         exportCsv: 'Gefiltertes CSV exportieren',
     },
     users: {
+        platformRoleFor: 'Zusätzliche Plattformrolle für {name}',
+        defaultSupportRole: 'Standard-Supportrolle',
         metaTitle: 'Benutzerverwaltung',
         eyebrow: 'Identität & Zugriff',
         title: 'Benutzerverwaltung',
@@ -544,6 +546,8 @@ export default {
             'Niedrigere fachliche Grenzen, etwa für Profilbilder, bleiben zusätzlich bestehen.',
         maxFileSize: 'Maximale Dateigröße in MB',
         userStorageQuota: 'Speicherlimit je Nutzer in MB',
+        profileCompletionThreshold:
+            'Mindest-Vollständigkeit für Bewerbung/Veröffentlichung in Prozent',
         retentionTitle: 'Aufbewahrung und automatische Löschung',
         retentionDescription:
             'Fristen werden täglich angewendet. Der Wert 0 deaktiviert die jeweilige Löschung.',
@@ -573,6 +577,33 @@ export default {
         uploadArtwork: 'Motiv hochladen',
         removeArtwork: 'Motiv entfernen',
         savePlatform: 'Plattformkonfiguration speichern',
+        skillTaxonomyTitle: 'Skill-Taxonomie',
+        skillTaxonomyDescription:
+            'Skills zweisprachig pflegen und relevanten Berufsfeldern zuordnen.',
+        skillNameDe: 'Skillname Deutsch',
+        skillNameEn: 'Skillname Englisch',
+        skillActive: 'Aktiv',
+        createSkill: 'Skill erstellen',
+        saveSkill: 'Skill speichern',
+        deactivateSkill: 'Skill deaktivieren',
+        platformRolesTitle: 'Zusätzliche Plattformrollen',
+        platformRolesDescription:
+            'Superadmins können den Zugriff von Supportmitarbeitenden auf einzelne Plattformbereiche begrenzen.',
+        platformRolesHint:
+            'Ohne zusätzliche Rolle gilt die Standard-Supportrolle. Zugewiesene Rollen ersetzen deren Rechte; Dashboardzugriff bleibt immer erhalten.',
+        platformRoleName: 'Rollenname',
+        platformRoleActive: 'Rolle aktiv',
+        platformRoleCapabilities: 'Berechtigungen',
+        platformRoleAssignments: '{count} Zuweisung | {count} Zuweisungen',
+        createPlatformRole: 'Plattformrolle erstellen',
+        savePlatformRole: 'Plattformrolle speichern',
+        deletePlatformRole: 'Plattformrolle löschen',
+        noPlatformRoles: 'Noch keine zusätzlichen Plattformrollen angelegt.',
+        capabilities: {
+            platformView: 'Plattformdaten anzeigen',
+            platformSupportManage: 'Supportfälle bearbeiten',
+            supportUse: 'Eigenen Support nutzen',
+        },
     },
     support: {
         metaTitle: 'Support',

@@ -41,6 +41,8 @@ class UpdatePlatformSettingsRequest extends FormRequest
             'uploads' => ['required', 'array:max_file_size_mb,user_quota_mb'],
             'uploads.max_file_size_mb' => ['required', 'integer', 'min:1', 'max:100'],
             'uploads.user_quota_mb' => ['required', 'integer', 'min:10', 'max:102400'],
+            'candidate_profile' => ['sometimes', 'array:minimum_completion'],
+            'candidate_profile.minimum_completion' => ['required_with:candidate_profile', 'integer', 'min:50', 'max:100'],
             'retention' => [
                 'sometimes',
                 'array:rejected_document_days,message_attachment_days,support_attachment_days,audit_log_days,orphan_grace_hours',

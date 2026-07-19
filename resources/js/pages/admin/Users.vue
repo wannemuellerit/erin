@@ -24,6 +24,8 @@ type UserRow = {
     email: string;
     email_verified_at: string | null;
     role: string;
+    platform_role_id: number | null;
+    platform_role?: { id: number; name: string } | null;
     status: string;
     locale: string;
     last_active_at: string | null;
@@ -63,6 +65,7 @@ const props = defineProps<{
     filters: UserFilters;
     roles: string[];
     statuses: string[];
+    platform_roles: Array<{ id: number; name: string }>;
 }>();
 
 const filters = reactive({
@@ -79,6 +82,9 @@ const statusForm = useForm({
 
 const roleForm = useForm({
     role: '',
+});
+const platformRoleForm = useForm({
+    platform_role_id: null as number | null,
 });
 
 const quotaForm = useForm({
@@ -159,6 +165,14 @@ function updateRole(user: UserRow, event: Event): void {
             select.value = user.role;
         },
         onFinish: () => roleForm.reset(),
+    });
+}
+function updatePlatformRole(user: UserRow, event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    platformRoleForm.platform_role_id = value ? Number(value) : null;
+    platformRoleForm.patch(`/admin/users/${user.id}/platform-role`, {
+        preserveScroll: true,
+        onFinish: () => platformRoleForm.reset(),
     });
 }
 
@@ -459,6 +473,28 @@ function updateQuota(user: UserRow): void {
                                 >
                                     {{ roleForm.errors.role }}
                                 </p>
+                                <select
+                                    v-if="user.role === 'support'"
+                                    :value="user.platform_role_id ?? ''"
+                                    class="erin-focus mt-2 h-9 min-w-36 rounded-lg border border-slate-200 bg-white px-2 text-xs"
+                                    :aria-label="
+                                        t('users.platformRoleFor', {
+                                            name: user.name,
+                                        })
+                                    "
+                                    @change="updatePlatformRole(user, $event)"
+                                >
+                                    <option value="">
+                                        {{ t('users.defaultSupportRole') }}
+                                    </option>
+                                    <option
+                                        v-for="platformRole in platform_roles"
+                                        :key="platformRole.id"
+                                        :value="platformRole.id"
+                                    >
+                                        {{ platformRole.name }}
+                                    </option>
+                                </select>
                             </td>
                             <td class="px-5 py-4">
                                 <StatusBadge

@@ -206,6 +206,8 @@ export default {
         exportCsv: 'Export filtered CSV',
     },
     users: {
+        platformRoleFor: 'Additional platform role for {name}',
+        defaultSupportRole: 'Default support role',
         metaTitle: 'User management',
         eyebrow: 'Identity & access',
         title: 'User management',
@@ -541,6 +543,8 @@ export default {
             'Lower feature-specific limits, such as for profile photos, continue to apply.',
         maxFileSize: 'Maximum file size in MB',
         userStorageQuota: 'Storage limit per user in MB',
+        profileCompletionThreshold:
+            'Minimum completeness for applications/publication in percent',
         retentionTitle: 'Retention and automatic deletion',
         retentionDescription:
             'Retention periods run daily. A value of 0 disables the respective deletion.',
@@ -570,6 +574,33 @@ export default {
         uploadArtwork: 'Upload artwork',
         removeArtwork: 'Remove artwork',
         savePlatform: 'Save platform configuration',
+        skillTaxonomyTitle: 'Skill taxonomy',
+        skillTaxonomyDescription:
+            'Maintain bilingual skills and assign them to relevant occupations.',
+        skillNameDe: 'German skill name',
+        skillNameEn: 'English skill name',
+        skillActive: 'Active',
+        createSkill: 'Create skill',
+        saveSkill: 'Save skill',
+        deactivateSkill: 'Deactivate skill',
+        platformRolesTitle: 'Additional platform roles',
+        platformRolesDescription:
+            'Superadmins can restrict support staff access to individual platform areas.',
+        platformRolesHint:
+            'The default support role applies without an additional role. Assigned roles replace those permissions; dashboard access always remains available.',
+        platformRoleName: 'Role name',
+        platformRoleActive: 'Role active',
+        platformRoleCapabilities: 'Capabilities',
+        platformRoleAssignments: '{count} assignment | {count} assignments',
+        createPlatformRole: 'Create platform role',
+        savePlatformRole: 'Save platform role',
+        deletePlatformRole: 'Delete platform role',
+        noPlatformRoles: 'No additional platform roles have been created yet.',
+        capabilities: {
+            platformView: 'View platform data',
+            platformSupportManage: 'Manage support cases',
+            supportUse: 'Use personal support',
+        },
     },
     support: {
         metaTitle: 'Support',

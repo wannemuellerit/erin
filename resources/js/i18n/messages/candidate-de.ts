@@ -219,6 +219,8 @@ export default {
         completeness: 'Profil vollständig',
         stopPublishing: 'Veröffentlichung stoppen',
         publish: 'Profil veröffentlichen',
+        unsavedWarning:
+            'Du hast ungespeicherte Profiländerungen. Möchtest du die Seite wirklich verlassen?',
         photo: {
             title: 'Profilbild',
             description:
@@ -232,7 +234,9 @@ export default {
         tabs: {
             personal: 'Persönliche Daten',
             profession: 'Beruf & Mobilität',
+            history: 'Erfahrung & Ausbildung',
             skills: 'Skills & Sprachen',
+            availability: 'Verfügbarkeit',
             documents: 'Dokumente',
         },
         personal: {
@@ -248,6 +252,7 @@ export default {
             currentCity: 'Aktuelle Stadt *',
             phone: 'Telefonnummer *',
             whatsapp: 'WhatsApp',
+            email: 'E-Mail *',
             summary: 'Kurztext über dich *',
         },
         privacy: {
@@ -285,6 +290,53 @@ export default {
             relocationReady: 'Umzugsbereit',
             requiresVisa: 'Visum benötigt',
             workPermit: 'Arbeitserlaubnis',
+            licenses: 'Führerscheine und Nachweise',
+            employmentPreferences: 'Gewünschte Anstellungsarten',
+            employment: {
+                full_time: 'Vollzeit',
+                part_time: 'Teilzeit',
+                temporary: 'Befristet',
+                permanent: 'Unbefristet',
+            },
+        },
+        history: {
+            experienceTitle: 'Berufserfahrung',
+            experienceDescription:
+                'Füge Stationen hinzu und sortiere sie in der gewünschten Reihenfolge.',
+            experienceNumber: 'Berufserfahrung {number}',
+            educationTitle: 'Ausbildung und Studium',
+            educationNumber: 'Ausbildung {number}',
+            employer: 'Arbeitgeber *',
+            position: 'Position *',
+            country: 'Land (ISO)',
+            startedAt: 'Beginn *',
+            endedAt: 'Ende',
+            completedAt: 'Abschluss',
+            current: 'Aktuelle Tätigkeit',
+            description: 'Beschreibung',
+            institution: 'Institution *',
+            qualification: 'Abschluss *',
+            field: 'Fachrichtung',
+            addExperience: 'Berufserfahrung hinzufügen',
+            addEducation: 'Ausbildung hinzufügen',
+        },
+        availability: {
+            title: 'Wöchentliche Verfügbarkeit',
+            description:
+                'Hinterlege mehrere Zeitfenster pro Tag für Interviews.',
+            weekday: 'Wochentag',
+            from: 'Von',
+            until: 'Bis',
+            add: 'Zeitfenster hinzufügen',
+            days: {
+                1: 'Montag',
+                2: 'Dienstag',
+                3: 'Mittwoch',
+                4: 'Donnerstag',
+                5: 'Freitag',
+                6: 'Samstag',
+                7: 'Sonntag',
+            },
         },
         skills: {
             title: 'Skills',

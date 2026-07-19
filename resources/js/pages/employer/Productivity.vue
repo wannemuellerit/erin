@@ -20,6 +20,7 @@ import PageHeader from '@/components/product/PageHeader.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
 import Textarea from '@/components/product/Textarea.vue';
+import { useCapabilities } from '@/composables/useCapabilities';
 import { useFormatters } from '@/composables/useFormatters';
 import type { StatusTone } from '@/types';
 
@@ -89,6 +90,8 @@ const props = withDefaults(
 );
 
 const { t, te } = useI18n();
+const { can } = useCapabilities();
+const canManageProductivity = computed(() => can('productivity.manage'));
 const { formatDate: formatLocalizedDate } = useFormatters();
 const activityItems = ref<ActivityEntry[]>([...props.activity]);
 const reminderForm = useForm({
@@ -242,6 +245,7 @@ const activityLabel = (entry: ActivityEntry) => {
                     "
                 >
                     <form
+                        v-if="canManageProductivity"
                         class="grid gap-4 md:grid-cols-2"
                         @submit.prevent="addReminder"
                     >
@@ -412,8 +416,12 @@ const activityLabel = (entry: ActivityEntry) => {
                                 "
                                 :tone="reminderTone(reminder)"
                             />
-                            <div class="flex gap-2">
+                            <div
+                                v-if="canManageProductivity"
+                                class="flex gap-2"
+                            >
                                 <button
+                                    v-if="canManageProductivity"
                                     type="button"
                                     class="erin-focus grid size-9 place-items-center rounded-xl bg-emerald-50 text-emerald-600"
                                     :aria-label="
@@ -484,6 +492,7 @@ const activityLabel = (entry: ActivityEntry) => {
                     "
                 >
                     <form
+                        v-if="canManageProductivity"
                         class="flex flex-col gap-3 sm:flex-row sm:items-end"
                         @submit.prevent="upload"
                     >
@@ -526,7 +535,7 @@ const activityLabel = (entry: ActivityEntry) => {
                     </form>
 
                     <form
-                        v-if="pendingImport"
+                        v-if="pendingImport && canManageProductivity"
                         class="mt-6 rounded-2xl border border-blue-100 bg-blue-50/50 p-4"
                         @submit.prevent="startImport"
                     >

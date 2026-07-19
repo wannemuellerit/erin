@@ -20,6 +20,7 @@ import MatchScore from '@/components/product/MatchScore.vue';
 import ProgressBar from '@/components/product/ProgressBar.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
+import { useCapabilities } from '@/composables/useCapabilities';
 import { useFormatters } from '@/composables/useFormatters';
 import { useLocalizedField } from '@/composables/useLocalizedField';
 import {
@@ -105,6 +106,8 @@ const props = withDefaults(
 const selectedJob = ref<number | null>(props.jobs[0]?.id ?? null);
 const selectedList = ref<number | null>(props.talent_lists[0]?.id ?? null);
 const { t, te } = useI18n();
+const { can } = useCapabilities();
+const canManageCandidates = computed(() => can('candidates.manage'));
 const { formatDate } = useFormatters();
 const { localizedField } = useLocalizedField();
 const inviteForm = useForm({ job_posting_id: selectedJob.value, message: '' });
@@ -513,6 +516,7 @@ const saveCandidate = () => {
                     </SectionCard>
 
                     <SectionCard
+                        v-if="canManageCandidates"
                         :title="t('employer.candidateShow.inviteTitle')"
                     >
                         <form class="space-y-3" @submit.prevent="sendInvite">
@@ -561,6 +565,7 @@ const saveCandidate = () => {
                     </SectionCard>
 
                     <SectionCard
+                        v-if="canManageCandidates"
                         :title="t('employer.candidateShow.talentPoolTitle')"
                     >
                         <form class="space-y-3" @submit.prevent="saveCandidate">

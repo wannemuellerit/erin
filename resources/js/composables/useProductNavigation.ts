@@ -23,6 +23,7 @@ import {
 } from '@lucide/vue';
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useCapabilities } from '@/composables/useCapabilities';
 import type { ProductNavGroup, ProductRole, User } from '@/types';
 
 type ProductUser = User & {
@@ -48,6 +49,7 @@ const roleAliases: Record<string, ProductRole> = {
 export function useProductNavigation() {
     const page = usePage();
     const { t } = useI18n();
+    const { can } = useCapabilities();
 
     const role = computed<ProductRole>(() => {
         const user = page.props.auth?.user as ProductUser | undefined;
@@ -318,20 +320,65 @@ export function useProductNavigation() {
         },
     ]);
 
+    const capabilityForPath: Record<string, string> = {
+        '/employer/candidates': 'candidates.view',
+        '/employer/jobs': 'jobs.view',
+        '/employer/pipeline': 'applications.view',
+        '/employer/analytics': 'analytics.view',
+        '/employer/messages': 'messages.view',
+        '/employer/interviews': 'interviews.view',
+        '/employer/productivity': 'applications.view',
+        '/employer/visa': 'visa.view',
+        '/employer/referrals': 'referrals.view',
+        '/employer/company': 'company.view',
+        '/employer/team': 'team.view',
+        '/employer/billing': 'billing.view',
+        '/candidate/jobs': 'candidate.jobs.view',
+        '/candidate/companies': 'candidate.jobs.view',
+        '/candidate/applications': 'candidate.applications.manage',
+        '/candidate/profile': 'candidate.profile.manage',
+        '/candidate/messages': 'messages.view',
+        '/candidate/interviews': 'interviews.view',
+        '/candidate/ai-studio': 'candidate.ai.use',
+        '/candidate/referrals': 'referrals.view',
+        '/admin': 'platform.view',
+    };
+
+    const filterByCapabilities = (groups: ProductNavGroup[]) =>
+        groups
+            .map((group) => ({
+                ...group,
+                items: group.items.filter((item) => {
+                    const required =
+                        capabilityForPath[
+                            Object.keys(capabilityForPath)
+                                .sort((a, b) => b.length - a.length)
+                                .find(
+                                    (path) =>
+                                        item.href === path ||
+                                        item.href.startsWith(`${path}/`),
+                                ) ?? ''
+                        ];
+
+                    return required === undefined || can(required);
+                }),
+            }))
+            .filter((group) => group.items.length > 0);
+
     const navigation = computed(() => {
+        let groups: ProductNavGroup[];
+
         if (role.value === 'candidate') {
-            return candidateNavigation.value;
+            groups = candidateNavigation.value;
+        } else if (role.value === 'support') {
+            groups = supportNavigation.value;
+        } else if (role.value === 'super_admin') {
+            groups = adminNavigation.value;
+        } else {
+            groups = employerNavigation.value;
         }
 
-        if (role.value === 'support') {
-            return supportNavigation.value;
-        }
-
-        if (role.value === 'super_admin') {
-            return adminNavigation.value;
-        }
-
-        return employerNavigation.value;
+        return filterByCapabilities(groups);
     });
 
     const roleLabel = computed(() => t(`roles.${role.value}`));

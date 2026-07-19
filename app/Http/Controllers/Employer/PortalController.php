@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Employer;
 
+use App\Enums\Capability;
 use App\Enums\CompanyMemberRole;
 use App\Enums\VisaCaseStatus;
 use App\Enums\VisaStepStatus;
@@ -13,6 +14,8 @@ use App\Models\CompanyMedia;
 use App\Models\CompanyMembership;
 use App\Models\VisaCase;
 use App\Models\VisaStep;
+use App\Services\Audit\AuditLogger;
+use App\Services\Authorization\CapabilityResolver;
 use App\Services\Billing\EntitlementService;
 use App\Services\Companies\CurrentCompany;
 use App\Services\Documents\UploadPolicy;
@@ -143,7 +146,16 @@ class PortalController extends Controller
             'invitations' => $company->invitations()->whereNull('accepted_at')->where('expires_at', '>', now())->get(),
             'teams' => $company->teams()->with('memberships.user:id,name,email')->get(),
             'seats' => $entitlements->summary($company)['seats'],
-            'can_manage' => $currentCompany->membership($request)->role->canManage(),
+            'can_manage' => in_array(
+                Capability::TeamManage->value,
+                app(CapabilityResolver::class)->forRequest($request),
+                true,
+            ),
+            'can_transfer_ownership' => in_array(
+                Capability::OwnershipTransfer->value,
+                app(CapabilityResolver::class)->forRequest($request),
+                true,
+            ),
         ]);
     }
 
@@ -282,6 +294,40 @@ class PortalController extends Controller
         return back()->with('success', __('Das Teammitglied wurde entfernt.'));
     }
 
+    public function transferOwnership(
+        Request $request,
+        CompanyMembership $membership,
+        CurrentCompany $currentCompany,
+        AuditLogger $audit,
+    ): RedirectResponse {
+        $company = $currentCompany->forRequest($request);
+        $actorMembership = $currentCompany->membership($request);
+        abort_unless($actorMembership->role === CompanyMemberRole::Owner, 403);
+        abort_unless(
+            $membership->company_id === $company->getKey()
+            && $membership->accepted_at !== null
+            && $membership->getKey() !== $actorMembership->getKey(),
+            404,
+        );
+
+        DB::transaction(function () use ($company, $actorMembership, $membership, $audit): void {
+            $lockedOwner = $company->memberships()
+                ->whereKey($actorMembership->getKey())->lockForUpdate()->firstOrFail();
+            $lockedTarget = $company->memberships()
+                ->whereKey($membership->getKey())->lockForUpdate()->firstOrFail();
+            abort_unless($lockedOwner->role === CompanyMemberRole::Owner, 409, __('Die Eigentümerschaft wurde bereits geändert.'));
+            $lockedOwner->update(['role' => CompanyMemberRole::Admin]);
+            $lockedTarget->update(['role' => CompanyMemberRole::Owner]);
+            $audit->record('company.ownership_transferred', $company, before: [
+                'owner_user_id' => $lockedOwner->user_id,
+            ], after: [
+                'owner_user_id' => $lockedTarget->user_id,
+            ]);
+        }, 3);
+
+        return back()->with('success', __('Die Eigentümerschaft wurde sicher übertragen.'));
+    }
+
     public function visa(Request $request, CurrentCompany $currentCompany): Response
     {
         $company = $currentCompany->forRequest($request);
@@ -334,7 +380,14 @@ class PortalController extends Controller
 
     private function assertManage(Request $request, CurrentCompany $currentCompany): void
     {
-        abort_unless($currentCompany->membership($request)->role->canManage(), 403);
+        abort_unless(
+            in_array(
+                Capability::CompanyManage->value,
+                app(CapabilityResolver::class)->forRequest($request),
+                true,
+            ),
+            403,
+        );
     }
 
     private function storeCompanyMedia(

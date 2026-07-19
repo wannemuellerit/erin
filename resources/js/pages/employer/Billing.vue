@@ -14,6 +14,7 @@ import PageHeader from '@/components/product/PageHeader.vue';
 import ProgressBar from '@/components/product/ProgressBar.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
+import { useCapabilities } from '@/composables/useCapabilities';
 import { useFormatters } from '@/composables/useFormatters';
 import {
     cancel,
@@ -122,6 +123,8 @@ const billingForm = useForm({
     address_line1: props.company?.address_line1 ?? '',
 });
 const { t, te } = useI18n();
+const { can } = useCapabilities();
+const canManageBilling = computed(() => can('billing.manage'));
 const { formatCurrency, formatDate } = useFormatters();
 const addonForm = useForm({ quantity: 1 });
 const currentPlan = computed(() => props.entitlements.plan);
@@ -171,7 +174,7 @@ const changePlan = (plan: Plan) => {
         >
             <template #actions>
                 <button
-                    v-if="subscription"
+                    v-if="subscription && canManageBilling"
                     type="button"
                     class="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700"
                     @click="router.post(portal.url())"
@@ -396,7 +399,7 @@ const changePlan = (plan: Plan) => {
                         </li>
                     </ul>
                     <button
-                        v-if="currentPlan?.id !== plan.id"
+                        v-if="canManageBilling && currentPlan?.id !== plan.id"
                         type="button"
                         :disabled="
                             plan.is_enterprise || !plan.checkout_available
@@ -422,6 +425,7 @@ const changePlan = (plan: Plan) => {
         <div class="grid gap-6 xl:grid-cols-[1fr_0.7fr]">
             <SectionCard :title="t('employer.billing.billingDetailsTitle')">
                 <form
+                    v-if="canManageBilling"
                     class="grid gap-4 sm:grid-cols-2"
                     @submit.prevent="
                         billingForm.patch(details.url(), {
@@ -501,9 +505,46 @@ const changePlan = (plan: Plan) => {
                         {{ t('employer.billing.saveBillingDetails') }}
                     </button>
                 </form>
+                <dl v-else class="grid gap-3 text-sm sm:grid-cols-2">
+                    <div class="rounded-xl bg-slate-50 p-3">
+                        <dt class="text-xs font-bold text-slate-500">
+                            {{ t('employer.billing.fields.legalName') }}
+                        </dt>
+                        <dd class="mt-1 font-semibold text-slate-800">
+                            {{ billingForm.legal_name || '—' }}
+                        </dd>
+                    </div>
+                    <div class="rounded-xl bg-slate-50 p-3">
+                        <dt class="text-xs font-bold text-slate-500">
+                            {{ t('employer.billing.fields.email') }}
+                        </dt>
+                        <dd class="mt-1 font-semibold text-slate-800">
+                            {{ billingForm.email || '—' }}
+                        </dd>
+                    </div>
+                    <div class="rounded-xl bg-slate-50 p-3">
+                        <dt class="text-xs font-bold text-slate-500">
+                            {{ t('employer.billing.fields.vatId') }}
+                        </dt>
+                        <dd class="mt-1 font-semibold text-slate-800">
+                            {{ billingForm.vat_id || '—' }}
+                        </dd>
+                    </div>
+                    <div class="rounded-xl bg-slate-50 p-3">
+                        <dt class="text-xs font-bold text-slate-500">
+                            {{ t('employer.billing.fields.city') }}
+                        </dt>
+                        <dd class="mt-1 font-semibold text-slate-800">
+                            {{ billingForm.city || '—' }}
+                        </dd>
+                    </div>
+                </dl>
             </SectionCard>
             <div class="space-y-6">
-                <SectionCard :title="t('employer.billing.addOnsTitle')">
+                <SectionCard
+                    v-if="canManageBilling"
+                    :title="t('employer.billing.addOnsTitle')"
+                >
                     <form
                         v-if="add_ons.seat_enabled"
                         class="flex items-center gap-2"
@@ -544,7 +585,7 @@ const changePlan = (plan: Plan) => {
                     </p>
                 </SectionCard>
                 <SectionCard
-                    v-if="subscription"
+                    v-if="subscription && canManageBilling"
                     :title="t('employer.billing.subscriptionTitle')"
                 >
                     <p class="text-xs leading-5 text-slate-500">

@@ -3,18 +3,22 @@ import { Head, router, useForm } from '@inertiajs/vue3';
 import {
     BadgeCheck,
     BriefcaseBusiness,
+    CalendarDays,
     Download,
     FileText,
+    GraduationCap,
+    GripVertical,
     ImagePlus,
     Languages as LanguagesIcon,
     LockKeyhole,
+    Plus,
     Save,
     ShieldCheck,
     Trash2,
     Upload,
     UserRound,
 } from '@lucide/vue';
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import PageHeader from '@/components/product/PageHeader.vue';
 import ProgressBar from '@/components/product/ProgressBar.vue';
@@ -33,6 +37,7 @@ type NamedOption = {
     code?: string;
 };
 type CandidateExperience = {
+    id?: number;
     employer?: string | null;
     position?: string | null;
     country_code?: string | null;
@@ -42,6 +47,7 @@ type CandidateExperience = {
     description?: string | null;
 };
 type CandidateEducation = {
+    id?: number;
     institution?: string | null;
     qualification?: string | null;
     field?: string | null;
@@ -53,6 +59,7 @@ type CandidateEducation = {
 type ProfileFormData = {
     first_name: string;
     last_name: string;
+    email: string;
     birth_date: string;
     gender: string;
     nationality_country_code: string;
@@ -83,6 +90,7 @@ type ProfileFormData = {
     }>;
     languages: Array<{ id: number; level: string }>;
     experiences: Array<{
+        id?: number;
         employer: string;
         position: string;
         country_code: string;
@@ -92,6 +100,7 @@ type ProfileFormData = {
         description: string;
     }>;
     educations: Array<{
+        id?: number;
         institution: string;
         qualification: string;
         field: string;
@@ -99,6 +108,12 @@ type ProfileFormData = {
         started_at: string;
         completed_at: string;
         description: string;
+    }>;
+    availability: Array<{
+        weekday: number;
+        starts_at: string;
+        ends_at: string;
+        timezone: string;
     }>;
 };
 type Profile = {
@@ -161,6 +176,7 @@ type ProfileStatus = {
     completed: string[];
     missing: string[];
     can_apply: boolean;
+    required_percentage?: number;
 };
 
 const props = withDefaults(
@@ -171,6 +187,13 @@ const props = withDefaults(
         skills?: NamedOption[];
         languages?: NamedOption[];
         document_types?: string[];
+        account_email?: string;
+        availability?: Array<{
+            weekday: number;
+            starts_at: string;
+            ends_at: string;
+            timezone: string;
+        }>;
     }>(),
     {
         profile: null,
@@ -179,11 +202,14 @@ const props = withDefaults(
             completed: [],
             missing: [],
             can_apply: false,
+            required_percentage: 80,
         }),
         occupations: () => [],
         skills: () => [],
         languages: () => [],
         document_types: () => [],
+        account_email: '',
+        availability: () => [],
     },
 );
 const { t, te } = useI18n();
@@ -202,9 +228,19 @@ const tabs = computed(() => [
         icon: BriefcaseBusiness,
     },
     {
+        key: 'history',
+        label: t('candidate.profile.tabs.history'),
+        icon: GraduationCap,
+    },
+    {
         key: 'skills',
         label: t('candidate.profile.tabs.skills'),
         icon: LanguagesIcon,
+    },
+    {
+        key: 'availability',
+        label: t('candidate.profile.tabs.availability'),
+        icon: CalendarDays,
     },
     {
         key: 'documents',
@@ -215,6 +251,7 @@ const tabs = computed(() => [
 const form = useForm<ProfileFormData>({
     first_name: props.profile?.first_name ?? '',
     last_name: props.profile?.last_name ?? '',
+    email: props.account_email,
     birth_date: props.profile?.birth_date ?? '',
     gender: props.profile?.gender ?? '',
     nationality_country_code: props.profile?.nationality_country_code ?? '',
@@ -258,6 +295,7 @@ const form = useForm<ProfileFormData>({
         })) ?? ([] as Array<{ id: number; level: string }>),
     experiences:
         props.profile?.experiences?.map((experience) => ({
+            id: experience.id,
             employer: experience.employer ?? '',
             position: experience.position ?? '',
             country_code: experience.country_code ?? '',
@@ -268,6 +306,7 @@ const form = useForm<ProfileFormData>({
         })) ?? [],
     educations:
         props.profile?.educations?.map((education) => ({
+            id: education.id,
             institution: education.institution ?? '',
             qualification: education.qualification ?? '',
             field: education.field ?? '',
@@ -276,6 +315,12 @@ const form = useForm<ProfileFormData>({
             completed_at: education.completed_at ?? '',
             description: education.description ?? '',
         })) ?? [],
+    availability: props.availability.map((slot) => ({
+        weekday: slot.weekday,
+        starts_at: slot.starts_at.slice(0, 5),
+        ends_at: slot.ends_at.slice(0, 5),
+        timezone: slot.timezone,
+    })),
 });
 const documentForm = useForm({
     type: props.document_types[0] ?? '',
@@ -351,6 +396,122 @@ const submitPhoto = () => {
 };
 const deletePhoto = () =>
     router.delete('/candidate/profile/photo', { preserveScroll: true });
+const addExperience = () =>
+    form.experiences.push({
+        employer: '',
+        position: '',
+        country_code: '',
+        started_at: '',
+        ended_at: '',
+        is_current: false,
+        description: '',
+    });
+const addEducation = () =>
+    form.educations.push({
+        institution: '',
+        qualification: '',
+        field: '',
+        country_code: '',
+        started_at: '',
+        completed_at: '',
+        description: '',
+    });
+const moveItem = <T,>(items: T[], index: number, offset: number) => {
+    const destination = index + offset;
+
+    if (destination < 0 || destination >= items.length) {
+        return;
+    }
+
+    const [item] = items.splice(index, 1);
+    items.splice(destination, 0, item);
+};
+const addAvailability = () =>
+    form.availability.push({
+        weekday: 1,
+        starts_at: '08:00',
+        ends_at: '12:00',
+        timezone: 'Europe/Berlin',
+    });
+const toggleArrayValue = (
+    field: 'driving_licenses' | 'employment_preferences',
+    value: string,
+) => {
+    const values = form[field];
+    form[field] = values.includes(value)
+        ? values.filter((entry) => entry !== value)
+        : [...values, value];
+};
+const errorTab = (key: string) => {
+    if (
+        /^(first_name|last_name|email|birth_date|gender|nationality|current_country|current_city|phone|whatsapp|summary)/.test(
+            key,
+        )
+    ) {
+        return 'personal';
+    }
+
+    if (/^(experiences|educations)/.test(key)) {
+        return 'history';
+    }
+
+    if (/^(skills|languages)/.test(key)) {
+        return 'skills';
+    }
+
+    if (/^availability/.test(key)) {
+        return 'availability';
+    }
+
+    return 'profession';
+};
+const submitProfile = () =>
+    form.put(update.url(), {
+        preserveScroll: true,
+        onError: (errors) => {
+            const first = Object.keys(errors)[0];
+
+            if (first) {
+                active.value = errorTab(first);
+            }
+        },
+    });
+const missingTab: Record<string, string> = {
+    personal: 'personal',
+    photo: 'personal',
+    profession: 'profession',
+    experience: 'history',
+    skills: 'skills',
+    languages: 'skills',
+    education: 'history',
+    cv: 'documents',
+    certificates: 'documents',
+    availability: 'availability',
+};
+const beforeUnload = (event: BeforeUnloadEvent) => {
+    if (!form.isDirty) {
+        return;
+    }
+
+    event.preventDefault();
+    event.returnValue = '';
+};
+let removeNavigationGuard: (() => void) | undefined;
+onMounted(() => {
+    window.addEventListener('beforeunload', beforeUnload);
+    removeNavigationGuard = router.on('before', (event) => {
+        if (
+            form.isDirty &&
+            !window.confirm(t('candidate.profile.unsavedWarning'))
+        ) {
+            event.preventDefault();
+        }
+    });
+});
+onBeforeUnmount(() => {
+    window.removeEventListener('beforeunload', beforeUnload);
+    removeNavigationGuard?.();
+});
 </script>
 
 <template>
@@ -366,7 +527,7 @@ const deletePhoto = () =>
                 <button
                     :disabled="form.processing || !profile"
                     class="inline-flex h-10 items-center gap-2 rounded-xl bg-[var(--erin-primary)] px-4 text-sm font-bold text-white disabled:opacity-50"
-                    @click="form.put(update.url(), { preserveScroll: true })"
+                    @click="submitProfile"
                 >
                     <Save class="size-4" />
                     {{ t('candidate.profile.save') }}
@@ -562,6 +723,16 @@ const deletePhoto = () =>
                             }}</span
                             ><input v-model="form.whatsapp" :class="input"
                         /></label>
+                        <label
+                            ><span class="text-sm font-bold text-slate-700">{{
+                                t('candidate.profile.personal.email')
+                            }}</span
+                            ><input
+                                v-model="form.email"
+                                required
+                                type="email"
+                                :class="input"
+                        /></label>
                     </div>
                     <label class="mt-5 block"
                         ><span class="text-sm font-bold text-slate-700">{{
@@ -672,13 +843,17 @@ const deletePhoto = () =>
                             v-if="profile_status.missing.length"
                             class="space-y-2"
                         >
-                            <div
+                            <button
                                 v-for="missing in profile_status.missing"
                                 :key="missing"
+                                type="button"
                                 class="rounded-lg bg-orange-50 p-2.5 text-xs font-bold text-orange-700"
+                                @click="
+                                    active = missingTab[missing] || 'personal'
+                                "
                             >
                                 {{ missingLabel(missing) }}
-                            </div>
+                            </button>
                         </div>
                         <p v-else class="text-xs text-teal-600">
                             {{ t('candidate.profile.missing.complete') }}
@@ -815,7 +990,363 @@ const deletePhoto = () =>
                         }}</label
                     >
                 </div>
+                <div class="mt-6 grid gap-6 lg:grid-cols-2">
+                    <div>
+                        <p class="text-sm font-extrabold text-slate-800">
+                            {{ t('candidate.profile.profession.licenses') }}
+                        </p>
+                        <div class="mt-2 flex flex-wrap gap-2">
+                            <button
+                                v-for="license in [
+                                    'B',
+                                    'BE',
+                                    'C',
+                                    'CE',
+                                    'D',
+                                    'DE',
+                                    'ADR',
+                                ]"
+                                :key="license"
+                                type="button"
+                                class="rounded-lg border px-3 py-2 text-xs font-bold"
+                                :class="
+                                    form.driving_licenses.includes(license)
+                                        ? 'border-blue-300 bg-blue-50 text-blue-700'
+                                        : 'border-slate-200 text-slate-500'
+                                "
+                                @click="
+                                    toggleArrayValue(
+                                        'driving_licenses',
+                                        license,
+                                    )
+                                "
+                            >
+                                {{ license }}
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <p class="text-sm font-extrabold text-slate-800">
+                            {{
+                                t(
+                                    'candidate.profile.profession.employmentPreferences',
+                                )
+                            }}
+                        </p>
+                        <div class="mt-2 grid gap-2 sm:grid-cols-2">
+                            <label
+                                v-for="preference in [
+                                    'full_time',
+                                    'part_time',
+                                    'temporary',
+                                    'permanent',
+                                ]"
+                                :key="preference"
+                                class="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-sm"
+                            >
+                                <input
+                                    type="checkbox"
+                                    :checked="
+                                        form.employment_preferences.includes(
+                                            preference,
+                                        )
+                                    "
+                                    @change="
+                                        toggleArrayValue(
+                                            'employment_preferences',
+                                            preference,
+                                        )
+                                    "
+                                />
+                                {{
+                                    t(
+                                        `candidate.profile.profession.employment.${preference}`,
+                                    )
+                                }}
+                            </label>
+                        </div>
+                    </div>
+                </div>
             </SectionCard>
+
+            <div v-else-if="active === 'history'" class="space-y-6">
+                <SectionCard
+                    :title="t('candidate.profile.history.experienceTitle')"
+                    :description="
+                        t('candidate.profile.history.experienceDescription')
+                    "
+                >
+                    <div class="space-y-4">
+                        <article
+                            v-for="(experience, index) in form.experiences"
+                            :key="experience.id ?? `new-experience-${index}`"
+                            class="rounded-2xl border border-slate-200 p-4"
+                        >
+                            <div class="mb-4 flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <GripVertical
+                                        class="size-4 text-slate-300"
+                                    />
+                                    <strong class="text-sm">{{
+                                        t(
+                                            'candidate.profile.history.experienceNumber',
+                                            { number: index + 1 },
+                                        )
+                                    }}</strong>
+                                </div>
+                                <div class="flex gap-1">
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="ghost"
+                                        :disabled="index === 0"
+                                        @click="
+                                            moveItem(
+                                                form.experiences,
+                                                index,
+                                                -1,
+                                            )
+                                        "
+                                        >↑</Button
+                                    >
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="ghost"
+                                        :disabled="
+                                            index ===
+                                            form.experiences.length - 1
+                                        "
+                                        @click="
+                                            moveItem(form.experiences, index, 1)
+                                        "
+                                        >↓</Button
+                                    >
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="ghost"
+                                        @click="
+                                            form.experiences.splice(index, 1)
+                                        "
+                                    >
+                                        <Trash2 class="size-4" />
+                                    </Button>
+                                </div>
+                            </div>
+                            <div
+                                class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+                            >
+                                <label class="text-xs font-bold text-slate-600">
+                                    {{
+                                        t('candidate.profile.history.employer')
+                                    }}
+                                    <input
+                                        v-model="experience.employer"
+                                        required
+                                        :class="input"
+                                    />
+                                </label>
+                                <label class="text-xs font-bold text-slate-600">
+                                    {{
+                                        t('candidate.profile.history.position')
+                                    }}
+                                    <input
+                                        v-model="experience.position"
+                                        required
+                                        :class="input"
+                                    />
+                                </label>
+                                <label class="text-xs font-bold text-slate-600">
+                                    {{ t('candidate.profile.history.country') }}
+                                    <input
+                                        v-model="experience.country_code"
+                                        maxlength="2"
+                                        :class="input"
+                                    />
+                                </label>
+                                <label class="text-xs font-bold text-slate-600">
+                                    {{
+                                        t('candidate.profile.history.startedAt')
+                                    }}
+                                    <input
+                                        v-model="experience.started_at"
+                                        required
+                                        type="date"
+                                        :class="input"
+                                    />
+                                </label>
+                                <label class="text-xs font-bold text-slate-600">
+                                    {{ t('candidate.profile.history.endedAt') }}
+                                    <input
+                                        v-model="experience.ended_at"
+                                        type="date"
+                                        :disabled="experience.is_current"
+                                        :class="input"
+                                    />
+                                </label>
+                                <label
+                                    class="flex items-center gap-2 pt-6 text-sm"
+                                >
+                                    <input
+                                        v-model="experience.is_current"
+                                        type="checkbox"
+                                    />
+                                    {{ t('candidate.profile.history.current') }}
+                                </label>
+                            </div>
+                            <label
+                                class="mt-4 block text-xs font-bold text-slate-600"
+                            >
+                                {{ t('candidate.profile.history.description') }}
+                                <textarea
+                                    v-model="experience.description"
+                                    rows="3"
+                                    class="erin-focus mt-1.5 w-full rounded-xl border border-slate-200 p-3 text-sm"
+                                />
+                            </label>
+                        </article>
+                    </div>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        class="mt-4"
+                        @click="addExperience"
+                    >
+                        <Plus class="size-4" />
+                        {{ t('candidate.profile.history.addExperience') }}
+                    </Button>
+                </SectionCard>
+
+                <SectionCard
+                    :title="t('candidate.profile.history.educationTitle')"
+                >
+                    <div class="space-y-4">
+                        <article
+                            v-for="(education, index) in form.educations"
+                            :key="education.id ?? `new-education-${index}`"
+                            class="rounded-2xl border border-slate-200 p-4"
+                        >
+                            <div class="mb-4 flex items-center justify-between">
+                                <strong class="text-sm">{{
+                                    t(
+                                        'candidate.profile.history.educationNumber',
+                                        { number: index + 1 },
+                                    )
+                                }}</strong>
+                                <div class="flex gap-1">
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="ghost"
+                                        :disabled="index === 0"
+                                        @click="
+                                            moveItem(form.educations, index, -1)
+                                        "
+                                        >↑</Button
+                                    >
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="ghost"
+                                        :disabled="
+                                            index === form.educations.length - 1
+                                        "
+                                        @click="
+                                            moveItem(form.educations, index, 1)
+                                        "
+                                        >↓</Button
+                                    >
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="ghost"
+                                        @click="
+                                            form.educations.splice(index, 1)
+                                        "
+                                    >
+                                        <Trash2 class="size-4" />
+                                    </Button>
+                                </div>
+                            </div>
+                            <div
+                                class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+                            >
+                                <label class="text-xs font-bold text-slate-600">
+                                    {{
+                                        t(
+                                            'candidate.profile.history.institution',
+                                        )
+                                    }}
+                                    <input
+                                        v-model="education.institution"
+                                        required
+                                        :class="input"
+                                    />
+                                </label>
+                                <label class="text-xs font-bold text-slate-600">
+                                    {{
+                                        t(
+                                            'candidate.profile.history.qualification',
+                                        )
+                                    }}
+                                    <input
+                                        v-model="education.qualification"
+                                        required
+                                        :class="input"
+                                    />
+                                </label>
+                                <label class="text-xs font-bold text-slate-600">
+                                    {{ t('candidate.profile.history.field') }}
+                                    <input
+                                        v-model="education.field"
+                                        :class="input"
+                                    />
+                                </label>
+                                <label class="text-xs font-bold text-slate-600">
+                                    {{ t('candidate.profile.history.country') }}
+                                    <input
+                                        v-model="education.country_code"
+                                        maxlength="2"
+                                        :class="input"
+                                    />
+                                </label>
+                                <label class="text-xs font-bold text-slate-600">
+                                    {{
+                                        t('candidate.profile.history.startedAt')
+                                    }}
+                                    <input
+                                        v-model="education.started_at"
+                                        type="date"
+                                        :class="input"
+                                    />
+                                </label>
+                                <label class="text-xs font-bold text-slate-600">
+                                    {{
+                                        t(
+                                            'candidate.profile.history.completedAt',
+                                        )
+                                    }}
+                                    <input
+                                        v-model="education.completed_at"
+                                        type="date"
+                                        :class="input"
+                                    />
+                                </label>
+                            </div>
+                        </article>
+                    </div>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        class="mt-4"
+                        @click="addEducation"
+                    >
+                        <Plus class="size-4" />
+                        {{ t('candidate.profile.history.addEducation') }}
+                    </Button>
+                </SectionCard>
+            </div>
 
             <div
                 v-else-if="active === 'skills'"
@@ -890,6 +1421,69 @@ const deletePhoto = () =>
                     </p></SectionCard
                 >
             </div>
+
+            <SectionCard
+                v-else-if="active === 'availability'"
+                :title="t('candidate.profile.availability.title')"
+                :description="t('candidate.profile.availability.description')"
+            >
+                <div class="space-y-3">
+                    <div
+                        v-for="(slot, index) in form.availability"
+                        :key="`${slot.weekday}-${index}`"
+                        class="grid items-end gap-3 rounded-xl border border-slate-200 p-4 sm:grid-cols-[1fr_1fr_1fr_auto]"
+                    >
+                        <label class="text-xs font-bold text-slate-600">
+                            {{ t('candidate.profile.availability.weekday') }}
+                            <select v-model="slot.weekday" :class="input">
+                                <option
+                                    v-for="day in 7"
+                                    :key="day"
+                                    :value="day"
+                                >
+                                    {{
+                                        t(
+                                            `candidate.profile.availability.days.${day}`,
+                                        )
+                                    }}
+                                </option>
+                            </select>
+                        </label>
+                        <label class="text-xs font-bold text-slate-600">
+                            {{ t('candidate.profile.availability.from') }}
+                            <input
+                                v-model="slot.starts_at"
+                                type="time"
+                                :class="input"
+                            />
+                        </label>
+                        <label class="text-xs font-bold text-slate-600">
+                            {{ t('candidate.profile.availability.until') }}
+                            <input
+                                v-model="slot.ends_at"
+                                type="time"
+                                :class="input"
+                            />
+                        </label>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            @click="form.availability.splice(index, 1)"
+                        >
+                            <Trash2 class="size-4" />
+                        </Button>
+                    </div>
+                </div>
+                <Button
+                    type="button"
+                    variant="outline"
+                    class="mt-4"
+                    @click="addAvailability"
+                >
+                    <Plus class="size-4" />
+                    {{ t('candidate.profile.availability.add') }}
+                </Button>
+            </SectionCard>
 
             <div v-else class="space-y-6">
                 <SectionCard

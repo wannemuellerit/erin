@@ -117,8 +117,9 @@ it('only discovers published candidates and reveals identity after an applicatio
         ->get(route('employer.candidates.index'))
         ->assertInertia(fn (Assert $page) => $page
             ->component('employer/Candidates')
-            ->has('candidates', 1)
-            ->has('candidates.0', fn (Assert $candidate) => $candidate
+            ->where('candidates.total', 1)
+            ->has('candidates.data', 1)
+            ->has('candidates.data.0', fn (Assert $candidate) => $candidate
                 ->where('id', $published->getKey())
                 ->where('label', 'Pflegefachkraft · RO')
                 ->missing('first_name')

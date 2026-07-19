@@ -56,6 +56,7 @@ return [
                     'salary_currency',
                     'requires_visa',
                     'has_work_permit',
+                    'profile_completeness',
                 ],
                 'sortableAttributes' => [
                     'experience_years',
@@ -91,6 +92,7 @@ return [
                     'salary_currency',
                     'requires_visa',
                     'has_work_permit',
+                    'profile_completeness',
                     'published_at',
                 ],
                 'pagination' => ['maxTotalHits' => 1000],

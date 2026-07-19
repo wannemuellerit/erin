@@ -8,7 +8,7 @@ import PageHeader from '@/components/product/PageHeader.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
 import { useFormatters } from '@/composables/useFormatters';
-import { invite, remove } from '@/routes/employer/team';
+import { invite, remove, transferOwnership } from '@/routes/employer/team';
 
 type Member = {
     id: number;
@@ -48,6 +48,7 @@ const props = withDefaults(
         teams?: Team[];
         seats?: SeatUsage;
         can_manage?: boolean;
+        can_transfer_ownership?: boolean;
     }>(),
     {
         members: () => [],
@@ -55,6 +56,7 @@ const props = withDefaults(
         teams: () => [],
         seats: () => ({ used: 0, limit: null, remaining: null }),
         can_manage: false,
+        can_transfer_ownership: false,
     },
 );
 
@@ -103,6 +105,19 @@ const submitInvite = () => {
 };
 const removeMember = (member: Member) => {
     router.delete(remove.url(member.id), { preserveScroll: true });
+};
+const transferOwner = (member: Member) => {
+    if (
+        !window.confirm(
+            t('employer.team.transferOwnershipConfirm', {
+                name: member.user?.name ?? member.user?.email,
+            }),
+        )
+    ) {
+        return;
+    }
+
+    router.post(transferOwnership.url(member.id), {}, { preserveScroll: true });
 };
 </script>
 
@@ -249,6 +264,14 @@ const removeMember = (member: Member) => {
                         "
                         :tone="member.accepted_at ? 'green' : 'yellow'"
                     />
+                    <button
+                        v-if="can_transfer_ownership && member.role !== 'owner'"
+                        type="button"
+                        class="rounded-lg border border-orange-200 px-3 py-2 text-xs font-bold text-orange-700 hover:bg-orange-50"
+                        @click="transferOwner(member)"
+                    >
+                        {{ t('employer.team.transferOwnership') }}
+                    </button>
                     <button
                         v-if="can_manage && member.role !== 'owner'"
                         type="button"

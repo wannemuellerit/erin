@@ -1,64 +1,85 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
 import {
+    ArrowLeft,
     ArrowRight,
     BriefcaseBusiness,
     Check,
-    CreditCard,
+    FileCheck2,
+    GraduationCap,
+    Languages,
     ShieldCheck,
     UserRound,
 } from '@lucide/vue';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import InputError from '@/components/InputError.vue';
 import PageHeader from '@/components/product/PageHeader.vue';
 import ProgressBar from '@/components/product/ProgressBar.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
-import Textarea from '@/components/product/Textarea.vue';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { useFormatters } from '@/composables/useFormatters';
 import { useLocalizedField } from '@/composables/useLocalizedField';
 
-type Occupation = {
+type NamedOption = {
     id: number;
-    slug: string;
-    name_de: string;
-    name_en: string;
+    slug?: string;
+    code?: string;
+    name_de?: string;
+    name_en?: string;
 };
-
-type Plan = {
-    id: number;
-    slug: string;
+type Plan = NamedOption & {
     name: string;
-    description?: string | null;
     price_cents?: number | null;
-    currency: string;
     term_months?: number | null;
     active_jobs_limit?: number | null;
     seat_limit?: number | null;
-    ai_credits_monthly?: number | null;
-    job_boosts_per_term?: number | null;
-    visa_credits_per_term?: number | null;
 };
-
+type Experience = {
+    employer: string;
+    position: string;
+    country_code: string;
+    started_at: string;
+    ended_at: string;
+    is_current: boolean;
+    description: string;
+};
+type Education = {
+    institution: string;
+    qualification: string;
+    field: string;
+    country_code: string;
+    started_at: string;
+    completed_at: string;
+};
+type AvailabilitySlot = {
+    weekday: number;
+    starts_at: string;
+    ends_at: string;
+    timezone: string;
+};
 type CandidateProfile = {
+    first_name?: string | null;
+    last_name?: string | null;
     occupation_id?: number | null;
     current_country_code?: string | null;
     current_city?: string | null;
     phone?: string | null;
+    whatsapp?: string | null;
     summary?: string | null;
+    current_position?: string | null;
     desired_position?: string | null;
     experience_years?: number | null;
     relocation_ready?: boolean;
     requires_visa?: boolean;
     has_work_permit?: boolean;
+    experiences?: Partial<Experience>[];
+    educations?: Partial<Education>[];
+    skills?: Array<{ id: number }>;
+    languages?: Array<{ id: number; level: string }>;
+    availability?: AvailabilitySlot[];
 };
-
 type Company = {
-    id: number;
-    name: string;
+    name?: string;
     legal_name?: string | null;
     email?: string | null;
     website?: string | null;
@@ -74,44 +95,183 @@ type Company = {
 const props = withDefaults(
     defineProps<{
         role: 'candidate' | 'company';
+        onboarding: {
+            current_step: number;
+            total_steps: number;
+            saved_data?: Record<string, unknown>;
+        };
         candidate_profile?: CandidateProfile | null;
         company?: Company | null;
-        occupations?: Occupation[];
+        occupations?: NamedOption[];
+        skills?: NamedOption[];
+        languages?: NamedOption[];
         plans?: Plan[];
+        document_types?: string[];
+        publication_threshold?: number;
     }>(),
     {
         candidate_profile: null,
         company: null,
         occupations: () => [],
+        skills: () => [],
+        languages: () => [],
         plans: () => [],
+        document_types: () => [],
+        publication_threshold: 80,
     },
 );
-const { t, te } = useI18n();
-const { formatCurrency, formatNumber } = useFormatters();
+const { t } = useI18n();
 const { localizedField } = useLocalizedField();
-
-const selectedPlan = computed(
-    () =>
-        props.plans.find(
-            (plan) => plan.id === props.company?.current_plan_id,
-        ) ?? props.plans[0],
+const currentStep = ref(props.onboarding.current_step);
+const maximumReachable = ref(props.onboarding.current_step);
+const progress = computed(() =>
+    Math.round((currentStep.value / props.onboarding.total_steps) * 100),
 );
+const input =
+    'erin-focus mt-1.5 h-11 w-full rounded-xl border border-slate-200 px-3.5 text-sm';
+const textarea =
+    'erin-focus mt-1.5 w-full rounded-xl border border-slate-200 p-3.5 text-sm';
+const candidateSteps = [
+    { step: 2, icon: UserRound, label: 'onboarding.wizard.contact' },
+    { step: 3, icon: BriefcaseBusiness, label: 'onboarding.wizard.profession' },
+    { step: 4, icon: GraduationCap, label: 'onboarding.wizard.history' },
+    { step: 5, icon: Languages, label: 'onboarding.wizard.skills' },
+    { step: 6, icon: ShieldCheck, label: 'onboarding.wizard.uploads' },
+    { step: 7, icon: FileCheck2, label: 'onboarding.wizard.finish' },
+];
+const companySteps = [
+    { step: 2, icon: BriefcaseBusiness, label: 'onboarding.wizard.plan' },
+    { step: 3, icon: FileCheck2, label: 'onboarding.wizard.companyData' },
+];
+const steps = computed(() =>
+    props.role === 'candidate' ? candidateSteps : companySteps,
+);
+const advance = (step: number) => {
+    maximumReachable.value = Math.max(maximumReachable.value, step + 1);
+    currentStep.value = Math.min(props.onboarding.total_steps, step + 1);
+};
 
-const candidateForm = useForm({
-    occupation_id: props.candidate_profile?.occupation_id ?? null,
+type ContactData = {
+    first_name: string;
+    last_name: string;
+    current_country_code: string;
+    current_city: string;
+    phone: string;
+    whatsapp: string;
+};
+const contactForm = useForm<ContactData>({
+    first_name: props.candidate_profile?.first_name ?? '',
+    last_name: props.candidate_profile?.last_name ?? '',
     current_country_code: props.candidate_profile?.current_country_code ?? '',
     current_city: props.candidate_profile?.current_city ?? '',
     phone: props.candidate_profile?.phone ?? '',
-    summary: props.candidate_profile?.summary ?? '',
+    whatsapp: props.candidate_profile?.whatsapp ?? '',
+});
+type ContactField = keyof ContactData;
+const contactFields: ContactField[] = [
+    'first_name',
+    'last_name',
+    'current_country_code',
+    'current_city',
+    'phone',
+    'whatsapp',
+];
+const setContactValue = (field: ContactField, event: Event) => {
+    contactForm[field] = (event.target as HTMLInputElement).value;
+};
+const professionForm = useForm({
+    occupation_id: props.candidate_profile?.occupation_id ?? null,
+    current_position: props.candidate_profile?.current_position ?? '',
     desired_position: props.candidate_profile?.desired_position ?? '',
     experience_years: props.candidate_profile?.experience_years ?? 0,
+    summary: props.candidate_profile?.summary ?? '',
     relocation_ready: props.candidate_profile?.relocation_ready ?? true,
     requires_visa: props.candidate_profile?.requires_visa ?? true,
     has_work_permit: props.candidate_profile?.has_work_permit ?? false,
 });
-
-const companyForm = useForm({
-    plan_slug: selectedPlan.value?.slug ?? '',
+const emptyExperience = (): Experience => ({
+    employer: '',
+    position: '',
+    country_code: '',
+    started_at: '',
+    ended_at: '',
+    is_current: false,
+    description: '',
+});
+const emptyEducation = (): Education => ({
+    institution: '',
+    qualification: '',
+    field: '',
+    country_code: '',
+    started_at: '',
+    completed_at: '',
+});
+const savedExperiences = props.candidate_profile?.experiences?.map((item) => ({
+    ...emptyExperience(),
+    ...item,
+}));
+const historyForm = useForm({
+    experiences: savedExperiences?.length
+        ? savedExperiences
+        : [emptyExperience()],
+    educations:
+        props.candidate_profile?.educations?.map((item) => ({
+            ...emptyEducation(),
+            ...item,
+        })) ?? [],
+});
+const skillForm = useForm({
+    skills: props.candidate_profile?.skills ?? ([] as Array<{ id: number }>),
+    languages:
+        props.candidate_profile?.languages ??
+        ([] as Array<{ id: number; level: string }>),
+});
+const uploadForm = useForm({ acknowledged_private_uploads: false });
+const photoForm = useForm<{ photo: File | null }>({ photo: null });
+const documentForm = useForm<{
+    type: string;
+    title: string;
+    file: File | null;
+}>({
+    type: props.document_types[0] ?? '',
+    title: '',
+    file: null,
+});
+const emptyAvailability = (): AvailabilitySlot => ({
+    weekday: 1,
+    starts_at: '08:00',
+    ends_at: '12:00',
+    timezone: 'Europe/Berlin',
+});
+const savedAvailability = props.candidate_profile?.availability?.map(
+    (slot) => ({
+        ...slot,
+        starts_at: slot.starts_at.slice(0, 5),
+        ends_at: slot.ends_at.slice(0, 5),
+    }),
+);
+const finishForm = useForm({
+    availability: savedAvailability?.length
+        ? savedAvailability
+        : [emptyAvailability()],
+    publish_profile: false,
+});
+const selectedPlan =
+    props.plans.find((plan) => plan.id === props.company?.current_plan_id) ??
+    props.plans[0];
+const planForm = useForm({ plan_slug: selectedPlan?.slug ?? '' });
+type CompanyData = {
+    legal_name: string;
+    email: string;
+    website: string;
+    industry: string;
+    employee_count: number;
+    country_code: string;
+    city: string;
+    postal_code: string;
+    address_line1: string;
+};
+const companyForm = useForm<CompanyData>({
     legal_name: props.company?.legal_name ?? props.company?.name ?? '',
     email: props.company?.email ?? '',
     website: props.company?.website ?? '',
@@ -122,24 +282,56 @@ const companyForm = useForm({
     postal_code: props.company?.postal_code ?? '',
     address_line1: props.company?.address_line1 ?? '',
 });
+type CompanyField = keyof CompanyData;
+const companyFields: CompanyField[] = [
+    'legal_name',
+    'email',
+    'website',
+    'industry',
+    'employee_count',
+    'country_code',
+    'city',
+    'postal_code',
+    'address_line1',
+];
+const setCompanyValue = (field: CompanyField, event: Event) => {
+    const value = (event.target as HTMLInputElement).value;
 
-const money = (cents?: number | null, currency = 'EUR') =>
-    cents == null
-        ? t('onboarding.company.onRequest')
-        : formatCurrency(cents / 100, currency, {
-              maximumFractionDigits: 0,
-          });
-const planDescription = (plan: Plan) => {
-    const key = `public.pricing.planDescriptions.${plan.slug}`;
-
-    return te(key) ? t(key) : (plan.description ?? '');
+    if (field === 'employee_count') {
+        companyForm.employee_count = Number(value);
+    } else {
+        Object.assign(companyForm, { [field]: value });
+    }
+};
+const hasSkill = (id: number) =>
+    skillForm.skills.some((skill) => skill.id === id);
+const toggleSkill = (id: number) => {
+    skillForm.skills = hasSkill(id)
+        ? skillForm.skills.filter((skill) => skill.id !== id)
+        : [...skillForm.skills, { id }];
+};
+const language = (id: number) =>
+    skillForm.languages.find((item) => item.id === id);
+const toggleLanguage = (id: number) => {
+    skillForm.languages = language(id)
+        ? skillForm.languages.filter((item) => item.id !== id)
+        : [...skillForm.languages, { id, level: 'A1' }];
+};
+const setLanguageLevel = (id: number, level: string) => {
+    skillForm.languages = skillForm.languages.map((item) =>
+        item.id === id ? { ...item, level } : item,
+    );
 };
 </script>
 
 <template>
     <Head :title="t('onboarding.metaTitle')" />
-
-    <div class="erin-page">
+    <div
+        class="erin-page"
+        :data-test="
+            role === 'company' ? 'company-onboarding' : 'candidate-onboarding'
+        "
+    >
         <PageHeader
             :eyebrow="t('onboarding.eyebrow')"
             :title="
@@ -147,531 +339,827 @@ const planDescription = (plan: Plan) => {
                     ? t('onboarding.company.title')
                     : t('onboarding.candidate.title')
             "
-            :description="
-                role === 'company'
-                    ? t('onboarding.company.description')
-                    : t('onboarding.candidate.description')
-            "
+            :description="t('onboarding.wizard.resumable')"
             :icon="role === 'company' ? BriefcaseBusiness : UserRound"
         />
 
         <section class="erin-panel p-5">
-            <div class="grid gap-4 sm:grid-cols-3">
-                <div class="rounded-xl bg-emerald-50 p-4">
-                    <p class="text-xs font-bold text-emerald-700">
-                        {{ t('onboarding.steps.account.label') }}
-                    </p>
-                    <p class="mt-1 text-sm font-extrabold text-slate-900">
-                        {{ t('onboarding.steps.account.description') }}
-                    </p>
-                </div>
-                <div class="rounded-xl bg-blue-50 p-4">
-                    <p class="text-xs font-bold text-blue-700">
-                        {{ t('onboarding.steps.setup.label') }}
-                    </p>
-                    <p class="mt-1 text-sm font-extrabold text-slate-900">
-                        {{ t('onboarding.steps.setup.description') }}
-                    </p>
-                </div>
-                <div class="rounded-xl bg-slate-50 p-4">
-                    <p class="text-xs font-bold text-slate-500">
-                        {{ t('onboarding.steps.start.label') }}
-                    </p>
-                    <p class="mt-1 text-sm font-extrabold text-slate-900">
-                        {{
-                            role === 'company'
-                                ? t('onboarding.steps.start.companyDescription')
-                                : t(
-                                      'onboarding.steps.start.candidateDescription',
-                                  )
-                        }}
-                    </p>
-                </div>
-            </div>
             <ProgressBar
-                class="mt-5"
-                :value="66"
-                :label="t('onboarding.progress')"
-                :show-value="false"
+                :value="progress"
+                :label="
+                    t('onboarding.wizard.progress', {
+                        current: currentStep,
+                        total: onboarding.total_steps,
+                    })
+                "
             />
+            <div class="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                <button
+                    v-for="item in steps"
+                    :key="item.step"
+                    type="button"
+                    :disabled="item.step > maximumReachable"
+                    class="erin-focus flex items-center gap-3 rounded-xl border p-3 text-left disabled:cursor-not-allowed disabled:opacity-45"
+                    :class="
+                        item.step === currentStep
+                            ? 'border-blue-300 bg-blue-50 text-blue-800'
+                            : item.step < maximumReachable
+                              ? 'border-emerald-200 bg-emerald-50'
+                              : 'border-slate-200'
+                    "
+                    @click="currentStep = item.step"
+                >
+                    <span
+                        class="grid size-8 place-items-center rounded-lg bg-white"
+                    >
+                        <Check
+                            v-if="item.step < maximumReachable"
+                            class="size-4 text-emerald-600"
+                        />
+                        <component :is="item.icon" v-else class="size-4" />
+                    </span>
+                    <span class="text-sm font-bold">{{ t(item.label) }}</span>
+                </button>
+            </div>
         </section>
 
         <form
-            v-if="role === 'candidate'"
-            class="grid gap-6 xl:grid-cols-[1fr_20rem]"
-            data-test="candidate-onboarding"
-            @submit.prevent="candidateForm.put('/onboarding/candidate')"
+            v-if="role === 'candidate' && currentStep === 2"
+            @submit.prevent="
+                contactForm.put('/onboarding/candidate/steps/2', {
+                    preserveScroll: true,
+                    onSuccess: () => advance(2),
+                })
+            "
         >
-            <div class="space-y-6">
-                <SectionCard
-                    :title="t('onboarding.candidate.professionTitle')"
-                    :description="
-                        t('onboarding.candidate.professionDescription')
-                    "
+            <SectionCard :title="t('onboarding.wizard.contact')">
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <label v-for="field in contactFields" :key="field">
+                        <span class="text-sm font-bold text-slate-700">{{
+                            t(`onboarding.wizard.fields.${field}`)
+                        }}</span>
+                        <input
+                            :value="contactForm[field]"
+                            :required="field !== 'whatsapp'"
+                            :maxlength="
+                                field === 'current_country_code' ? 2 : undefined
+                            "
+                            :class="input"
+                            @input="setContactValue(field, $event)"
+                        />
+                        <InputError :message="contactForm.errors[field]" />
+                    </label>
+                </div>
+                <Button
+                    class="mt-5"
+                    type="submit"
+                    :disabled="contactForm.processing"
                 >
-                    <div class="grid gap-5 sm:grid-cols-2">
-                        <label class="grid gap-2">
-                            <Label for="occupation_id">
-                                {{ t('onboarding.candidate.occupation') }} *
-                            </Label>
-                            <select
-                                id="occupation_id"
-                                v-model.number="candidateForm.occupation_id"
-                                required
-                                class="erin-focus h-11 rounded-xl border border-slate-200 bg-white px-3.5 text-sm"
+                    {{ t('onboarding.wizard.saveContinue') }}
+                    <ArrowRight class="size-4" />
+                </Button>
+            </SectionCard>
+        </form>
+
+        <form
+            v-else-if="role === 'candidate' && currentStep === 3"
+            @submit.prevent="
+                professionForm.put('/onboarding/candidate/steps/3', {
+                    preserveScroll: true,
+                    onSuccess: () => advance(3),
+                })
+            "
+        >
+            <SectionCard :title="t('onboarding.wizard.profession')">
+                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <label>
+                        <span class="text-sm font-bold">{{
+                            t('onboarding.candidate.occupation')
+                        }}</span>
+                        <select
+                            v-model="professionForm.occupation_id"
+                            required
+                            :class="input"
+                        >
+                            <option :value="null">
+                                {{ t('onboarding.candidate.selectOccupation') }}
+                            </option>
+                            <option
+                                v-for="occupation in occupations"
+                                :key="occupation.id"
+                                :value="occupation.id"
                             >
-                                <option :value="null" disabled>
-                                    {{
-                                        t(
-                                            'onboarding.candidate.selectOccupation',
-                                        )
-                                    }}
-                                </option>
+                                {{ localizedField(occupation) }}
+                            </option>
+                        </select>
+                    </label>
+                    <label>
+                        <span class="text-sm font-bold">{{
+                            t('onboarding.wizard.fields.current_position')
+                        }}</span>
+                        <input
+                            v-model="professionForm.current_position"
+                            :class="input"
+                        />
+                    </label>
+                    <label>
+                        <span class="text-sm font-bold">{{
+                            t('onboarding.candidate.desiredPosition')
+                        }}</span>
+                        <input
+                            v-model="professionForm.desired_position"
+                            required
+                            :class="input"
+                        />
+                    </label>
+                    <label>
+                        <span class="text-sm font-bold">{{
+                            t('onboarding.candidate.experienceYears')
+                        }}</span>
+                        <input
+                            v-model.number="professionForm.experience_years"
+                            required
+                            type="number"
+                            min="0"
+                            max="60"
+                            :class="input"
+                        />
+                    </label>
+                </div>
+                <label class="mt-4 block">
+                    <span class="text-sm font-bold">{{
+                        t('onboarding.candidate.summaryTitle')
+                    }}</span>
+                    <textarea
+                        v-model="professionForm.summary"
+                        required
+                        minlength="80"
+                        rows="5"
+                        :class="textarea"
+                    />
+                </label>
+                <div class="mt-4 grid gap-3 sm:grid-cols-3">
+                    <label class="rounded-xl border p-3 text-sm"
+                        ><input
+                            v-model="professionForm.relocation_ready"
+                            type="checkbox"
+                            class="mr-2"
+                        />{{ t('onboarding.candidate.relocationReady') }}</label
+                    >
+                    <label class="rounded-xl border p-3 text-sm"
+                        ><input
+                            v-model="professionForm.requires_visa"
+                            type="checkbox"
+                            class="mr-2"
+                        />{{ t('onboarding.candidate.requiresVisa') }}</label
+                    >
+                    <label class="rounded-xl border p-3 text-sm"
+                        ><input
+                            v-model="professionForm.has_work_permit"
+                            type="checkbox"
+                            class="mr-2"
+                        />{{ t('onboarding.candidate.hasWorkPermit') }}</label
+                    >
+                </div>
+                <div class="mt-5 flex gap-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        @click="currentStep = 2"
+                        ><ArrowLeft class="size-4" />{{
+                            t('onboarding.wizard.back')
+                        }}</Button
+                    >
+                    <Button type="submit"
+                        >{{ t('onboarding.wizard.saveContinue')
+                        }}<ArrowRight class="size-4"
+                    /></Button>
+                </div>
+            </SectionCard>
+        </form>
+
+        <form
+            v-else-if="role === 'candidate' && currentStep === 4"
+            @submit.prevent="
+                historyForm.put('/onboarding/candidate/steps/4', {
+                    preserveScroll: true,
+                    onSuccess: () => advance(4),
+                })
+            "
+        >
+            <SectionCard :title="t('onboarding.wizard.history')">
+                <article
+                    v-for="(experience, index) in historyForm.experiences"
+                    :key="index"
+                    class="mb-4 rounded-xl border border-slate-200 p-4"
+                >
+                    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        <input
+                            v-model="experience.employer"
+                            required
+                            :aria-label="
+                                t('candidate.profile.history.employer')
+                            "
+                            :class="input"
+                            :placeholder="
+                                t('candidate.profile.history.employer')
+                            "
+                        />
+                        <input
+                            v-model="experience.position"
+                            required
+                            :aria-label="
+                                t('candidate.profile.history.position')
+                            "
+                            :class="input"
+                            :placeholder="
+                                t('candidate.profile.history.position')
+                            "
+                        />
+                        <input
+                            v-model="experience.country_code"
+                            maxlength="2"
+                            :aria-label="t('candidate.profile.history.country')"
+                            :class="input"
+                            :placeholder="
+                                t('candidate.profile.history.country')
+                            "
+                        />
+                        <input
+                            v-model="experience.started_at"
+                            required
+                            type="date"
+                            :aria-label="
+                                t('candidate.profile.history.startedAt')
+                            "
+                            :class="input"
+                        />
+                        <input
+                            v-model="experience.ended_at"
+                            type="date"
+                            :disabled="experience.is_current"
+                            :aria-label="t('candidate.profile.history.endedAt')"
+                            :class="input"
+                        />
+                        <label class="flex items-center gap-2 pt-3 text-sm"
+                            ><input
+                                v-model="experience.is_current"
+                                type="checkbox"
+                            />{{
+                                t('candidate.profile.history.current')
+                            }}</label
+                        >
+                    </div>
+                    <Button
+                        v-if="historyForm.experiences.length > 1"
+                        class="mt-3"
+                        type="button"
+                        variant="ghost"
+                        @click="historyForm.experiences.splice(index, 1)"
+                    >
+                        {{ t('onboarding.wizard.remove') }}
+                    </Button>
+                </article>
+                <Button
+                    type="button"
+                    variant="outline"
+                    @click="historyForm.experiences.push(emptyExperience())"
+                >
+                    {{ t('candidate.profile.history.addExperience') }}
+                </Button>
+                <h3 class="mt-7 text-sm font-extrabold text-slate-900">
+                    {{ t('candidate.profile.history.educationTitle') }}
+                </h3>
+                <article
+                    v-for="(education, index) in historyForm.educations"
+                    :key="`education-${index}`"
+                    class="mt-3 rounded-xl border border-slate-200 p-4"
+                >
+                    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        <input
+                            v-model="education.institution"
+                            required
+                            :aria-label="
+                                t('candidate.profile.history.institution')
+                            "
+                            :class="input"
+                            :placeholder="
+                                t('candidate.profile.history.institution')
+                            "
+                        />
+                        <input
+                            v-model="education.qualification"
+                            required
+                            :aria-label="
+                                t('candidate.profile.history.qualification')
+                            "
+                            :class="input"
+                            :placeholder="
+                                t('candidate.profile.history.qualification')
+                            "
+                        />
+                        <input
+                            v-model="education.field"
+                            :aria-label="t('candidate.profile.history.field')"
+                            :class="input"
+                            :placeholder="t('candidate.profile.history.field')"
+                        />
+                        <input
+                            v-model="education.country_code"
+                            maxlength="2"
+                            :aria-label="t('candidate.profile.history.country')"
+                            :class="input"
+                            :placeholder="
+                                t('candidate.profile.history.country')
+                            "
+                        />
+                        <input
+                            v-model="education.started_at"
+                            type="date"
+                            :aria-label="
+                                t('candidate.profile.history.startedAt')
+                            "
+                            :class="input"
+                        />
+                        <input
+                            v-model="education.completed_at"
+                            type="date"
+                            :aria-label="
+                                t('candidate.profile.history.completedAt')
+                            "
+                            :class="input"
+                        />
+                    </div>
+                    <Button
+                        class="mt-3"
+                        type="button"
+                        variant="ghost"
+                        @click="historyForm.educations.splice(index, 1)"
+                    >
+                        {{ t('onboarding.wizard.remove') }}
+                    </Button>
+                </article>
+                <Button
+                    class="mt-3"
+                    type="button"
+                    variant="outline"
+                    @click="historyForm.educations.push(emptyEducation())"
+                >
+                    {{ t('candidate.profile.history.addEducation') }}
+                </Button>
+                <div class="mt-5 flex gap-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        @click="currentStep = 3"
+                        ><ArrowLeft class="size-4" />{{
+                            t('onboarding.wizard.back')
+                        }}</Button
+                    >
+                    <Button type="submit"
+                        >{{ t('onboarding.wizard.saveContinue')
+                        }}<ArrowRight class="size-4"
+                    /></Button>
+                </div>
+            </SectionCard>
+        </form>
+
+        <form
+            v-else-if="role === 'candidate' && currentStep === 5"
+            @submit.prevent="
+                skillForm.put('/onboarding/candidate/steps/5', {
+                    preserveScroll: true,
+                    onSuccess: () => advance(5),
+                })
+            "
+        >
+            <div class="grid gap-6 lg:grid-cols-2">
+                <SectionCard :title="t('candidate.profile.skills.title')">
+                    <div class="flex flex-wrap gap-2">
+                        <button
+                            v-for="skill in skills"
+                            :key="skill.id"
+                            type="button"
+                            class="rounded-lg border px-3 py-2 text-xs font-bold"
+                            :class="
+                                hasSkill(skill.id)
+                                    ? 'border-teal-300 bg-teal-50 text-teal-700'
+                                    : 'border-slate-200'
+                            "
+                            @click="toggleSkill(skill.id)"
+                        >
+                            {{ localizedField(skill) }}
+                        </button>
+                    </div>
+                </SectionCard>
+                <SectionCard
+                    :title="t('candidate.profile.skills.languagesTitle')"
+                >
+                    <div
+                        v-for="item in languages"
+                        :key="item.id"
+                        class="mb-2 flex items-center gap-3 rounded-xl border p-3"
+                    >
+                        <input
+                            :checked="!!language(item.id)"
+                            type="checkbox"
+                            :aria-label="
+                                localizedField(item, 'name', item.code)
+                            "
+                            @change="toggleLanguage(item.id)"
+                        />
+                        <span class="flex-1 text-sm font-bold">{{
+                            localizedField(item, 'name', item.code)
+                        }}</span>
+                        <select
+                            v-if="language(item.id)"
+                            :value="language(item.id)?.level"
+                            :aria-label="`${localizedField(item, 'name', item.code)} CEFR`"
+                            class="rounded-lg border px-2 py-1"
+                            @change="
+                                setLanguageLevel(
+                                    item.id,
+                                    ($event.target as HTMLSelectElement).value,
+                                )
+                            "
+                        >
+                            <option
+                                v-for="level in [
+                                    'A1',
+                                    'A2',
+                                    'B1',
+                                    'B2',
+                                    'C1',
+                                    'C2',
+                                ]"
+                                :key="level"
+                            >
+                                {{ level }}
+                            </option>
+                        </select>
+                    </div>
+                </SectionCard>
+            </div>
+            <div class="flex gap-2">
+                <Button type="button" variant="outline" @click="currentStep = 4"
+                    ><ArrowLeft class="size-4" />{{
+                        t('onboarding.wizard.back')
+                    }}</Button
+                >
+                <Button type="submit"
+                    >{{ t('onboarding.wizard.saveContinue')
+                    }}<ArrowRight class="size-4"
+                /></Button>
+            </div>
+        </form>
+
+        <div v-else-if="role === 'candidate' && currentStep === 6">
+            <SectionCard :title="t('onboarding.wizard.uploads')">
+                <p class="text-sm leading-6 text-slate-600">
+                    {{ t('onboarding.wizard.uploadNotice') }}
+                </p>
+                <div class="mt-5 grid gap-4 lg:grid-cols-2">
+                    <form
+                        class="rounded-xl border border-slate-200 p-4"
+                        @submit.prevent="
+                            photoForm.post('/onboarding/candidate/photo', {
+                                forceFormData: true,
+                                preserveScroll: true,
+                                onSuccess: () => photoForm.reset(),
+                            })
+                        "
+                    >
+                        <p class="text-sm font-extrabold text-slate-900">
+                            {{ t('onboarding.wizard.profilePhoto') }}
+                        </p>
+                        <input
+                            type="file"
+                            accept="image/jpeg,image/png"
+                            required
+                            :aria-label="t('onboarding.wizard.profilePhoto')"
+                            class="erin-focus mt-3 block w-full rounded-xl border border-slate-200 p-2 text-sm"
+                            @change="
+                                photoForm.photo =
+                                    ($event.target as HTMLInputElement)
+                                        .files?.[0] ?? null
+                            "
+                        />
+                        <InputError :message="photoForm.errors.photo" />
+                        <Button
+                            class="mt-3"
+                            type="submit"
+                            :disabled="photoForm.processing || !photoForm.photo"
+                        >
+                            {{ t('onboarding.wizard.uploadPhoto') }}
+                        </Button>
+                    </form>
+                    <form
+                        class="rounded-xl border border-slate-200 p-4"
+                        @submit.prevent="
+                            documentForm.post(
+                                '/onboarding/candidate/documents',
+                                {
+                                    forceFormData: true,
+                                    preserveScroll: true,
+                                    onSuccess: () =>
+                                        documentForm.reset('title', 'file'),
+                                },
+                            )
+                        "
+                    >
+                        <p class="text-sm font-extrabold text-slate-900">
+                            {{ t('candidate.profile.documents.uploadTitle') }}
+                        </p>
+                        <div class="mt-3 grid gap-3">
+                            <select
+                                v-model="documentForm.type"
+                                required
+                                :class="input"
+                            >
                                 <option
-                                    v-for="occupation in occupations"
-                                    :key="occupation.id"
-                                    :value="occupation.id"
+                                    v-for="type in document_types"
+                                    :key="type"
+                                    :value="type"
                                 >
                                     {{
-                                        localizedField(
-                                            occupation,
-                                            'name',
-                                            occupation.slug,
+                                        t(
+                                            `candidate.profile.documents.types.${type}`,
                                         )
                                     }}
                                 </option>
                             </select>
-                            <InputError
-                                :message="candidateForm.errors.occupation_id"
-                            />
-                        </label>
-                        <label class="grid gap-2">
-                            <Label for="desired_position">
-                                {{ t('onboarding.candidate.desiredPosition') }}
-                                *
-                            </Label>
-                            <Input
-                                id="desired_position"
-                                v-model="candidateForm.desired_position"
+                            <input
+                                v-model="documentForm.title"
                                 required
+                                :class="input"
                                 :placeholder="
                                     t(
-                                        'onboarding.candidate.desiredPositionPlaceholder',
+                                        'candidate.profile.documents.documentTitle',
                                     )
                                 "
                             />
-                            <InputError
-                                :message="candidateForm.errors.desired_position"
-                            />
-                        </label>
-                        <label class="grid gap-2">
-                            <Label for="experience_years">
-                                {{ t('onboarding.candidate.experienceYears') }}
-                                *
-                            </Label>
-                            <Input
-                                id="experience_years"
-                                v-model.number="candidateForm.experience_years"
-                                required
-                                min="0"
-                                max="60"
-                                step="0.5"
-                                type="number"
-                            />
-                            <InputError
-                                :message="candidateForm.errors.experience_years"
-                            />
-                        </label>
-                        <label class="grid gap-2">
-                            <Label for="phone">
-                                {{ t('onboarding.candidate.phone') }} *
-                            </Label>
-                            <Input
-                                id="phone"
-                                v-model="candidateForm.phone"
-                                required
-                                autocomplete="tel"
-                                :placeholder="
-                                    t('onboarding.candidate.phonePlaceholder')
-                                "
-                            />
-                            <InputError :message="candidateForm.errors.phone" />
-                        </label>
-                    </div>
-                </SectionCard>
-
-                <SectionCard
-                    :title="t('onboarding.candidate.locationTitle')"
-                    :description="t('onboarding.candidate.locationDescription')"
-                >
-                    <div class="grid gap-5 sm:grid-cols-2">
-                        <label class="grid gap-2">
-                            <Label for="current_country_code">
-                                {{ t('onboarding.candidate.currentCountry') }} *
-                            </Label>
-                            <Input
-                                id="current_country_code"
-                                v-model="candidateForm.current_country_code"
-                                required
-                                maxlength="2"
-                                class="uppercase"
-                                :placeholder="
-                                    t(
-                                        'onboarding.candidate.currentCountryPlaceholder',
-                                    )
-                                "
-                            />
-                            <InputError
-                                :message="
-                                    candidateForm.errors.current_country_code
-                                "
-                            />
-                        </label>
-                        <label class="grid gap-2">
-                            <Label for="current_city">
-                                {{ t('onboarding.candidate.currentCity') }} *
-                            </Label>
-                            <Input
-                                id="current_city"
-                                v-model="candidateForm.current_city"
-                                required
-                                :placeholder="
-                                    t(
-                                        'onboarding.candidate.currentCityPlaceholder',
-                                    )
-                                "
-                            />
-                            <InputError
-                                :message="candidateForm.errors.current_city"
-                            />
-                        </label>
-                    </div>
-                    <div class="mt-5 grid gap-3 sm:grid-cols-3">
-                        <label
-                            class="flex items-center gap-3 rounded-xl border border-slate-200 p-4 text-sm font-bold"
-                        >
                             <input
-                                v-model="candidateForm.relocation_ready"
-                                type="checkbox"
-                                class="size-4 rounded border-slate-300"
+                                type="file"
+                                required
+                                :aria-label="
+                                    t('candidate.profile.documents.file')
+                                "
+                                class="erin-focus block w-full rounded-xl border border-slate-200 p-2 text-sm"
+                                @change="
+                                    documentForm.file =
+                                        ($event.target as HTMLInputElement)
+                                            .files?.[0] ?? null
+                                "
                             />
-                            {{ t('onboarding.candidate.relocationReady') }}
-                        </label>
-                        <label
-                            class="flex items-center gap-3 rounded-xl border border-slate-200 p-4 text-sm font-bold"
+                        </div>
+                        <InputError :message="documentForm.errors.file" />
+                        <Button
+                            class="mt-3"
+                            type="submit"
+                            :disabled="
+                                documentForm.processing || !documentForm.file
+                            "
                         >
-                            <input
-                                v-model="candidateForm.requires_visa"
-                                type="checkbox"
-                                class="size-4 rounded border-slate-300"
-                            />
-                            {{ t('onboarding.candidate.requiresVisa') }}
-                        </label>
-                        <label
-                            class="flex items-center gap-3 rounded-xl border border-slate-200 p-4 text-sm font-bold"
-                        >
-                            <input
-                                v-model="candidateForm.has_work_permit"
-                                type="checkbox"
-                                class="size-4 rounded border-slate-300"
-                            />
-                            {{ t('onboarding.candidate.hasWorkPermit') }}
-                        </label>
-                    </div>
-                </SectionCard>
-
-                <SectionCard
-                    :title="t('onboarding.candidate.summaryTitle')"
-                    :description="t('onboarding.candidate.summaryDescription')"
+                            {{ t('candidate.profile.documents.upload') }}
+                        </Button>
+                    </form>
+                </div>
+                <form
+                    class="mt-4"
+                    @submit.prevent="
+                        uploadForm.put('/onboarding/candidate/steps/6', {
+                            preserveScroll: true,
+                            onSuccess: () => advance(6),
+                        })
+                    "
                 >
-                    <Textarea
-                        v-model="candidateForm.summary"
-                        required
-                        minlength="80"
-                        maxlength="5000"
-                        rows="6"
-                        class="p-3.5"
-                        :placeholder="
-                            t('onboarding.candidate.summaryPlaceholder')
-                        "
-                    />
-                    <div class="mt-2 flex justify-between text-xs">
-                        <InputError :message="candidateForm.errors.summary" />
-                        <span class="ml-auto text-slate-600">
-                            {{ formatNumber(candidateForm.summary.length) }} /
-                            {{ formatNumber(5000) }}
-                        </span>
-                    </div>
-                </SectionCard>
-            </div>
-
-            <aside>
-                <SectionCard
-                    :title="t('onboarding.candidate.secureStartTitle')"
-                >
-                    <div class="space-y-4 text-sm leading-6 text-slate-600">
-                        <p class="flex gap-3">
-                            <ShieldCheck
-                                class="mt-0.5 size-5 shrink-0 text-teal-500"
-                            />
-                            {{
-                                t('onboarding.candidate.anonymousProfileNotice')
-                            }}
-                        </p>
-                        <p class="flex gap-3">
-                            <Check
-                                class="mt-0.5 size-5 shrink-0 text-teal-500"
-                            />
-                            {{ t('onboarding.candidate.nextProfileSteps') }}
-                        </p>
-                    </div>
-                    <Button
-                        type="submit"
-                        class="mt-6 h-11 w-full rounded-xl"
-                        :disabled="candidateForm.processing"
+                    <label
+                        class="flex items-start gap-3 rounded-xl bg-blue-50 p-4 text-sm"
                     >
-                        {{ t('onboarding.candidate.complete') }}
-                        <ArrowRight class="size-4" />
+                        <input
+                            v-model="uploadForm.acknowledged_private_uploads"
+                            required
+                            type="checkbox"
+                            class="mt-1"
+                        />
+                        {{ t('onboarding.wizard.uploadAcknowledge') }}
+                    </label>
+                    <div class="mt-5 flex gap-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            @click="currentStep = 5"
+                            ><ArrowLeft class="size-4" />{{
+                                t('onboarding.wizard.back')
+                            }}</Button
+                        >
+                        <Button type="submit"
+                            >{{ t('onboarding.wizard.saveContinue')
+                            }}<ArrowRight class="size-4"
+                        /></Button>
+                    </div>
+                </form>
+            </SectionCard>
+        </div>
+
+        <form
+            v-else-if="role === 'candidate' && currentStep === 7"
+            @submit.prevent="finishForm.put('/onboarding/candidate/steps/7')"
+        >
+            <SectionCard :title="t('onboarding.wizard.finish')">
+                <div class="mb-5">
+                    <h3 class="text-sm font-extrabold text-slate-900">
+                        {{ t('candidate.profile.availability.title') }}
+                    </h3>
+                    <p class="mt-1 text-sm text-slate-600">
+                        {{ t('candidate.profile.availability.description') }}
+                    </p>
+                    <article
+                        v-for="(slot, index) in finishForm.availability"
+                        :key="index"
+                        class="mt-3 grid gap-3 rounded-xl border border-slate-200 p-3 sm:grid-cols-[1fr_1fr_1fr_auto]"
+                    >
+                        <select
+                            v-model="slot.weekday"
+                            :aria-label="
+                                t('candidate.profile.availability.weekday')
+                            "
+                            :class="input"
+                        >
+                            <option
+                                v-for="weekday in [1, 2, 3, 4, 5, 6, 7]"
+                                :key="weekday"
+                                :value="weekday"
+                            >
+                                {{
+                                    t(
+                                        `candidate.profile.availability.days.${weekday}`,
+                                    )
+                                }}
+                            </option>
+                        </select>
+                        <input
+                            v-model="slot.starts_at"
+                            required
+                            type="time"
+                            :aria-label="
+                                t('candidate.profile.availability.from')
+                            "
+                            :class="input"
+                        />
+                        <input
+                            v-model="slot.ends_at"
+                            required
+                            type="time"
+                            :aria-label="
+                                t('candidate.profile.availability.until')
+                            "
+                            :class="input"
+                        />
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            :disabled="finishForm.availability.length === 1"
+                            @click="finishForm.availability.splice(index, 1)"
+                        >
+                            {{ t('onboarding.wizard.remove') }}
+                        </Button>
+                    </article>
+                    <Button
+                        class="mt-3"
+                        type="button"
+                        variant="outline"
+                        @click="
+                            finishForm.availability.push(emptyAvailability())
+                        "
+                    >
+                        {{ t('candidate.profile.availability.add') }}
                     </Button>
-                </SectionCard>
-            </aside>
+                    <InputError :message="finishForm.errors.availability" />
+                </div>
+                <p class="text-sm leading-6 text-slate-600">
+                    {{ t('onboarding.wizard.publishNotice') }}
+                </p>
+                <label
+                    class="mt-4 flex items-start gap-3 rounded-xl border border-slate-200 p-4 text-sm"
+                >
+                    <input
+                        v-model="finishForm.publish_profile"
+                        type="checkbox"
+                        class="mt-1"
+                    />
+                    {{
+                        t('onboarding.wizard.publishNow', {
+                            percentage: publication_threshold,
+                        })
+                    }}
+                </label>
+                <InputError :message="finishForm.errors.publish_profile" />
+                <div class="mt-5 flex gap-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        @click="currentStep = 6"
+                        ><ArrowLeft class="size-4" />{{
+                            t('onboarding.wizard.back')
+                        }}</Button
+                    >
+                    <Button type="submit">{{
+                        t('onboarding.candidate.complete')
+                    }}</Button>
+                </div>
+            </SectionCard>
         </form>
 
         <form
-            v-else
-            class="space-y-6"
-            data-test="company-onboarding"
-            @submit.prevent="companyForm.put('/onboarding/company')"
+            v-else-if="role === 'company' && currentStep === 2"
+            @submit.prevent="
+                planForm.put('/onboarding/company/steps/2', {
+                    preserveScroll: true,
+                    onSuccess: () => advance(2),
+                })
+            "
         >
-            <SectionCard
-                :title="t('onboarding.company.planTitle')"
-                :description="t('onboarding.company.planDescription')"
-            >
+            <SectionCard :title="t('onboarding.company.planTitle')">
                 <div class="grid gap-4 md:grid-cols-3">
-                    <button
+                    <label
                         v-for="plan in plans"
                         :key="plan.id"
-                        type="button"
-                        class="relative rounded-2xl border p-5 text-left transition"
+                        class="cursor-pointer rounded-2xl border p-5"
                         :class="
-                            companyForm.plan_slug === plan.slug
-                                ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500'
-                                : 'border-slate-200 hover:border-slate-300'
+                            planForm.plan_slug === plan.slug
+                                ? 'border-blue-400 bg-blue-50'
+                                : 'border-slate-200'
                         "
-                        @click="companyForm.plan_slug = plan.slug"
                     >
-                        <Check
-                            v-if="companyForm.plan_slug === plan.slug"
-                            class="absolute top-4 right-4 size-5 text-blue-600"
+                        <input
+                            v-model="planForm.plan_slug"
+                            type="radio"
+                            :value="plan.slug"
+                            class="sr-only"
                         />
-                        <p class="font-extrabold text-slate-950">
-                            {{ plan.name }}
-                        </p>
-                        <p class="mt-3 text-2xl font-extrabold">
-                            {{ money(plan.price_cents, plan.currency) }}
-                        </p>
-                        <p class="mt-1 text-xs text-slate-600">
+                        <strong>{{ plan.name }}</strong>
+                        <p class="mt-2 text-2xl font-extrabold">
                             {{
-                                t('onboarding.company.termMonths', {
-                                    count: plan.term_months ?? 0,
-                                })
+                                plan.price_cents
+                                    ? `${(plan.price_cents / 100).toLocaleString('de-DE')} €`
+                                    : '–'
                             }}
                         </p>
-                        <p class="mt-4 text-xs leading-5 text-slate-700">
-                            {{ planDescription(plan) }}
+                        <p class="mt-2 text-xs text-slate-600">
+                            {{ plan.term_months }}
+                            {{ t('onboarding.wizard.months') }}
                         </p>
-                        <ul class="mt-4 space-y-2 text-xs text-slate-600">
-                            <li>
-                                {{
-                                    t('onboarding.company.activeJobs', {
-                                        count:
-                                            plan.active_jobs_limit ??
-                                            t('onboarding.company.unlimited'),
-                                    })
-                                }}
-                            </li>
-                            <li>
-                                {{
-                                    t('onboarding.company.recruiterSeats', {
-                                        count:
-                                            plan.seat_limit ??
-                                            t('onboarding.company.unlimited'),
-                                    })
-                                }}
-                            </li>
-                            <li>
-                                {{
-                                    t('onboarding.company.aiCredits', {
-                                        count: plan.ai_credits_monthly ?? 0,
-                                    })
-                                }}
-                            </li>
-                        </ul>
-                    </button>
+                    </label>
                 </div>
-                <InputError
-                    class="mt-3"
-                    :message="companyForm.errors.plan_slug"
-                />
+                <Button class="mt-5" type="submit"
+                    >{{ t('onboarding.wizard.saveContinue')
+                    }}<ArrowRight class="size-4"
+                /></Button>
             </SectionCard>
+        </form>
 
-            <div class="grid gap-6 xl:grid-cols-[1fr_20rem]">
-                <SectionCard
-                    :title="t('onboarding.company.billingDetailsTitle')"
-                    :description="
-                        t('onboarding.company.billingDetailsDescription')
-                    "
-                >
-                    <div class="grid gap-5 sm:grid-cols-2">
-                        <label class="grid gap-2 sm:col-span-2">
-                            <Label for="legal_name">
-                                {{ t('onboarding.company.legalName') }} *
-                            </Label>
-                            <Input
-                                id="legal_name"
-                                v-model="companyForm.legal_name"
-                                required
-                                autocomplete="organization"
-                            />
-                            <InputError
-                                :message="companyForm.errors.legal_name"
-                            />
-                        </label>
-                        <label class="grid gap-2">
-                            <Label for="company_email">
-                                {{ t('onboarding.company.billingEmail') }} *
-                            </Label>
-                            <Input
-                                id="company_email"
-                                v-model="companyForm.email"
-                                required
-                                type="email"
-                            />
-                            <InputError :message="companyForm.errors.email" />
-                        </label>
-                        <label class="grid gap-2">
-                            <Label for="website">
-                                {{ t('onboarding.company.website') }}
-                            </Label>
-                            <Input
-                                id="website"
-                                v-model="companyForm.website"
-                                type="url"
-                                :placeholder="
-                                    t('onboarding.company.websitePlaceholder')
-                                "
-                            />
-                            <InputError :message="companyForm.errors.website" />
-                        </label>
-                        <label class="grid gap-2">
-                            <Label for="industry">
-                                {{ t('onboarding.company.industry') }} *
-                            </Label>
-                            <Input
-                                id="industry"
-                                v-model="companyForm.industry"
-                                required
-                                :placeholder="
-                                    t('onboarding.company.industryPlaceholder')
-                                "
-                            />
-                            <InputError
-                                :message="companyForm.errors.industry"
-                            />
-                        </label>
-                        <label class="grid gap-2">
-                            <Label for="employee_count">
-                                {{ t('onboarding.company.employees') }} *
-                            </Label>
-                            <Input
-                                id="employee_count"
-                                v-model.number="companyForm.employee_count"
-                                required
-                                min="1"
-                                type="number"
-                            />
-                            <InputError
-                                :message="companyForm.errors.employee_count"
-                            />
-                        </label>
-                        <label class="grid gap-2 sm:col-span-2">
-                            <Label for="address_line1">
-                                {{ t('onboarding.company.street') }} *
-                            </Label>
-                            <Input
-                                id="address_line1"
-                                v-model="companyForm.address_line1"
-                                required
-                                autocomplete="street-address"
-                            />
-                            <InputError
-                                :message="companyForm.errors.address_line1"
-                            />
-                        </label>
-                        <label class="grid gap-2">
-                            <Label for="postal_code">
-                                {{ t('onboarding.company.postalCode') }} *
-                            </Label>
-                            <Input
-                                id="postal_code"
-                                v-model="companyForm.postal_code"
-                                required
-                                autocomplete="postal-code"
-                            />
-                            <InputError
-                                :message="companyForm.errors.postal_code"
-                            />
-                        </label>
-                        <label class="grid gap-2">
-                            <Label for="city">
-                                {{ t('onboarding.company.city') }} *
-                            </Label>
-                            <Input
-                                id="city"
-                                v-model="companyForm.city"
-                                required
-                                autocomplete="address-level2"
-                            />
-                            <InputError :message="companyForm.errors.city" />
-                        </label>
-                        <label class="grid gap-2">
-                            <Label for="country_code">
-                                {{ t('onboarding.company.country') }} *
-                            </Label>
-                            <Input
-                                id="country_code"
-                                v-model="companyForm.country_code"
-                                required
-                                maxlength="2"
-                                class="uppercase"
-                            />
-                            <InputError
-                                :message="companyForm.errors.country_code"
-                            />
-                        </label>
-                    </div>
-                </SectionCard>
-
-                <aside>
-                    <SectionCard :title="t('onboarding.company.nextStepTitle')">
-                        <CreditCard class="size-8 text-[var(--erin-primary)]" />
-                        <p class="mt-4 text-sm leading-6 text-slate-600">
-                            {{ t('onboarding.company.checkoutDescription') }}
-                        </p>
-                        <p class="mt-3 text-xs leading-5 text-slate-600">
-                            {{ t('onboarding.company.webhookNotice') }}
-                        </p>
-                        <Button
-                            type="submit"
-                            class="mt-6 h-11 w-full rounded-xl"
-                            :disabled="companyForm.processing"
-                        >
-                            {{ t('onboarding.company.saveAndContinue') }}
-                            <ArrowRight class="size-4" />
-                        </Button>
-                    </SectionCard>
-                </aside>
-            </div>
+        <form
+            v-else-if="role === 'company' && currentStep === 3"
+            @submit.prevent="companyForm.put('/onboarding/company/steps/3')"
+        >
+            <SectionCard :title="t('onboarding.company.billingDetailsTitle')">
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <label v-for="field in companyFields" :key="field">
+                        <span class="text-sm font-bold">{{
+                            t(`onboarding.wizard.fields.${field}`)
+                        }}</span>
+                        <input
+                            :value="companyForm[field]"
+                            :type="
+                                field === 'email'
+                                    ? 'email'
+                                    : field === 'employee_count'
+                                      ? 'number'
+                                      : 'text'
+                            "
+                            :required="field !== 'website'"
+                            :class="input"
+                            @input="setCompanyValue(field, $event)"
+                        />
+                        <InputError :message="companyForm.errors[field]" />
+                    </label>
+                </div>
+                <div class="mt-5 flex gap-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        @click="currentStep = 2"
+                        ><ArrowLeft class="size-4" />{{
+                            t('onboarding.wizard.back')
+                        }}</Button
+                    >
+                    <Button type="submit"
+                        >{{ t('onboarding.company.saveAndContinue')
+                        }}<ArrowRight class="size-4"
+                    /></Button>
+                </div>
+            </SectionCard>
         </form>
     </div>
 </template>

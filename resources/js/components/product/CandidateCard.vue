@@ -54,11 +54,13 @@ const props = withDefaults(
         href?: string;
         selectable?: boolean;
         selected?: boolean;
+        canManage?: boolean;
     }>(),
     {
         href: '',
         selectable: false,
         selected: false,
+        canManage: true,
     },
 );
 
@@ -214,6 +216,7 @@ const verified = computed(
                 </div>
             </div>
             <button
+                v-if="canManage"
                 type="button"
                 class="erin-focus rounded-lg p-2"
                 :class="
@@ -276,6 +279,7 @@ const verified = computed(
                 {{ t('candidateCard.viewProfile') }}
             </Link>
             <button
+                v-if="canManage"
                 type="button"
                 class="erin-focus grid size-10 place-items-center rounded-xl border border-slate-200 text-slate-500 hover:border-teal-300 hover:bg-teal-50 hover:text-teal-600"
                 :aria-label="t('candidateCard.invite')"

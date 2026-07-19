@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, useForm } from '@inertiajs/vue3';
+import { Head, router, useForm } from '@inertiajs/vue3';
 import {
     CircleDollarSign,
     HardDrive,
@@ -7,8 +7,10 @@ import {
     RotateCcw,
     Save,
     Settings2,
+    ShieldCheck,
+    Trash2,
 } from '@lucide/vue';
-import { computed } from 'vue';
+import { computed, reactive } from 'vue';
 import FormField from '@/components/product/FormField.vue';
 import PageHeader from '@/components/product/PageHeader.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
@@ -61,6 +63,22 @@ type DashboardAd = {
     starts_at: string | null;
     ends_at: string | null;
 };
+type Occupation = { id: number; name_de: string; name_en: string };
+type Skill = {
+    id: number;
+    slug: string;
+    name_de: string;
+    name_en: string;
+    is_active: boolean;
+    occupations: Occupation[];
+};
+type PlatformRole = {
+    id: number;
+    name: string;
+    capabilities: string[];
+    is_active: boolean;
+    users_count: number;
+};
 
 const props = defineProps<{
     colors: Record<string, string>;
@@ -68,10 +86,14 @@ const props = defineProps<{
     dashboard_notice: DashboardNotice;
     billing: BillingSettings;
     uploads: UploadSettings;
+    candidate_profile: { minimum_completion: number };
     retention: RetentionSettings;
     dashboard_ad: DashboardAd;
     dashboard_ad_stats: { impressions: number; clicks: number; ctr: number };
     dashboard_ad_media_url: string | null;
+    occupations: Occupation[];
+    skills: Skill[];
+    platform_roles: PlatformRole[];
 }>();
 
 const colorKeys = Object.keys(props.defaults);
@@ -103,6 +125,10 @@ const platformForm = useForm({
         max_file_size_mb: props.uploads.max_file_size_mb.toString(),
         user_quota_mb: props.uploads.user_quota_mb.toString(),
     },
+    candidate_profile: {
+        minimum_completion:
+            props.candidate_profile.minimum_completion.toString(),
+    },
     retention: {
         rejected_document_days:
             props.retention.rejected_document_days.toString(),
@@ -122,6 +148,65 @@ const platformForm = useForm({
 });
 
 const adMediaForm = useForm<{ media: File | null }>({ media: null });
+const skillCreateForm = useForm({
+    name_de: '',
+    name_en: '',
+    is_active: true,
+    occupation_ids: [] as number[],
+});
+const skillForms = reactive(
+    Object.fromEntries(
+        props.skills.map((skill) => [
+            skill.id,
+            {
+                name_de: skill.name_de,
+                name_en: skill.name_en,
+                is_active: skill.is_active,
+                occupation_ids: skill.occupations.map(
+                    (occupation) => occupation.id,
+                ),
+            },
+        ]),
+    ) as Record<
+        number,
+        {
+            name_de: string;
+            name_en: string;
+            is_active: boolean;
+            occupation_ids: number[];
+        }
+    >,
+);
+const platformCapabilities = [
+    'platform.view',
+    'platform.support.manage',
+    'support.use',
+];
+const platformCapabilityLabels: Record<string, string> = {
+    'platform.view': 'settings.capabilities.platformView',
+    'platform.support.manage': 'settings.capabilities.platformSupportManage',
+    'support.use': 'settings.capabilities.supportUse',
+};
+const platformRoleCreateForm = useForm({
+    name: '',
+    capabilities: ['platform.view', 'support.use'],
+    is_active: true,
+});
+const platformRoleForms = reactive(
+    Object.fromEntries(
+        props.platform_roles.map((role) => [
+            role.id,
+            {
+                name: role.name,
+                capabilities: [...role.capabilities],
+                is_active: role.is_active,
+            },
+        ]),
+    ) as Record<
+        number,
+        { name: string; capabilities: string[]; is_active: boolean }
+    >,
+);
 
 const firstThemeError = computed(
     () => Object.values(themeForm.errors)[0] as string | undefined,
@@ -172,6 +257,48 @@ function deleteAdMedia(): void {
         adminSettings.ads.media.destroy.url(props.dashboard_ad.campaign_id),
         { preserveScroll: true },
     );
+}
+function createSkill(): void {
+    skillCreateForm.post('/admin/settings/skills', {
+        preserveScroll: true,
+        onSuccess: () => skillCreateForm.reset(),
+    });
+}
+function updateSkill(skillId: number): void {
+    router.patch(`/admin/settings/skills/${skillId}`, skillForms[skillId], {
+        preserveScroll: true,
+    });
+}
+function deactivateSkill(skillId: number): void {
+    router.delete(`/admin/settings/skills/${skillId}`, {
+        preserveScroll: true,
+    });
+}
+function togglePlatformCapability(
+    form: { capabilities: string[] },
+    capability: string,
+): void {
+    form.capabilities = form.capabilities.includes(capability)
+        ? form.capabilities.filter((item) => item !== capability)
+        : [...form.capabilities, capability];
+}
+function createPlatformRole(): void {
+    platformRoleCreateForm.post('/admin/settings/platform-roles', {
+        preserveScroll: true,
+        onSuccess: () => platformRoleCreateForm.reset(),
+    });
+}
+function updatePlatformRole(roleId: number): void {
+    router.patch(
+        `/admin/settings/platform-roles/${roleId}`,
+        platformRoleForms[roleId],
+        { preserveScroll: true },
+    );
+}
+function deletePlatformRole(roleId: number): void {
+    router.delete(`/admin/settings/platform-roles/${roleId}`, {
+        preserveScroll: true,
+    });
 }
 </script>
 
@@ -374,7 +501,7 @@ function deleteAdMedia(): void {
                 :title="t('settings.retentionTitle')"
                 :description="t('settings.retentionDescription')"
             >
-                <div class="grid gap-4 sm:grid-cols-2">
+                <div class="grid gap-4 sm:grid-cols-3">
                     <FormField
                         id="retention-documents"
                         :label="t('settings.rejectedDocumentDays')"
@@ -443,6 +570,28 @@ function deleteAdMedia(): void {
                             type="number"
                             min="1"
                             max="720"
+                            class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                        />
+                    </FormField>
+                    <FormField
+                        id="profile-completion-threshold"
+                        :label="t('settings.profileCompletionThreshold')"
+                        :error="
+                            platformForm.errors[
+                                'candidate_profile.minimum_completion'
+                            ]
+                        "
+                        required
+                    >
+                        <input
+                            id="profile-completion-threshold"
+                            v-model="
+                                platformForm.candidate_profile
+                                    .minimum_completion
+                            "
+                            type="number"
+                            min="50"
+                            max="100"
                             class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
                         />
                     </FormField>
@@ -801,5 +950,279 @@ function deleteAdMedia(): void {
                 </button>
             </div>
         </form>
+
+        <SectionCard
+            class="mt-6"
+            :title="t('settings.skillTaxonomyTitle')"
+            :description="t('settings.skillTaxonomyDescription')"
+        >
+            <form
+                class="grid gap-3 rounded-xl bg-slate-50 p-4 lg:grid-cols-[1fr_1fr_2fr_auto]"
+                @submit.prevent="createSkill"
+            >
+                <input
+                    v-model="skillCreateForm.name_de"
+                    required
+                    class="erin-focus h-10 rounded-xl border border-slate-200 px-3 text-sm"
+                    :placeholder="t('settings.skillNameDe')"
+                />
+                <input
+                    v-model="skillCreateForm.name_en"
+                    required
+                    class="erin-focus h-10 rounded-xl border border-slate-200 px-3 text-sm"
+                    :placeholder="t('settings.skillNameEn')"
+                />
+                <select
+                    v-model="skillCreateForm.occupation_ids"
+                    multiple
+                    class="erin-focus min-h-10 rounded-xl border border-slate-200 px-3 text-sm"
+                >
+                    <option
+                        v-for="occupation in occupations"
+                        :key="occupation.id"
+                        :value="occupation.id"
+                    >
+                        {{ occupation.name_de }}
+                    </option>
+                </select>
+                <button
+                    type="submit"
+                    class="erin-focus rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white"
+                >
+                    {{ t('settings.createSkill') }}
+                </button>
+            </form>
+
+            <div class="mt-4 space-y-3">
+                <article
+                    v-for="skill in skills"
+                    :key="skill.id"
+                    class="grid gap-3 rounded-xl border border-slate-200 p-4 lg:grid-cols-[1fr_1fr_2fr_auto]"
+                >
+                    <input
+                        v-model="skillForms[skill.id].name_de"
+                        class="erin-focus h-10 rounded-xl border border-slate-200 px-3 text-sm"
+                        :aria-label="t('settings.skillNameDe')"
+                    />
+                    <input
+                        v-model="skillForms[skill.id].name_en"
+                        class="erin-focus h-10 rounded-xl border border-slate-200 px-3 text-sm"
+                        :aria-label="t('settings.skillNameEn')"
+                    />
+                    <div>
+                        <select
+                            v-model="skillForms[skill.id].occupation_ids"
+                            multiple
+                            class="erin-focus min-h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                        >
+                            <option
+                                v-for="occupation in occupations"
+                                :key="occupation.id"
+                                :value="occupation.id"
+                            >
+                                {{ occupation.name_de }}
+                            </option>
+                        </select>
+                        <label
+                            class="mt-2 inline-flex items-center gap-2 text-xs font-bold text-slate-600"
+                        >
+                            <input
+                                v-model="skillForms[skill.id].is_active"
+                                type="checkbox"
+                            />
+                            {{ t('settings.skillActive') }}
+                        </label>
+                    </div>
+                    <div class="flex items-start gap-2">
+                        <button
+                            type="button"
+                            class="erin-focus rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white"
+                            @click="updateSkill(skill.id)"
+                        >
+                            {{ t('settings.saveSkill') }}
+                        </button>
+                        <button
+                            type="button"
+                            class="erin-focus rounded-xl border border-red-200 p-2 text-red-600"
+                            :aria-label="t('settings.deactivateSkill')"
+                            @click="deactivateSkill(skill.id)"
+                        >
+                            <Trash2 class="size-4" />
+                        </button>
+                    </div>
+                </article>
+            </div>
+        </SectionCard>
+
+        <SectionCard
+            class="mt-6"
+            :title="t('settings.platformRolesTitle')"
+            :description="t('settings.platformRolesDescription')"
+        >
+            <div
+                class="mb-5 flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4"
+            >
+                <ShieldCheck class="mt-0.5 size-5 shrink-0 text-blue-600" />
+                <p class="text-xs leading-5 text-blue-900">
+                    {{ t('settings.platformRolesHint') }}
+                </p>
+            </div>
+
+            <form
+                class="rounded-xl bg-slate-50 p-4"
+                @submit.prevent="createPlatformRole"
+            >
+                <div class="grid gap-3 sm:grid-cols-[1fr_auto]">
+                    <FormField
+                        id="platform-role-name"
+                        :label="t('settings.platformRoleName')"
+                        :error="platformRoleCreateForm.errors.name"
+                        required
+                    >
+                        <input
+                            id="platform-role-name"
+                            v-model="platformRoleCreateForm.name"
+                            required
+                            class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                        />
+                    </FormField>
+                    <label
+                        class="flex items-center gap-2 self-end pb-2 text-xs font-bold text-slate-600"
+                    >
+                        <input
+                            v-model="platformRoleCreateForm.is_active"
+                            type="checkbox"
+                        />
+                        {{ t('settings.platformRoleActive') }}
+                    </label>
+                </div>
+                <fieldset class="mt-4">
+                    <legend class="text-xs font-bold text-slate-600">
+                        {{ t('settings.platformRoleCapabilities') }}
+                    </legend>
+                    <div class="mt-2 flex flex-wrap gap-3">
+                        <label
+                            v-for="capability in platformCapabilities"
+                            :key="capability"
+                            class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
+                        >
+                            <input
+                                type="checkbox"
+                                :checked="
+                                    platformRoleCreateForm.capabilities.includes(
+                                        capability,
+                                    )
+                                "
+                                @change="
+                                    togglePlatformCapability(
+                                        platformRoleCreateForm,
+                                        capability,
+                                    )
+                                "
+                            />
+                            {{ t(platformCapabilityLabels[capability]) }}
+                        </label>
+                    </div>
+                </fieldset>
+                <p
+                    v-if="platformRoleCreateForm.errors.capabilities"
+                    class="mt-2 text-xs text-red-600"
+                >
+                    {{ platformRoleCreateForm.errors.capabilities }}
+                </p>
+                <button
+                    type="submit"
+                    :disabled="platformRoleCreateForm.processing"
+                    class="erin-focus mt-4 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
+                >
+                    {{ t('settings.createPlatformRole') }}
+                </button>
+            </form>
+
+            <div class="mt-4 space-y-3">
+                <article
+                    v-for="role in platform_roles"
+                    :key="role.id"
+                    class="rounded-xl border border-slate-200 p-4"
+                >
+                    <div class="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
+                        <input
+                            v-model="platformRoleForms[role.id].name"
+                            :aria-label="t('settings.platformRoleName')"
+                            class="erin-focus h-10 rounded-xl border border-slate-200 px-3 text-sm"
+                        />
+                        <label
+                            class="inline-flex items-center gap-2 text-xs font-bold text-slate-600"
+                        >
+                            <input
+                                v-model="platformRoleForms[role.id].is_active"
+                                type="checkbox"
+                            />
+                            {{ t('settings.platformRoleActive') }}
+                        </label>
+                        <span
+                            class="self-center rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600"
+                        >
+                            {{
+                                t('settings.platformRoleAssignments', {
+                                    count: role.users_count,
+                                })
+                            }}
+                        </span>
+                    </div>
+                    <fieldset class="mt-4">
+                        <legend class="text-xs font-bold text-slate-600">
+                            {{ t('settings.platformRoleCapabilities') }}
+                        </legend>
+                        <div class="mt-2 flex flex-wrap gap-3">
+                            <label
+                                v-for="capability in platformCapabilities"
+                                :key="capability"
+                                class="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700"
+                            >
+                                <input
+                                    type="checkbox"
+                                    :checked="
+                                        platformRoleForms[
+                                            role.id
+                                        ].capabilities.includes(capability)
+                                    "
+                                    @change="
+                                        togglePlatformCapability(
+                                            platformRoleForms[role.id],
+                                            capability,
+                                        )
+                                    "
+                                />
+                                {{ t(platformCapabilityLabels[capability]) }}
+                            </label>
+                        </div>
+                    </fieldset>
+                    <div class="mt-4 flex flex-wrap gap-2">
+                        <button
+                            type="button"
+                            class="erin-focus rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white"
+                            @click="updatePlatformRole(role.id)"
+                        >
+                            {{ t('settings.savePlatformRole') }}
+                        </button>
+                        <button
+                            type="button"
+                            :disabled="role.users_count > 0"
+                            class="erin-focus rounded-xl border border-red-200 px-3 py-2 text-xs font-bold text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+                            @click="deletePlatformRole(role.id)"
+                        >
+                            {{ t('settings.deletePlatformRole') }}
+                        </button>
+                    </div>
+                </article>
+                <p
+                    v-if="platform_roles.length === 0"
+                    class="rounded-xl border border-dashed border-slate-200 p-5 text-center text-sm text-slate-500"
+                >
+                    {{ t('settings.noPlatformRoles') }}
+                </p>
+            </div>
+        </SectionCard>
     </div>
 </template>

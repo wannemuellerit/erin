@@ -10,6 +10,7 @@ import PageHeader from '@/components/product/PageHeader.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import SearchField from '@/components/product/SearchField.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
+import { useCapabilities } from '@/composables/useCapabilities';
 import { useFormatters } from '@/composables/useFormatters';
 import { useLocalizedField } from '@/composables/useLocalizedField';
 import { useStatusLabels } from '@/composables/useStatusLabels';
@@ -40,6 +41,8 @@ const props = withDefaults(
     },
 );
 const { t, te } = useI18n();
+const { can } = useCapabilities();
+const canManageJobs = computed(() => can('jobs.manage'));
 const { formatDate } = useFormatters();
 const { localizedField } = useLocalizedField();
 const search = ref('');
@@ -119,7 +122,7 @@ const employmentTypeLabel = (value: unknown) => {
             :description="t('employer.jobs.description')"
             :icon="BriefcaseBusiness"
         >
-            <template #actions>
+            <template v-if="canManageJobs" #actions>
                 <Link
                     :href="create()"
                     class="inline-flex h-10 items-center gap-2 rounded-xl bg-[var(--erin-primary)] px-4 text-sm font-bold text-white hover:bg-[var(--erin-primary-hover)]"
@@ -168,7 +171,11 @@ const employmentTypeLabel = (value: unknown) => {
                 <template #cell-title="{ row }"
                     ><div>
                         <Link
-                            :href="edit(Number(row.id))"
+                            :href="
+                                canManageJobs
+                                    ? edit(Number(row.id))
+                                    : '/employer/jobs'
+                            "
                             class="font-bold text-slate-900 hover:text-[var(--erin-primary)]"
                             >{{ row.title }}</Link
                         >
@@ -193,7 +200,7 @@ const employmentTypeLabel = (value: unknown) => {
                         value
                     }}</span></template
                 >
-                <template #actions="{ row }">
+                <template v-if="canManageJobs" #actions="{ row }">
                     <div class="flex justify-end gap-2">
                         <Link
                             :href="edit(Number(row.id))"
