@@ -23,6 +23,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { SidebarTrigger } from '@/components/ui/sidebar';
+import { useFormatters } from '@/composables/useFormatters';
 import { useProductNavigation } from '@/composables/useProductNavigation';
 import { update as updateLocale } from '@/routes/locale';
 import {
@@ -68,6 +69,7 @@ withDefaults(
 
 const page = usePage();
 const { locale, t } = useI18n();
+const { formatDate } = useFormatters();
 const { role, roleLabel } = useProductNavigation();
 
 const impersonation = computed(
@@ -152,16 +154,15 @@ const notificationDetail = (notification: SharedNotification) => {
     return '';
 };
 
-const notificationDate = (createdAt?: string | null) => {
-    if (!createdAt) {
-        return '';
-    }
-
-    return new Intl.DateTimeFormat(locale.value, {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-    }).format(new Date(createdAt));
-};
+const notificationDate = (createdAt?: string | null) =>
+    formatDate(
+        createdAt,
+        {
+            dateStyle: 'medium',
+            timeStyle: 'short',
+        },
+        '',
+    );
 
 const openNotification = (notification: SharedNotification) => {
     const visitTarget = () => {

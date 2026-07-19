@@ -15,6 +15,7 @@ import FormField from '@/components/product/FormField.vue';
 import FileAttachmentPicker from '@/components/product/FileAttachmentPicker.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
 import Textarea from '@/components/product/Textarea.vue';
+import { useFormatters } from '@/composables/useFormatters';
 import type { StatusTone, SupportTicket, SupportTicketMessage } from '@/types';
 
 const props = withDefaults(
@@ -43,7 +44,8 @@ const props = withDefaults(
     },
 );
 
-const { locale, t } = useI18n();
+const { t } = useI18n();
+const { formatDate: formatLocalizedDate } = useFormatters();
 const messages = ref<SupportTicketMessage[]>([...props.ticket.messages]);
 const form = useForm({
     message: '',
@@ -90,10 +92,10 @@ const statusTone = computed<StatusTone>(() => {
 });
 
 const formatDate = (value: string) =>
-    new Intl.DateTimeFormat(locale.value, {
+    formatLocalizedDate(value, {
         dateStyle: 'medium',
         timeStyle: 'short',
-    }).format(new Date(value));
+    });
 
 const send = () => {
     form.post(props.replyUrl, {

@@ -15,6 +15,7 @@ import EmptyState from '@/components/product/EmptyState.vue';
 import PageHeader from '@/components/product/PageHeader.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
+import { useFormatters } from '@/composables/useFormatters';
 import { useStatusLabels } from '@/composables/useStatusLabels';
 import de from '@/i18n/messages/product-components-de';
 import en from '@/i18n/messages/product-components-en';
@@ -34,10 +35,11 @@ const props = withDefaults(defineProps<InterviewCenterProps>(), {
     timezone: 'Europe/Berlin',
 });
 
-const { locale, t } = useI18n({
+const { t } = useI18n({
     useScope: 'local',
     messages: { de, en },
 });
+const { formatDate: formatLocalizedDate } = useFormatters();
 
 const availabilityForm = useForm({
     slots: props.availability.map((slot) => ({
@@ -65,12 +67,14 @@ const person = (interview: Interview) =>
         : (interview.application?.candidate_profile?.user?.name ??
           t('interviewCenter.candidateFallback'));
 const formatDate = (value?: string | null) =>
-    value
-        ? new Intl.DateTimeFormat(locale.value, {
-              dateStyle: 'full',
-              timeStyle: 'short',
-          }).format(new Date(value))
-        : t('interviewCenter.dateOpen');
+    formatLocalizedDate(
+        value,
+        {
+            dateStyle: 'full',
+            timeStyle: 'short',
+        },
+        t('interviewCenter.dateOpen'),
+    );
 const accept = (interview: Interview, proposal: InterviewProposal) =>
     router.post(
         respond.url(interview.id),

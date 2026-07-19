@@ -14,6 +14,7 @@ use App\Models\Occupation;
 use App\Models\Skill;
 use App\Services\Audit\AuditLogger;
 use App\Services\Candidates\ProfileCompletenessCalculator;
+use App\Services\Documents\UploadPolicy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -77,13 +78,29 @@ class ProfileController extends Controller
     public function uploadPhoto(
         Request $request,
         AuditLogger $audit,
+        UploadPolicy $uploads,
     ): RedirectResponse {
         $profile = $request->user()?->candidateProfile()->firstOrFail();
         $validated = $request->validate([
-            'photo' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png', 'max:10240', 'dimensions:max_width=10000,max_height=10000'],
+            'photo' => [
+                'required',
+                'file',
+                'image',
+                'mimes:jpg,jpeg,png',
+                'max:'.$uploads->maxFileKilobytes(10240),
+                'dimensions:max_width=10000,max_height=10000',
+            ],
         ]);
         $photo = $request->file('photo');
         abort_if($photo === null, 422);
+        $user = $request->user();
+        abort_if($user === null, 401);
+        $uploads->assertCanStore(
+            $user,
+            $photo,
+            'photo',
+            (int) ($profile->profile_photo_size_bytes ?? 0),
+        );
         $path = $photo->store("candidates/{$profile->getKey()}/profile/quarantine", 'private');
         abort_if($path === false, 500, __('Das Profilbild konnte nicht privat gespeichert werden.'));
         $previousQuarantine = $profile->profile_photo_quarantine_path;
@@ -271,16 +288,25 @@ class ProfileController extends Controller
         Request $request,
         ProfileCompletenessCalculator $completeness,
         AuditLogger $audit,
+        UploadPolicy $uploads,
     ): RedirectResponse {
         $profile = $request->user()?->candidateProfile()->firstOrFail();
         $validated = $request->validate([
             'type' => ['required', Rule::enum(CandidateDocumentType::class)],
             'title' => ['required', 'string', 'max:180'],
-            'file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,doc,docx', 'max:15360'],
+            'file' => [
+                'required',
+                'file',
+                'mimes:pdf,jpg,jpeg,png,doc,docx',
+                'max:'.$uploads->maxFileKilobytes(15360),
+            ],
             'expires_at' => ['nullable', 'date', 'after:today'],
         ]);
         $file = $request->file('file');
         abort_if($file === null, 422);
+        $user = $request->user();
+        abort_if($user === null, 401);
+        $uploads->assertCanStore($user, $file);
         $path = $file->store("candidates/{$profile->getKey()}/documents", 'private');
         abort_if($path === false, 500, __('Das Dokument konnte nicht privat gespeichert werden.'));
         $realPath = $file->getRealPath();

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\AdCampaignController;
 use App\Http\Controllers\AiController;
 use App\Http\Controllers\Auth\AdminBootstrapController;
 use App\Http\Controllers\BillingController;
@@ -74,6 +75,15 @@ Route::middleware(['auth', 'verified', 'staff.2fa'])->group(function (): void {
         ->name('notifications.read-all');
     Route::post('notifications/{notification}/read', [AccountController::class, 'readNotification'])
         ->name('notifications.read');
+    Route::post('ads/{campaign}/impression', [AdCampaignController::class, 'impression'])
+        ->middleware('throttle:120,1')
+        ->name('ads.impression');
+    Route::post('ads/{campaign}/click', [AdCampaignController::class, 'click'])
+        ->middleware('throttle:120,1')
+        ->name('ads.click');
+    Route::get('ads/{campaign}/media', [AdCampaignController::class, 'media'])
+        ->middleware(['signed', 'throttle:120,1'])
+        ->name('ads.media');
 
     Route::get('messages', [CommunicationController::class, 'index'])->name('messages.index');
     Route::post('messages/applications/{application}', [CommunicationController::class, 'start'])

@@ -20,6 +20,7 @@ import PageHeader from '@/components/product/PageHeader.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
 import Textarea from '@/components/product/Textarea.vue';
+import { useFormatters } from '@/composables/useFormatters';
 import type { StatusTone } from '@/types';
 
 type Reminder = {
@@ -87,7 +88,8 @@ const props = withDefaults(
     },
 );
 
-const { locale, t, te } = useI18n();
+const { t, te } = useI18n();
+const { formatDate: formatLocalizedDate } = useFormatters();
 const activityItems = ref<ActivityEntry[]>([...props.activity]);
 const reminderForm = useForm({
     title: '',
@@ -189,10 +191,10 @@ const rowErrorText = (row: NonNullable<CandidateImport['rows']>[number]) =>
         .join(' ');
 
 const formatDate = (value: string) =>
-    new Intl.DateTimeFormat(locale.value, {
+    formatLocalizedDate(value, {
         dateStyle: 'medium',
         timeStyle: 'short',
-    }).format(new Date(value));
+    });
 
 const reminderTone = (reminder: Reminder): StatusTone =>
     reminder.completed_at

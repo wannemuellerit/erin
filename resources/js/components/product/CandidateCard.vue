@@ -13,6 +13,7 @@ import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import MatchScore from '@/components/product/MatchScore.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
+import { useFormatters } from '@/composables/useFormatters';
 import de from '@/i18n/messages/product-components-de';
 import en from '@/i18n/messages/product-components-en';
 
@@ -69,6 +70,7 @@ const { locale, t } = useI18n({
     useScope: 'local',
     messages: { de, en },
 });
+const { formatDate } = useFormatters();
 
 const reference = computed(
     () =>
@@ -129,15 +131,8 @@ const language = computed(() => {
           } ${first.level ?? ''}`.trim()
         : t('candidateCard.languageMissing');
 });
-const formatAvailabilityDate = (value: string) => {
-    const date = new Date(value);
-
-    return Number.isNaN(date.getTime())
-        ? value
-        : new Intl.DateTimeFormat(locale.value, {
-              dateStyle: 'medium',
-          }).format(date);
-};
+const formatAvailabilityDate = (value: string) =>
+    formatDate(value, { dateStyle: 'medium' });
 const available = computed(
     () =>
         props.candidate.available ??

@@ -2,8 +2,11 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\AdCampaign;
 use App\Services\Platform\PlatformSettings;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\URL;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -37,6 +40,7 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         $user = $request->user();
+        $settings = app(PlatformSettings::class);
 
         return [
             ...parent::share($request),
@@ -74,11 +78,12 @@ class HandleInertiaRequests extends Middleware
                     ])
                     ->all(),
             ] : ['unread_count' => 0, 'items' => []],
-            'theme' => fn (): array => app(PlatformSettings::class)->colors(),
+            'theme' => fn (): array => $settings->colors(),
             'platform' => fn (): array => [
                 'demo_mode' => (bool) config('app.demo_mode'),
                 'locale' => app()->getLocale(),
                 'supported_locales' => ['de', 'en'],
+                'dashboard_ad' => $user ? $this->dashboardAd($settings, $user->role->value, $user->locale) : null,
             ],
             'impersonation' => fn (): ?array => $request->session()->has('impersonation_session_id') ? [
                 'active' => true,
@@ -91,6 +96,54 @@ class HandleInertiaRequests extends Middleware
                 'warning' => fn () => $request->session()->get('warning'),
                 'error' => fn () => $request->session()->get('error'),
             ],
+        ];
+    }
+
+    /**
+     * @return array{id: int, title: string, body: string, cta_label: string, url: string|null, media_url: string|null}|null
+     */
+    private function dashboardAd(
+        PlatformSettings $settings,
+        string $role,
+        string $locale,
+    ): ?array {
+        $ad = array_replace(
+            PlatformSettings::DEFAULT_DASHBOARD_AD,
+            (array) $settings->getPublic('ads.dashboard', []),
+        );
+        $audience = (string) $ad['audience'];
+        $roleAudience = $role === 'candidate' ? 'candidate' : ($role === 'company' ? 'company' : null);
+        $startsAt = is_string($ad['starts_at']) && $ad['starts_at'] !== ''
+            ? Carbon::parse($ad['starts_at'])
+            : null;
+        $endsAt = is_string($ad['ends_at']) && $ad['ends_at'] !== ''
+            ? Carbon::parse($ad['ends_at'])
+            : null;
+
+        if (
+            ! $ad['enabled']
+            || $roleAudience === null
+            || ($audience !== 'all' && $audience !== $roleAudience)
+            || ($startsAt !== null && $startsAt->isFuture())
+            || ($endsAt !== null && $endsAt->isPast())
+        ) {
+            return null;
+        }
+
+        $language = $locale === 'en' ? 'en' : 'de';
+        $campaign = isset($ad['campaign_id'])
+            ? AdCampaign::query()->whereKey($ad['campaign_id'])->first()
+            : null;
+
+        return [
+            'id' => $campaign?->getKey() ?? 0,
+            'title' => (string) $ad['title_'.$language],
+            'body' => (string) $ad['body_'.$language],
+            'cta_label' => (string) $ad['cta_label_'.$language],
+            'url' => is_string($ad['url']) && $ad['url'] !== '' ? $ad['url'] : null,
+            'media_url' => $campaign?->media_path
+                ? URL::temporarySignedRoute('ads.media', now()->addMinutes(15), ['campaign' => $campaign])
+                : null,
         ];
     }
 }

@@ -215,5 +215,19 @@
     "Für diese E-Mail existiert bereits eine andere Rolle.": "A different role already exists for this email address.",
     "Prüfung und Freigabe müssen durch zwei verschiedene Superadmins erfolgen.": "Verification and approval must be performed by two different super administrators.",
     "Vor der weiteren Nutzung ist ein Passwortwechsel erforderlich.": "You must change your password before continuing.",
-    "Ändere jetzt dein Passwort erneut und richte anschließend Zwei-Faktor-Authentifizierung ein.": "Change your password again now, then set up two-factor authentication."
+    "Ändere jetzt dein Passwort erneut und richte anschließend Zwei-Faktor-Authentifizierung ein.": "Change your password again now, then set up two-factor authentication.",
+    "Aktive Anzeigen benötigen einen Titel in beiden Sprachen.": "Active advertisements require a title in both languages.",
+    "Aktive Anzeigen benötigen einen Text in beiden Sprachen.": "Active advertisements require text in both languages.",
+    "Dein Speicherlimit ist erreicht. Verwendet: :used MB, Limit: :limit MB.": "Your storage limit has been reached. Used: :used MB, limit: :limit MB.",
+    "Dein Speicherlimit ist erreicht. Verwendet: :used MB, reserviert: :reserved MB, Limit: :limit MB.": "Your storage limit has been reached. Used: :used MB, reserved: :reserved MB, limit: :limit MB.",
+    "Das Anzeigenmotiv wurde aktualisiert.": "The advertisement artwork has been updated.",
+    "Das Anzeigenmotiv wurde entfernt.": "The advertisement artwork has been removed.",
+    "Das persönliche Speicherlimit wurde aktualisiert.": "The individual storage limit has been updated.",
+    "Der Sicherheitsalarm wurde als geprüft markiert.": "The security alert has been marked as reviewed.",
+    "Du hast diese Person oder Firma für diese Bewerbung bereits bewertet.": "You have already reviewed this person or company for this application.",
+    "Dieses Feedback wurde bereits geprüft.": "This feedback has already been reviewed.",
+    "Das Feedback wurde geprüft.": "The feedback has been reviewed.",
+    "Moderationsfälle können nur Plattformmitarbeitenden zugewiesen werden.": "Moderation cases can only be assigned to platform staff.",
+    "Dieser Moderationsfall ist bereits abgeschlossen.": "This moderation case has already been closed.",
+    "Der Moderationsfall wurde aktualisiert.": "The moderation case has been updated."
 }

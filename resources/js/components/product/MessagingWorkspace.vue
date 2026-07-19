@@ -6,6 +6,7 @@ import { useI18n } from 'vue-i18n';
 import EmptyState from '@/components/product/EmptyState.vue';
 import FileAttachmentPicker from '@/components/product/FileAttachmentPicker.vue';
 import SearchField from '@/components/product/SearchField.vue';
+import { useFormatters } from '@/composables/useFormatters';
 import de from '@/i18n/messages/product-components-de';
 import en from '@/i18n/messages/product-components-en';
 import { index, read, send } from '@/routes/messages';
@@ -17,10 +18,11 @@ const props = withDefaults(defineProps<MessagingWorkspaceProps>(), {
     selected: null,
 });
 
-const { locale, t } = useI18n({
+const { t } = useI18n({
     useScope: 'local',
     messages: { de, en },
 });
+const { formatDate: formatLocalizedDate } = useFormatters();
 
 const page = usePage();
 const currentUserId = computed(() => page.props.auth?.user?.id);
@@ -59,13 +61,9 @@ const name = (conversation: Conversation) =>
     conversation.title ||
     t('messagingWorkspace.conversationFallback');
 const formatDate = (value: string) =>
-    new Intl.DateTimeFormat(locale.value, {
-        dateStyle: 'short',
-    }).format(new Date(value));
+    formatLocalizedDate(value, { dateStyle: 'short' });
 const formatTime = (value: string) =>
-    new Intl.DateTimeFormat(locale.value, {
-        timeStyle: 'short',
-    }).format(new Date(value));
+    formatLocalizedDate(value, { timeStyle: 'short' });
 const messageForm = useForm({
     body: '',
     type: 'text',

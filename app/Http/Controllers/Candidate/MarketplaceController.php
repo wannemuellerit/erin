@@ -247,10 +247,11 @@ class MarketplaceController extends Controller
         Referral::query()
             ->where('referred_user_id', $request->user()?->getKey())
             ->where('status', ReferralStatus::Registered)
-            ->update([
+            ->get()
+            ->each(fn (Referral $referral): bool => $referral->update([
                 'application_id' => $application->getKey(),
                 'status' => ReferralStatus::Applied,
-            ]);
+            ]));
 
         return redirect()->route('candidate.applications')->with('success', __('Deine Bewerbung wurde gesendet.'));
     }
