@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\DocumentController;
 use App\Http\Controllers\Admin\EmailTemplateController;
 use App\Http\Controllers\Admin\FeatureFlagController;
 use App\Http\Controllers\Admin\GdprRequestController;
+use App\Http\Controllers\Admin\ModerationController;
 use App\Http\Controllers\Admin\ReferralController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\SupportController;
@@ -26,9 +27,6 @@ Route::middleware(['auth', 'verified', 'role:super_admin,support', 'staff.2fa'])
         Route::get('/', DashboardController::class)->name('dashboard');
         Route::get('users', [UserController::class, 'index'])->name('users.index');
         Route::get('companies', [CompanyController::class, 'index'])->name('companies.index');
-        Route::get('documents', [DocumentController::class, 'index'])->name('documents.index');
-        Route::patch('documents/{document}/review', [DocumentController::class, 'review'])
-            ->name('documents.review');
         Route::get('visa', [VisaController::class, 'index'])->name('visa.index');
         Route::get('support', [SupportController::class, 'index'])->name('support.index');
         Route::patch('support/{ticket}', [SupportController::class, 'update'])
@@ -44,10 +42,20 @@ Route::middleware(['auth', 'verified', 'role:super_admin,support', 'staff.2fa'])
         Route::get('system', [SystemController::class, 'index'])->name('system.index');
 
         Route::middleware('role:super_admin')->group(function (): void {
+            Route::get('audit/export', [AuditController::class, 'export'])
+                ->middleware('throttle:5,1')
+                ->name('audit.export');
+            Route::patch('audit/alerts/{alert}/resolve', [AuditController::class, 'resolve'])
+                ->name('audit.alerts.resolve');
+            Route::get('documents', [DocumentController::class, 'index'])->name('documents.index');
+            Route::patch('documents/{document}/review', [DocumentController::class, 'review'])
+                ->name('documents.review');
             Route::patch('users/{user}/status', [UserController::class, 'updateStatus'])
                 ->name('users.status.update');
             Route::patch('users/{user}/role', [UserController::class, 'updateRole'])
                 ->name('users.role.update');
+            Route::patch('users/{user}/storage-quota', [UserController::class, 'updateStorageQuota'])
+                ->name('users.storage-quota.update');
             Route::patch('companies/{company}/status', [CompanyController::class, 'updateStatus'])
                 ->name('companies.status.update');
             Route::patch('billing/plans/{plan}', [BillingController::class, 'updatePlan'])
@@ -58,10 +66,18 @@ Route::middleware(['auth', 'verified', 'role:super_admin,support', 'staff.2fa'])
             )->name('billing.manual-reviews.resolve');
             Route::patch('referrals/{referral}', [ReferralController::class, 'update'])
                 ->name('referrals.update');
+            Route::patch('moderation/feedback/{feedback}', [ModerationController::class, 'reviewFeedback'])
+                ->name('moderation.feedback.review');
+            Route::patch('moderation/cases/{case}', [ModerationController::class, 'updateCase'])
+                ->name('moderation.cases.update');
             Route::patch('settings/theme', [SettingController::class, 'updateTheme'])
                 ->name('settings.theme.update');
             Route::patch('settings/platform', [SettingController::class, 'update'])
                 ->name('settings.platform.update');
+            Route::post('settings/ads/{campaign}/media', [SettingController::class, 'uploadAdMedia'])
+                ->name('settings.ads.media.store');
+            Route::delete('settings/ads/{campaign}/media', [SettingController::class, 'deleteAdMedia'])
+                ->name('settings.ads.media.destroy');
             Route::post('system/feature-flags', [FeatureFlagController::class, 'store'])
                 ->name('feature-flags.store');
             Route::patch('system/feature-flags/{featureFlag}', [FeatureFlagController::class, 'update'])

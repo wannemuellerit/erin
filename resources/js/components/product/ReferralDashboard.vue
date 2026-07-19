@@ -21,6 +21,7 @@ import PageHeader from '@/components/product/PageHeader.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
 import Textarea from '@/components/product/Textarea.vue';
+import { useFormatters } from '@/composables/useFormatters';
 import { useStatusLabels } from '@/composables/useStatusLabels';
 import de from '@/i18n/messages/product-components-de';
 import en from '@/i18n/messages/product-components-en';
@@ -41,10 +42,11 @@ const props = withDefaults(defineProps<ReferralDashboardProps>(), {
     referrals: () => [],
 });
 
-const { locale, t } = useI18n({
+const { t } = useI18n({
     useScope: 'local',
     messages: { de, en },
 });
+const { formatCurrency, formatDate: formatLocalizedDate } = useFormatters();
 
 const copied = ref(false);
 const showEmailForm = ref(false);
@@ -54,14 +56,9 @@ const emailForm = useForm({
 });
 
 const money = (amount: number, currency = 'EUR') =>
-    new Intl.NumberFormat(locale.value, {
-        style: 'currency',
-        currency,
-    }).format(amount / 100);
+    formatCurrency(amount / 100, currency);
 const formatDate = (value: string) =>
-    new Intl.DateTimeFormat(locale.value, {
-        dateStyle: 'medium',
-    }).format(new Date(value));
+    formatLocalizedDate(value, { dateStyle: 'medium' });
 const { statusLabel: translatedStatusLabel } = useStatusLabels();
 const statusLabel = (status: string) =>
     translatedStatusLabel('referral', status);

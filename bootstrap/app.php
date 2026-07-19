@@ -11,6 +11,7 @@ use App\Http\Middleware\EnsureStaffTwoFactor;
 use App\Http\Middleware\EnsureSubscribedCompany;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\RecordUserActivity;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\TrackLastActivity;
 use Illuminate\Foundation\Application;
@@ -54,6 +55,7 @@ return Application::configure(basePath: dirname(__DIR__))
             EnsurePasswordChangeCompleted::class,
             BlockSupportWrites::class,
             TrackLastActivity::class,
+            RecordUserActivity::class,
             AddLinkHeadersForPreloadedAssets::class,
         ]);
 

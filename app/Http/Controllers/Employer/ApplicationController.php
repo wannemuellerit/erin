@@ -148,12 +148,13 @@ class ApplicationController extends Controller
                     Referral::query()
                         ->where('referred_user_id', $lockedApplication->candidateProfile->user_id)
                         ->whereIn('status', [ReferralStatus::Applied, ReferralStatus::Registered])
-                        ->update([
+                        ->get()
+                        ->each(fn (Referral $referral): bool => $referral->update([
                             'application_id' => $lockedApplication->getKey(),
                             'status' => ReferralStatus::Holding,
                             'hired_at' => now(),
                             'hold_until' => now()->addDays(30),
-                        ]);
+                        ]));
                 }
             });
         } catch (DomainException $exception) {

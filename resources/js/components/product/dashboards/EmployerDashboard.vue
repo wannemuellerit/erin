@@ -10,6 +10,7 @@ import {
 import { useI18n } from 'vue-i18n';
 import MetricCard from '@/components/product/MetricCard.vue';
 import PageHeader from '@/components/product/PageHeader.vue';
+import PlatformAd from '@/components/product/PlatformAd.vue';
 import ProgressBar from '@/components/product/ProgressBar.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
@@ -91,6 +92,7 @@ const { t } = useI18n();
                 >
             </template>
         </PageHeader>
+        <PlatformAd />
         <div
             v-if="dashboard?.requires_company"
             class="erin-panel p-8 text-center"

@@ -304,11 +304,6 @@ export function useProductNavigation() {
                     href: '/admin/companies',
                     icon: Building2,
                 },
-                {
-                    label: t('nav.documents'),
-                    href: '/admin/documents',
-                    icon: FileCheck2,
-                },
             ],
         },
         {

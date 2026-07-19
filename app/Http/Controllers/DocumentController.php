@@ -3,10 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Enums\CandidateDocumentStatus;
-use App\Enums\UserRole;
 use App\Models\CandidateDocument;
 use App\Models\JobApplication;
 use App\Services\Audit\AuditLogger;
+use App\Services\Documents\CandidateDocumentAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -56,32 +56,19 @@ class DocumentController extends Controller
         Request $request,
         CandidateDocument $document,
         AuditLogger $audit,
+        CandidateDocumentAccess $access,
     ): StreamedResponse {
         $user = $request->user();
         abort_if($user === null, 401);
         abort_if($document->scan_result !== 'clean', 423, __('Das Dokument ist noch nicht sicherheitsgeprüft.'));
-        $ownsDocument = $document->candidateProfile->user_id === $user->getKey();
-        $platformAccess = $user->isPlatformStaff();
-        $companyAccess = false;
-        $companyId = null;
-
-        if ($user->role === UserRole::Company) {
-            $companyIds = $user->companies()->pluck('companies.id');
-            $grant = DB::table('document_access_grants')
-                ->where('candidate_document_id', $document->getKey())
-                ->whereIn('company_id', $companyIds)
-                ->whereNull('revoked_at')
-                ->where('expires_at', '>', now())
-                ->first();
-            $companyAccess = $grant !== null;
-            $companyId = $grant?->company_id;
-        }
-
-        abort_unless($ownsDocument || $platformAccess || $companyAccess, 403);
+        abort_unless($access->canDownload($user, $document), 403);
         abort_unless(Storage::disk($document->disk)->exists($document->path), 404);
+        $ownsDocument = $document->candidateProfile->user_id === $user->getKey();
+        $companyId = $access->grantedCompanyId($user, $document);
         $audit->record('candidate.document_downloaded', $document, metadata: [
             'owner_access' => $ownsDocument,
-            'platform_access' => $platformAccess,
+            'superadmin_access' => $user->isSuperAdmin(),
+            'grant_company_id' => $companyId,
         ], companyId: $companyId);
 
         return Storage::disk($document->disk)->download($document->path, $document->original_name);

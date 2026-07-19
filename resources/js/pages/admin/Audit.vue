@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
 import { Search, ScrollText, X } from '@lucide/vue';
-import { reactive } from 'vue';
+import { computed, reactive } from 'vue';
 import EmptyState from '@/components/product/EmptyState.vue';
 import PageHeader from '@/components/product/PageHeader.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
@@ -46,10 +46,22 @@ type AuditFilters = {
     until?: string;
 };
 
+type SecurityAlert = {
+    id: number;
+    type: string;
+    severity: string;
+    occurrences: number;
+    details: Record<string, unknown> | null;
+    last_detected_at: string;
+    user: { id: number; name: string; email: string } | null;
+};
+
 const props = defineProps<{
     logs: AdminPaginator<AuditLogRow>;
     filters: AuditFilters;
     events: string[];
+    security_alerts: SecurityAlert[];
+    can_manage_audit: boolean;
 }>();
 
 const filters = reactive({
@@ -62,6 +74,13 @@ const filters = reactive({
 });
 
 const { t, formatDate, humanize } = useAdminI18n();
+const exportUrl = computed(() => {
+    const params = new URLSearchParams(
+        cleanFilters(filters) as Record<string, string>,
+    );
+
+    return `${adminAudit.export.url()}?${params.toString()}`;
+});
 
 function applyFilters(): void {
     router.get(adminAudit.index.url(), cleanFilters(filters), {
@@ -85,6 +104,14 @@ function targetLabel(log: AuditLogRow): string {
 function hasDetails(log: AuditLogRow): boolean {
     return Boolean(log.before_values || log.after_values || log.metadata);
 }
+
+function resolveAlert(id: number): void {
+    router.patch(
+        adminAudit.alerts.resolve.url(id),
+        {},
+        { preserveScroll: true },
+    );
+}
 </script>
 
 <template>
@@ -97,6 +124,53 @@ function hasDetails(log: AuditLogRow): boolean {
             :description="t('audit.description', { count: logs.total })"
             :icon="ScrollText"
         />
+
+        <SectionCard
+            v-if="security_alerts.length > 0"
+            :title="t('audit.alertsTitle')"
+            :description="t('audit.alertsDescription')"
+        >
+            <div class="divide-y divide-slate-100">
+                <div
+                    v-for="alert in security_alerts"
+                    :key="alert.id"
+                    class="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                    <div>
+                        <p class="text-sm font-bold text-slate-900">
+                            {{ humanize(alert.type) }}
+                        </p>
+                        <p class="mt-1 text-xs text-slate-500">
+                            {{ alert.user?.name ?? t('audit.unknownUser') }} ·
+                            {{
+                                t('audit.detections', {
+                                    count: alert.occurrences,
+                                })
+                            }}
+                            ·
+                            {{ formatDate(alert.last_detected_at) }}
+                        </p>
+                    </div>
+                    <button
+                        v-if="can_manage_audit"
+                        type="button"
+                        class="erin-focus rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700"
+                        @click="resolveAlert(alert.id)"
+                    >
+                        {{ t('audit.resolveAlert') }}
+                    </button>
+                </div>
+            </div>
+        </SectionCard>
+
+        <div v-if="can_manage_audit" class="flex justify-end">
+            <a
+                :href="exportUrl"
+                class="erin-focus rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white"
+            >
+                {{ t('audit.exportCsv') }}
+            </a>
+        </div>
 
         <SectionCard flush>
             <form

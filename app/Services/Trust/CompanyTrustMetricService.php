@@ -4,6 +4,7 @@ namespace App\Services\Trust;
 
 use App\Enums\ApplicationStatus;
 use App\Enums\InterviewStatus;
+use App\Models\AuditLog;
 use App\Models\Company;
 use App\Models\CompanyTrustMetric;
 use App\Models\Feedback;
@@ -17,6 +18,13 @@ final class CompanyTrustMetricService
 
     public function recalculate(Company $company): CompanyTrustMetric
     {
+        $previous = $company->trustMetric()->first()?->only([
+            'response_rate',
+            'interview_attendance_rate',
+            'contract_compliance_rate',
+            'cases_count',
+            'is_top_company',
+        ]) ?? [];
         $applications = JobApplication::query()
             ->whereHas('jobPosting', fn ($query) => $query->where('company_id', $company->getKey()))
             ->with(['interviews', 'statusHistory'])
@@ -29,7 +37,7 @@ final class CompanyTrustMetricService
 
         $feedbacks = Feedback::query()
             ->where('subject_company_id', $company->getKey())
-            ->where('status', '!=', 'rejected')
+            ->where('status', 'approved')
             ->orderBy('id')
             ->get();
 
@@ -105,7 +113,25 @@ final class CompanyTrustMetricService
 
         $this->recalculateTopCompanies();
 
-        return $metric->refresh();
+        $metric->refresh();
+        AuditLog::query()->create([
+            'company_id' => $company->getKey(),
+            'event' => 'company.trust.recalculated',
+            'auditable_type' => $company->getMorphClass(),
+            'auditable_id' => $company->getKey(),
+            'before_values' => $previous ?: null,
+            'after_values' => $metric->only([
+                'response_rate',
+                'interview_attendance_rate',
+                'contract_compliance_rate',
+                'cases_count',
+                'is_top_company',
+            ]),
+            'metadata' => ['calculator_version' => 1],
+            'created_at' => now(),
+        ]);
+
+        return $metric;
     }
 
     public function recalculateTopCompanies(): void

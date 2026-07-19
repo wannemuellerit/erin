@@ -104,6 +104,28 @@ class SupportController extends AdminController
             'moderation' => [
                 'open_cases' => ModerationCase::query()->where('status', 'open')->count(),
                 'pending_feedback' => Feedback::query()->where('status', 'pending')->count(),
+                'cases' => ModerationCase::query()
+                    ->whereIn('status', ['open', 'in_review', 'escalated'])
+                    ->with([
+                        'subjectUser:id,name,email,status',
+                        'subjectCompany:id,name,status',
+                        'assignee:id,name,email',
+                    ])
+                    ->latest()
+                    ->limit(20)
+                    ->get(),
+                'feedback' => Feedback::query()
+                    ->where('status', 'pending')
+                    ->with([
+                        'author:id,name,email',
+                        'subjectUser:id,name,email,status',
+                        'subjectCompany:id,name,status',
+                        'application:id,job_posting_id',
+                        'application.jobPosting:id,title',
+                    ])
+                    ->latest()
+                    ->limit(20)
+                    ->get(),
             ],
             'attachmentLimits' => $attachmentLimits->forFrontend(),
         ]);

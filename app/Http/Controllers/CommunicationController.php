@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Notifications\ActivityNotification;
 use App\Services\Audit\AuditLogger;
 use App\Services\Companies\CurrentCompany;
+use App\Services\Documents\UploadPolicy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -95,8 +96,11 @@ class CommunicationController extends Controller
         return redirect()->route('messages.index', ['conversation' => $conversation->getKey()]);
     }
 
-    public function send(Request $request, Conversation $conversation): RedirectResponse
-    {
+    public function send(
+        Request $request,
+        Conversation $conversation,
+        UploadPolicy $uploads,
+    ): RedirectResponse {
         $user = $request->user();
         abort_if($user === null, 401);
         abort_unless($conversation->participants()->where('users.id', $user->getKey())->exists(), 403);
@@ -118,8 +122,16 @@ class CommunicationController extends Controller
             'type' => ['nullable', 'in:text,voice'],
             'reply_to_id' => ['nullable', 'integer'],
             'attachments' => ['array', 'max:8', 'required_without:body'],
-            'attachments.*' => ['file', 'mimes:jpg,jpeg,png,gif,pdf,doc,docx,mp3,m4a,ogg,wav,webm', 'max:20480'],
+            'attachments.*' => [
+                'file',
+                'mimes:jpg,jpeg,png,gif,pdf,doc,docx,mp3,m4a,ogg,wav,webm',
+                'max:'.$uploads->maxFileKilobytes(20480),
+            ],
         ]);
+        $files = $request->file('attachments', []);
+        if (is_array($files) && $files !== []) {
+            $uploads->assertCanStore($user, array_values($files), 'attachments');
+        }
 
         $message = DB::transaction(function () use ($request, $conversation, $user, $validated): Message {
             if (isset($validated['reply_to_id'])) {
