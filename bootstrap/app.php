@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\AttachCorrelationId;
 use App\Http\Middleware\BlockSupportWrites;
+use App\Http\Middleware\EnsureCapability;
 use App\Http\Middleware\EnsureCompanyMember;
 use App\Http\Middleware\EnsureOnboardingComplete;
 use App\Http\Middleware\EnsurePasswordChangeCompleted;
@@ -62,6 +63,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => EnsureRole::class,
             'company.member' => EnsureCompanyMember::class,
+            'capability' => EnsureCapability::class,
             'company.subscribed' => EnsureSubscribedCompany::class,
             'onboarding.complete' => EnsureOnboardingComplete::class,
             'staff.2fa' => EnsureStaffTwoFactor::class,

@@ -18,6 +18,7 @@ import PageHeader from '@/components/product/PageHeader.vue';
 import ProgressBar from '@/components/product/ProgressBar.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
+import { useCapabilities } from '@/composables/useCapabilities';
 import { update } from '@/routes/employer/company';
 import type { StatusTone } from '@/types';
 
@@ -70,6 +71,8 @@ const props = withDefaults(
 );
 
 const { t, te } = useI18n();
+const { can } = useCapabilities();
+const canManageCompany = computed(() => can('company.manage'));
 const benefitLabel = (benefit: string) =>
     te(`employer.companyProfile.benefits.${benefit}`)
         ? t(`employer.companyProfile.benefits.${benefit}`)
@@ -184,7 +187,7 @@ const submit = () => {
             :description="t('employer.companyProfile.description')"
             :icon="Building2"
         >
-            <template #actions>
+            <template v-if="canManageCompany" #actions>
                 <button
                     type="button"
                     :disabled="form.processing || !company"
@@ -214,7 +217,10 @@ const submit = () => {
 
         <form
             v-else
+            :inert="!canManageCompany"
+            :aria-disabled="!canManageCompany"
             class="grid gap-6 xl:grid-cols-[1fr_20rem]"
+            :class="{ 'opacity-80': !canManageCompany }"
             @submit.prevent="submit"
         >
             <div class="space-y-6">
@@ -668,6 +674,7 @@ const submit = () => {
                     </div>
                 </SectionCard>
                 <button
+                    v-if="canManageCompany"
                     type="submit"
                     :disabled="form.processing"
                     class="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[var(--erin-primary)] text-sm font-bold text-white disabled:opacity-50"

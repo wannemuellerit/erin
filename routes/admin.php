@@ -10,8 +10,10 @@ use App\Http\Controllers\Admin\EmailTemplateController;
 use App\Http\Controllers\Admin\FeatureFlagController;
 use App\Http\Controllers\Admin\GdprRequestController;
 use App\Http\Controllers\Admin\ModerationController;
+use App\Http\Controllers\Admin\PlatformRoleController;
 use App\Http\Controllers\Admin\ReferralController;
 use App\Http\Controllers\Admin\SettingController;
+use App\Http\Controllers\Admin\SkillTaxonomyController;
 use App\Http\Controllers\Admin\SupportController;
 use App\Http\Controllers\Admin\SystemController;
 use App\Http\Controllers\Admin\UserController;
@@ -24,24 +26,29 @@ Route::middleware(['auth', 'verified', 'role:super_admin,support', 'staff.2fa'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function (): void {
-        Route::get('/', DashboardController::class)->name('dashboard');
-        Route::get('users', [UserController::class, 'index'])->name('users.index');
-        Route::get('companies', [CompanyController::class, 'index'])->name('companies.index');
-        Route::get('visa', [VisaController::class, 'index'])->name('visa.index');
-        Route::get('support', [SupportController::class, 'index'])->name('support.index');
-        Route::patch('support/{ticket}', [SupportController::class, 'update'])
-            ->name('support.update');
-        Route::post('support/{ticket}/replies', [SupportController::class, 'reply'])
-            ->name('support.reply');
-        Route::post('support/impersonate/{user}', [ImpersonationController::class, 'start'])
-            ->name('support.impersonation.start');
-        Route::get('billing', [BillingController::class, 'index'])->name('billing.index');
-        Route::get('referrals', [ReferralController::class, 'index'])->name('referrals.index');
-        Route::get('audit', [AuditController::class, 'index'])->name('audit.index');
-        Route::get('settings', [SettingController::class, 'index'])->name('settings.index');
-        Route::get('system', [SystemController::class, 'index'])->name('system.index');
+        Route::middleware('capability:platform.view')->group(function (): void {
+            Route::get('/', DashboardController::class)->name('dashboard');
+            Route::get('users', [UserController::class, 'index'])->name('users.index');
+            Route::get('companies', [CompanyController::class, 'index'])->name('companies.index');
+            Route::get('visa', [VisaController::class, 'index'])->name('visa.index');
+            Route::get('support', [SupportController::class, 'index'])->name('support.index');
+            Route::patch('support/{ticket}', [SupportController::class, 'update'])
+                ->middleware('capability:platform.support.manage')
+                ->name('support.update');
+            Route::post('support/{ticket}/replies', [SupportController::class, 'reply'])
+                ->middleware('capability:platform.support.manage')
+                ->name('support.reply');
+            Route::post('support/impersonate/{user}', [ImpersonationController::class, 'start'])
+                ->middleware('capability:platform.support.manage')
+                ->name('support.impersonation.start');
+            Route::get('billing', [BillingController::class, 'index'])->name('billing.index');
+            Route::get('referrals', [ReferralController::class, 'index'])->name('referrals.index');
+            Route::get('audit', [AuditController::class, 'index'])->name('audit.index');
+            Route::get('settings', [SettingController::class, 'index'])->name('settings.index');
+            Route::get('system', [SystemController::class, 'index'])->name('system.index');
+        });
 
-        Route::middleware('role:super_admin')->group(function (): void {
+        Route::middleware(['role:super_admin', 'capability:platform.manage'])->group(function (): void {
             Route::get('audit/export', [AuditController::class, 'export'])
                 ->middleware('throttle:5,1')
                 ->name('audit.export');
@@ -54,6 +61,8 @@ Route::middleware(['auth', 'verified', 'role:super_admin,support', 'staff.2fa'])
                 ->name('users.status.update');
             Route::patch('users/{user}/role', [UserController::class, 'updateRole'])
                 ->name('users.role.update');
+            Route::patch('users/{user}/platform-role', [UserController::class, 'updatePlatformRole'])
+                ->name('users.platform-role.update');
             Route::patch('users/{user}/storage-quota', [UserController::class, 'updateStorageQuota'])
                 ->name('users.storage-quota.update');
             Route::patch('companies/{company}/status', [CompanyController::class, 'updateStatus'])
@@ -74,6 +83,18 @@ Route::middleware(['auth', 'verified', 'role:super_admin,support', 'staff.2fa'])
                 ->name('settings.theme.update');
             Route::patch('settings/platform', [SettingController::class, 'update'])
                 ->name('settings.platform.update');
+            Route::post('settings/skills', [SkillTaxonomyController::class, 'store'])
+                ->name('settings.skills.store');
+            Route::patch('settings/skills/{skill}', [SkillTaxonomyController::class, 'update'])
+                ->name('settings.skills.update');
+            Route::delete('settings/skills/{skill}', [SkillTaxonomyController::class, 'destroy'])
+                ->name('settings.skills.destroy');
+            Route::post('settings/platform-roles', [PlatformRoleController::class, 'store'])
+                ->name('settings.platform-roles.store');
+            Route::patch('settings/platform-roles/{platformRole}', [PlatformRoleController::class, 'update'])
+                ->name('settings.platform-roles.update');
+            Route::delete('settings/platform-roles/{platformRole}', [PlatformRoleController::class, 'destroy'])
+                ->name('settings.platform-roles.destroy');
             Route::post('settings/ads/{campaign}/media', [SettingController::class, 'uploadAdMedia'])
                 ->name('settings.ads.media.store');
             Route::delete('settings/ads/{campaign}/media', [SettingController::class, 'deleteAdMedia'])

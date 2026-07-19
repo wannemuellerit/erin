@@ -4,6 +4,8 @@ namespace App\Services\Matching;
 
 final class MatchScoreCalculator
 {
+    public const VERSION = '1.0';
+
     /**
      * @var array<string, int>
      */
@@ -21,7 +23,7 @@ final class MatchScoreCalculator
 
     /**
      * @param  array<string, float|int>  $factors  Values between 0 and 1.
-     * @return array{score: int, factors: array<string, array{score: int, weight: int, contribution: float}>}
+     * @return array{version: string, score: int, factors: array<string, array{score: int, weight: int, contribution: float}>}
      */
     public function calculate(array $factors): array
     {
@@ -40,6 +42,7 @@ final class MatchScoreCalculator
         }
 
         return [
+            'version' => self::VERSION,
             'score' => (int) round($total),
             'factors' => $breakdown,
         ];

@@ -10,6 +10,7 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -36,12 +37,13 @@ use NotificationChannels\WebPush\HasPushSubscriptions;
  * @property Carbon|null $last_active_at
  * @property Carbon|null $suspended_at
  * @property Carbon|null $onboarding_completed_at
+ * @property array<string, mixed>|null $onboarding_data
  * @property Carbon|null $password_change_required_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read CandidateProfile|null $candidateProfile
  */
-#[Fillable(['name', 'email', 'password', 'role', 'status', 'locale', 'timezone', 'onboarding_completed_at', 'password_change_required_at', 'storage_quota_bytes'])]
+#[Fillable(['name', 'email', 'password', 'role', 'platform_role_id', 'status', 'locale', 'timezone', 'onboarding_completed_at', 'onboarding_step', 'onboarding_data', 'password_change_required_at', 'storage_quota_bytes'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 {
@@ -144,6 +146,14 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
         return $this->role === UserRole::SuperAdmin;
     }
 
+    /**
+     * @return BelongsTo<PlatformRole, $this>
+     */
+    public function platformRole(): BelongsTo
+    {
+        return $this->belongsTo(PlatformRole::class);
+    }
+
     public function isSupport(): bool
     {
         return $this->role === UserRole::Support;
@@ -196,6 +206,8 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
             'last_active_at' => 'datetime',
             'suspended_at' => 'datetime',
             'onboarding_completed_at' => 'datetime',
+            'onboarding_step' => 'integer',
+            'onboarding_data' => 'array',
             'password_change_required_at' => 'datetime',
             'storage_quota_bytes' => 'integer',
             /* @chisel-2fa */

@@ -2,11 +2,12 @@
 
 namespace App\Policies;
 
-use App\Enums\CompanyMemberRole;
+use App\Enums\Capability;
 use App\Enums\JobStatus;
 use App\Models\Company;
 use App\Models\JobPosting;
 use App\Models\User;
+use App\Services\Authorization\CapabilityResolver;
 
 class JobPostingPolicy
 {
@@ -25,11 +26,7 @@ class JobPostingPolicy
     public function create(User $user, Company $company): bool
     {
         return $user->isSuperAdmin()
-            || $user->hasCompanyRole($company, [
-                CompanyMemberRole::Owner,
-                CompanyMemberRole::Admin,
-                CompanyMemberRole::Recruiter,
-            ]);
+            || app(CapabilityResolver::class)->allows($user, Capability::JobsManage, $company);
     }
 
     public function update(User $user, JobPosting $jobPosting): bool
@@ -40,9 +37,10 @@ class JobPostingPolicy
     public function delete(User $user, JobPosting $jobPosting): bool
     {
         return $user->isSuperAdmin()
-            || $user->hasCompanyRole($jobPosting->company, [
-                CompanyMemberRole::Owner,
-                CompanyMemberRole::Admin,
-            ]);
+            || app(CapabilityResolver::class)->allows(
+                $user,
+                Capability::CompanyManage,
+                $jobPosting->company,
+            );
     }
 }

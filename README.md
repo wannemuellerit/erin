@@ -76,7 +76,8 @@ and the seeder are disabled in production.
 ## Isolated tools
 
 Pest uses the separate `erin_testing` MySQL database. Tool containers run only
-when requested:
+when requested. The Pest container verifies this dedicated environment and
+recreates only `erin_testing` before a complete run:
 
 ```bash
 docker compose run --rm pest

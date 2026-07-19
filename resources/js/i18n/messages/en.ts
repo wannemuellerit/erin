@@ -351,6 +351,51 @@ export default {
         metaTitle: 'Set up account',
         eyebrow: 'Welcome to Erin',
         progress: 'Setup',
+        wizard: {
+            resumable:
+                'Every step is saved securely. You can sign out and continue from the same point later.',
+            progress: 'Step {current} of {total}',
+            contact: 'Personal and contact details',
+            profession: 'Profession and desired position',
+            history: 'Experience and education',
+            skills: 'Skills and languages',
+            uploads: 'Picture and documents',
+            finish: 'Review and publish',
+            plan: 'Plan',
+            companyData: 'Company and billing details',
+            saveContinue: 'Save and continue',
+            back: 'Back',
+            remove: 'Remove',
+            months: 'months',
+            uploadNotice:
+                'Profile pictures and documents are stored privately and scanned for malware before use. Uploads are optional and can be completed later.',
+            profilePhoto: 'Private profile picture',
+            uploadPhoto: 'Upload profile picture securely',
+            uploadAcknowledge:
+                'I understand that documents require separate access approval and are not publicly accessible.',
+            publishNotice:
+                'You explicitly decide whether your anonymised profile appears in the talent marketplace now. Your name, picture, city, and contact details remain hidden.',
+            publishNow:
+                'Publish my anonymised profile now if it is at least {percentage}% complete.',
+            fields: {
+                first_name: 'First name',
+                last_name: 'Last name',
+                current_country_code: 'Current country (ISO)',
+                current_city: 'Current city',
+                phone: 'Phone number',
+                whatsapp: 'WhatsApp',
+                current_position: 'Current position',
+                legal_name: 'Legal company name',
+                email: 'Billing email',
+                website: 'Website',
+                industry: 'Industry',
+                employee_count: 'Employees',
+                country_code: 'Country (ISO)',
+                city: 'City',
+                postal_code: 'Postcode',
+                address_line1: 'Street address',
+            },
+        },
         steps: {
             account: {
                 label: '1 · Account',

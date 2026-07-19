@@ -354,6 +354,51 @@ export default {
         metaTitle: 'Konto einrichten',
         eyebrow: 'Willkommen bei Erin',
         progress: 'Einrichtung',
+        wizard: {
+            resumable:
+                'Jeder Schritt wird sicher gespeichert. Du kannst dich abmelden und später an derselben Stelle fortfahren.',
+            progress: 'Schritt {current} von {total}',
+            contact: 'Stammdaten & Kontakt',
+            profession: 'Beruf & Wunschposition',
+            history: 'Erfahrung & Ausbildung',
+            skills: 'Skills & Sprachen',
+            uploads: 'Bild & Dokumente',
+            finish: 'Prüfen & Veröffentlichen',
+            plan: 'Paket',
+            companyData: 'Firmen- & Rechnungsdaten',
+            saveContinue: 'Speichern und weiter',
+            back: 'Zurück',
+            remove: 'Entfernen',
+            months: 'Monate',
+            uploadNotice:
+                'Profilbild und Dokumente werden ausschließlich privat gespeichert und vor ihrer Verwendung auf Schadsoftware geprüft. Die Uploads sind freiwillig und können später ergänzt werden.',
+            profilePhoto: 'Privates Profilbild',
+            uploadPhoto: 'Profilbild sicher hochladen',
+            uploadAcknowledge:
+                'Ich habe verstanden, dass Dokumente separat freigegeben werden und nicht öffentlich abrufbar sind.',
+            publishNotice:
+                'Du entscheidest ausdrücklich, ob dein anonymisiertes Profil jetzt im Talent-Marktplatz erscheint. Name, Bild, Stadt und Kontaktdaten bleiben dort verborgen.',
+            publishNow:
+                'Mein anonymisiertes Profil jetzt veröffentlichen, sofern es mindestens {percentage} % vollständig ist.',
+            fields: {
+                first_name: 'Vorname',
+                last_name: 'Nachname',
+                current_country_code: 'Aktuelles Land (ISO)',
+                current_city: 'Aktuelle Stadt',
+                phone: 'Telefonnummer',
+                whatsapp: 'WhatsApp',
+                current_position: 'Aktuelle Position',
+                legal_name: 'Rechtlicher Firmenname',
+                email: 'Rechnungs-E-Mail',
+                website: 'Webseite',
+                industry: 'Branche',
+                employee_count: 'Mitarbeitende',
+                country_code: 'Land (ISO)',
+                city: 'Stadt',
+                postal_code: 'Postleitzahl',
+                address_line1: 'Straße und Hausnummer',
+            },
+        },
         steps: {
             account: {
                 label: '1 · Konto',

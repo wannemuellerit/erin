@@ -217,6 +217,8 @@ export default {
         completeness: 'Profile complete',
         stopPublishing: 'Stop publishing',
         publish: 'Publish profile',
+        unsavedWarning:
+            'You have unsaved profile changes. Do you really want to leave this page?',
         photo: {
             title: 'Profile picture',
             description:
@@ -230,7 +232,9 @@ export default {
         tabs: {
             personal: 'Personal details',
             profession: 'Profession & mobility',
+            history: 'Experience & education',
             skills: 'Skills & languages',
+            availability: 'Availability',
             documents: 'Documents',
         },
         personal: {
@@ -246,6 +250,7 @@ export default {
             currentCity: 'Current city *',
             phone: 'Phone number *',
             whatsapp: 'WhatsApp',
+            email: 'Email *',
             summary: 'Short profile about you *',
         },
         privacy: {
@@ -283,6 +288,52 @@ export default {
             relocationReady: 'Willing to relocate',
             requiresVisa: 'Visa required',
             workPermit: 'Work permit',
+            licenses: 'Driving licences and certificates',
+            employmentPreferences: 'Preferred employment types',
+            employment: {
+                full_time: 'Full-time',
+                part_time: 'Part-time',
+                temporary: 'Temporary',
+                permanent: 'Permanent',
+            },
+        },
+        history: {
+            experienceTitle: 'Work experience',
+            experienceDescription:
+                'Add positions and sort them in the desired order.',
+            experienceNumber: 'Work experience {number}',
+            educationTitle: 'Education and studies',
+            educationNumber: 'Education {number}',
+            employer: 'Employer *',
+            position: 'Position *',
+            country: 'Country (ISO)',
+            startedAt: 'Start *',
+            endedAt: 'End',
+            completedAt: 'Completion',
+            current: 'Current position',
+            description: 'Description',
+            institution: 'Institution *',
+            qualification: 'Qualification *',
+            field: 'Field of study',
+            addExperience: 'Add work experience',
+            addEducation: 'Add education',
+        },
+        availability: {
+            title: 'Weekly availability',
+            description: 'Add multiple time windows per day for interviews.',
+            weekday: 'Weekday',
+            from: 'From',
+            until: 'Until',
+            add: 'Add time window',
+            days: {
+                1: 'Monday',
+                2: 'Tuesday',
+                3: 'Wednesday',
+                4: 'Thursday',
+                5: 'Friday',
+                6: 'Saturday',
+                7: 'Sunday',
+            },
         },
         skills: {
             title: 'Skills',

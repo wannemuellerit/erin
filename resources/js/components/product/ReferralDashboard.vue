@@ -22,6 +22,7 @@ import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
 import Textarea from '@/components/product/Textarea.vue';
 import { useFormatters } from '@/composables/useFormatters';
+import { useCapabilities } from '@/composables/useCapabilities';
 import { useStatusLabels } from '@/composables/useStatusLabels';
 import de from '@/i18n/messages/product-components-de';
 import en from '@/i18n/messages/product-components-en';
@@ -47,6 +48,8 @@ const { t } = useI18n({
     messages: { de, en },
 });
 const { formatCurrency, formatDate: formatLocalizedDate } = useFormatters();
+const { can } = useCapabilities();
+const canManageReferrals = () => can('referrals.manage');
 
 const copied = ref(false);
 const showEmailForm = ref(false);
@@ -167,6 +170,7 @@ const sendEmail = () => {
                                 class="min-w-0 flex-1 bg-transparent px-3 text-xs font-medium text-slate-600 outline-none"
                             />
                             <button
+                                v-if="canManageReferrals()"
                                 type="button"
                                 class="inline-flex h-9 items-center gap-2 rounded-lg bg-[var(--erin-primary)] px-3 text-xs font-bold text-white"
                                 @click="copyLink"
@@ -184,6 +188,7 @@ const sendEmail = () => {
                         </div>
                         <div class="mt-3 flex gap-2">
                             <button
+                                v-if="canManageReferrals()"
                                 type="button"
                                 class="inline-flex h-9 items-center gap-2 rounded-lg bg-white/10 px-3 text-xs font-bold ring-1 ring-white/10"
                                 @click="showEmailForm = !showEmailForm"
@@ -202,7 +207,7 @@ const sendEmail = () => {
                         </div>
                     </div>
                     <button
-                        v-else
+                        v-else-if="canManageReferrals()"
                         type="button"
                         class="mt-5 h-10 rounded-xl bg-white px-4 text-xs font-bold text-[var(--erin-primary)]"
                         @click="createLink"
@@ -223,7 +228,7 @@ const sendEmail = () => {
         </section>
 
         <form
-            v-if="showEmailForm && code"
+            v-if="showEmailForm && code && canManageReferrals()"
             class="erin-panel grid gap-4 p-5 sm:grid-cols-2"
             @submit.prevent="sendEmail"
         >

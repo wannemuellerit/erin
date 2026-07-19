@@ -6,6 +6,7 @@ import { useI18n } from 'vue-i18n';
 import FilterToolbar from '@/components/product/FilterToolbar.vue';
 import PageHeader from '@/components/product/PageHeader.vue';
 import SearchField from '@/components/product/SearchField.vue';
+import { useCapabilities } from '@/composables/useCapabilities';
 import { useFormatters } from '@/composables/useFormatters';
 import { useStatusLabels } from '@/composables/useStatusLabels';
 import { status as updateApplicationStatus } from '@/routes/employer/applications';
@@ -48,6 +49,8 @@ const props = withDefaults(
 const search = ref('');
 const selectedJob = ref<number | null>(props.selected_job);
 const { t } = useI18n();
+const { can } = useCapabilities();
+const canManageApplications = computed(() => can('applications.manage'));
 const { formatDate } = useFormatters();
 const { statusLabel } = useStatusLabels();
 const stageDefinitions = computed(() => [
@@ -268,6 +271,7 @@ const transition = (application: Application, nextStatus: string) => {
                             </div>
                             <div class="mt-3 border-t border-slate-100 pt-3">
                                 <select
+                                    v-if="canManageApplications"
                                     :value="application.status"
                                     class="h-8 w-full rounded-lg border border-slate-200 px-2 text-[10px] font-bold text-slate-600"
                                     :aria-label="
@@ -296,6 +300,17 @@ const transition = (application: Application, nextStatus: string) => {
                                         }}
                                     </option>
                                 </select>
+                                <p
+                                    v-else
+                                    class="rounded-lg bg-slate-50 px-2 py-2 text-[10px] font-bold text-slate-600"
+                                >
+                                    {{
+                                        statusLabel(
+                                            'application',
+                                            application.status,
+                                        )
+                                    }}
+                                </p>
                                 <p
                                     v-if="application.applied_at"
                                     class="mt-2 flex items-center gap-1.5 text-[9px] text-slate-400"

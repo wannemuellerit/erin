@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\AdCampaign;
+use App\Services\Authorization\CapabilityResolver;
 use App\Services\Platform\PlatformSettings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -62,6 +63,7 @@ class HandleInertiaRequests extends Middleware
                     ->get()
                     ->toArray() ?? [],
                 'active_company_id' => $request->session()->get('active_company_id'),
+                'capabilities' => fn (): array => app(CapabilityResolver::class)->forRequest($request),
             ],
             'notifications' => fn (): array => $user ? [
                 'unread_count' => $user->unreadNotifications()->count(),

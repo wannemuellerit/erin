@@ -5,7 +5,10 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Requests\Admin\UpdatePlatformSettingsRequest;
 use App\Http\Requests\Admin\UpdateThemeRequest;
 use App\Models\AdCampaign;
+use App\Models\Occupation;
+use App\Models\PlatformRole;
 use App\Models\PlatformSetting;
+use App\Models\Skill;
 use App\Services\Documents\UploadPolicy;
 use App\Services\Platform\DashboardAdCampaignManager;
 use App\Services\Platform\PlatformSettings;
@@ -58,6 +61,9 @@ class SettingController extends AdminController
                     PlatformSettings::DEFAULT_UPLOAD_LIMITS['user_quota_mb'],
                 ),
             ],
+            'candidate_profile' => [
+                'minimum_completion' => (int) $settings->get('candidate_profile.minimum_completion', 80),
+            ],
             'retention' => collect(PlatformSettings::DEFAULT_RETENTION)
                 ->mapWithKeys(fn (int $default, string $key): array => [
                     $key => (int) $settings->get("retention.{$key}", $default),
@@ -67,6 +73,11 @@ class SettingController extends AdminController
             'dashboard_ad_media_url' => $campaign?->media_path
                 ? URL::temporarySignedRoute('ads.media', now()->addMinutes(15), ['campaign' => $campaign])
                 : null,
+            'occupations' => Occupation::query()->orderBy('name_de')
+                ->get(['id', 'name_de', 'name_en', 'is_active']),
+            'skills' => Skill::query()->with('occupations:id')
+                ->orderBy('name_de')->get(['id', 'slug', 'name_de', 'name_en', 'is_active']),
+            'platform_roles' => PlatformRole::query()->withCount('users')->orderBy('name')->get(),
         ]);
     }
 
@@ -115,6 +126,12 @@ class SettingController extends AdminController
             'uploads' => [
                 'max_file_size_mb' => $settings->get('uploads.max_file_size_mb'),
                 'user_quota_mb' => $settings->get('uploads.user_quota_mb'),
+            ],
+            'candidate_profile' => [
+                'minimum_completion' => $settings->get(
+                    'candidate_profile.minimum_completion',
+                    80,
+                ),
             ],
             'dashboard_ad' => $settings->get('ads.dashboard'),
             'retention' => collect(PlatformSettings::DEFAULT_RETENTION)
@@ -182,6 +199,15 @@ class SettingController extends AdminController
         );
         foreach ($validated['retention'] ?? [] as $key => $value) {
             $settings->put("retention.{$key}", $value, 'retention', false, $userId);
+        }
+        if (isset($validated['candidate_profile']['minimum_completion'])) {
+            $settings->put(
+                'candidate_profile.minimum_completion',
+                $validated['candidate_profile']['minimum_completion'],
+                'matching',
+                false,
+                $userId,
+            );
         }
         $campaign = $campaigns->sync($validated['dashboard_ad'], $request->user());
         $dashboardAd = [
