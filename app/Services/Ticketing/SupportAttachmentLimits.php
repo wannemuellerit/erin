@@ -3,6 +3,7 @@
 namespace App\Services\Ticketing;
 
 use App\Exceptions\SupportAttachmentLimitExceeded;
+use App\Services\Documents\UploadPolicy;
 use Illuminate\Http\UploadedFile;
 
 class SupportAttachmentLimits
@@ -14,7 +15,9 @@ class SupportAttachmentLimits
 
     public function maxFileBytes(): int
     {
-        return max(1, (int) config('support.attachments.max_kilobytes', 10240)) * 1024;
+        return app(UploadPolicy::class)->maxFileKilobytes(
+            max(1, (int) config('support.attachments.max_kilobytes', 10240)),
+        ) * 1024;
     }
 
     public function maxTotalBytes(): int

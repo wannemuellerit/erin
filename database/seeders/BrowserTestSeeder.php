@@ -55,18 +55,36 @@ class BrowserTestSeeder extends Seeder
                 'locale' => 'de',
                 'timezone' => 'Europe/Berlin',
                 'onboarding_completed_at' => null,
+                'onboarding_step' => 2,
+                'onboarding_data' => null,
             ],
         );
-        CandidateProfile::query()->updateOrCreate(
+        $candidateProfile = CandidateProfile::query()->updateOrCreate(
             ['user_id' => $candidate->getKey()],
             [
                 'first_name' => 'E2E',
                 'last_name' => 'Kandidat',
                 'occupation_id' => null,
+                'current_country_code' => null,
+                'current_city' => null,
+                'phone' => null,
+                'whatsapp' => null,
+                'summary' => null,
+                'current_position' => null,
+                'desired_position' => null,
+                'experience_years' => 0,
+                'relocation_ready' => false,
+                'requires_visa' => true,
+                'has_work_permit' => false,
                 'completeness' => 0,
                 'published_at' => null,
             ],
         );
+        $candidateProfile->experiences()->delete();
+        $candidateProfile->educations()->delete();
+        $candidateProfile->skills()->detach();
+        $candidateProfile->languages()->detach();
+        $candidate->availabilitySlots()->delete();
 
         $companyOwner = User::query()->updateOrCreate(
             ['email' => 'onboarding.company@wannemueller.dev'],
@@ -79,6 +97,8 @@ class BrowserTestSeeder extends Seeder
                 'locale' => 'de',
                 'timezone' => 'Europe/Berlin',
                 'onboarding_completed_at' => null,
+                'onboarding_step' => 2,
+                'onboarding_data' => null,
             ],
         );
         $onboardingCompany = Company::query()->updateOrCreate(
@@ -101,6 +121,49 @@ class BrowserTestSeeder extends Seeder
                 'accepted_at' => now(),
             ],
         );
+
+        $roleCompany = Company::query()->where('slug', 'mueller-elektrotechnik')->firstOrFail();
+        foreach ([
+            [
+                'email' => 'company.admin.e2e@wannemueller.dev',
+                'name' => 'Erin E2E Firmenadmin',
+                'role' => CompanyMemberRole::Admin,
+            ],
+            [
+                'email' => 'recruiter.e2e@wannemueller.dev',
+                'name' => 'Erin E2E Recruiter',
+                'role' => CompanyMemberRole::Recruiter,
+            ],
+            [
+                'email' => 'viewer.e2e@wannemueller.dev',
+                'name' => 'Erin E2E Viewer',
+                'role' => CompanyMemberRole::Viewer,
+            ],
+        ] as $account) {
+            $member = User::query()->updateOrCreate(
+                ['email' => $account['email']],
+                [
+                    'name' => $account['name'],
+                    'email_verified_at' => now(),
+                    'password' => 'password',
+                    'role' => UserRole::Company,
+                    'status' => UserStatus::Active,
+                    'locale' => 'de',
+                    'timezone' => 'Europe/Berlin',
+                    'onboarding_completed_at' => now(),
+                ],
+            );
+            CompanyMembership::query()->updateOrCreate(
+                [
+                    'company_id' => $roleCompany->getKey(),
+                    'user_id' => $member->getKey(),
+                ],
+                [
+                    'role' => $account['role'],
+                    'accepted_at' => now(),
+                ],
+            );
+        }
 
         $requester = User::query()
             ->where('email', 'candidate01@wannemueller.dev')

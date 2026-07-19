@@ -13,8 +13,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-it('allows support to verify only files that passed the malware scan', function () {
+it('allows only superadmins to verify files that passed the malware scan', function () {
     $support = User::factory()->create(['role' => UserRole::Support]);
+    $admin = User::factory()->create(['role' => UserRole::SuperAdmin]);
     $profile = CandidateProfile::factory()->create();
     $document = CandidateDocument::query()->create([
         'candidate_profile_id' => $profile->id,
@@ -30,6 +31,12 @@ it('allows support to verify only files that passed the malware scan', function 
         ->patch(route('admin.documents.review', $document), [
             'status' => CandidateDocumentStatus::Verified->value,
         ])
+        ->assertForbidden();
+
+    $this->actingAs($admin)
+        ->patch(route('admin.documents.review', $document), [
+            'status' => CandidateDocumentStatus::Verified->value,
+        ])
         ->assertSessionHasErrors('status');
 
     $document->update([
@@ -37,14 +44,14 @@ it('allows support to verify only files that passed the malware scan', function 
         'scan_result' => 'clean',
     ]);
 
-    $this->actingAs($support)
+    $this->actingAs($admin)
         ->patch(route('admin.documents.review', $document), [
             'status' => CandidateDocumentStatus::Verified->value,
         ])
         ->assertRedirect();
 
     expect($document->refresh()->status)->toBe(CandidateDocumentStatus::Verified)
-        ->and($document->verified_by)->toBe($support->id)
+        ->and($document->verified_by)->toBe($admin->id)
         ->and($document->verified_at)->not->toBeNull()
         ->and(AuditLog::query()
             ->where('event', 'admin.candidate_document.reviewed')
@@ -54,6 +61,7 @@ it('allows support to verify only files that passed the malware scan', function 
 
 it('requires a reason when a document is rejected', function () {
     $support = User::factory()->create(['role' => UserRole::Support]);
+    $admin = User::factory()->create(['role' => UserRole::SuperAdmin]);
     $document = CandidateDocument::query()->create([
         'candidate_profile_id' => CandidateProfile::factory()->create()->id,
         'type' => CandidateDocumentType::Qualification,
@@ -69,9 +77,15 @@ it('requires a reason when a document is rejected', function () {
         ->patch(route('admin.documents.review', $document), [
             'status' => CandidateDocumentStatus::Rejected->value,
         ])
+        ->assertForbidden();
+
+    $this->actingAs($admin)
+        ->patch(route('admin.documents.review', $document), [
+            'status' => CandidateDocumentStatus::Rejected->value,
+        ])
         ->assertSessionHasErrors('rejection_reason');
 
-    $this->actingAs($support)
+    $this->actingAs($admin)
         ->patch(route('admin.documents.review', $document), [
             'status' => CandidateDocumentStatus::Rejected->value,
             'rejection_reason' => 'Die eingereichte Datei ist nicht vollständig lesbar.',

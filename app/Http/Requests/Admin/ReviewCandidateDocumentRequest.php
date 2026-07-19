@@ -10,7 +10,7 @@ class ReviewCandidateDocumentRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->isPlatformStaff() === true;
+        return $this->user()?->isSuperAdmin() === true;
     }
 
     /**

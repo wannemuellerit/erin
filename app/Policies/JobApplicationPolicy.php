@@ -2,9 +2,10 @@
 
 namespace App\Policies;
 
-use App\Enums\CompanyMemberRole;
+use App\Enums\Capability;
 use App\Models\JobApplication;
 use App\Models\User;
+use App\Services\Authorization\CapabilityResolver;
 
 class JobApplicationPolicy
 {
@@ -18,11 +19,11 @@ class JobApplicationPolicy
     public function manage(User $user, JobApplication $application): bool
     {
         return $user->isSuperAdmin()
-            || $user->hasCompanyRole($application->jobPosting->company, [
-                CompanyMemberRole::Owner,
-                CompanyMemberRole::Admin,
-                CompanyMemberRole::Recruiter,
-            ]);
+            || app(CapabilityResolver::class)->allows(
+                $user,
+                Capability::ApplicationsManage,
+                $application->jobPosting->company,
+            );
     }
 
     public function withdraw(User $user, JobApplication $application): bool

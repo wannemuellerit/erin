@@ -8,6 +8,7 @@ import PageHeader from '@/components/product/PageHeader.vue';
 import ProgressBar from '@/components/product/ProgressBar.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
+import { useCapabilities } from '@/composables/useCapabilities';
 import { useFormatters } from '@/composables/useFormatters';
 import { useStatusLabels } from '@/composables/useStatusLabels';
 import { steps as updateStep } from '@/routes/employer/visa';
@@ -50,6 +51,8 @@ const props = withDefaults(defineProps<{ cases?: VisaCase[] }>(), {
     cases: () => [],
 });
 const { t } = useI18n();
+const { can } = useCapabilities();
+const canManageVisa = computed(() => can('visa.manage'));
 const { formatDate } = useFormatters();
 const { statusLabel } = useStatusLabels();
 
@@ -312,6 +315,7 @@ const updateStepDeadline = (step: VisaStep, dueAt: string) => {
                                     </p>
                                 </div>
                                 <select
+                                    v-if="canManageVisa"
                                     :value="step.status"
                                     class="h-9 rounded-lg border border-slate-200 px-2 text-xs"
                                     @change="
@@ -338,7 +342,19 @@ const updateStepDeadline = (step: VisaStep, dueAt: string) => {
                                         {{ stepLabel('not_required') }}
                                     </option>
                                 </select>
+                                <StatusBadge
+                                    v-else
+                                    :label="stepLabel(step.status)"
+                                    :tone="
+                                        step.status === 'completed'
+                                            ? 'green'
+                                            : step.status === 'blocked'
+                                              ? 'red'
+                                              : 'slate'
+                                    "
+                                />
                                 <input
+                                    v-if="canManageVisa"
                                     :value="step.due_at?.slice(0, 10) ?? ''"
                                     type="date"
                                     class="h-9 rounded-lg border border-slate-200 px-2 text-xs"
@@ -351,6 +367,16 @@ const updateStepDeadline = (step: VisaStep, dueAt: string) => {
                                         )
                                     "
                                 />
+                                <span
+                                    v-else
+                                    class="self-center text-xs text-slate-500"
+                                >
+                                    {{
+                                        step.due_at
+                                            ? formatDate(step.due_at)
+                                            : '—'
+                                    }}
+                                </span>
                             </div>
                         </div>
                         <p

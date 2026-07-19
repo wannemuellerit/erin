@@ -2,10 +2,13 @@
 
 namespace App\Services\Candidates;
 
+use App\Services\Platform\PlatformSettings;
 use Illuminate\Support\Arr;
 
 final class ProfileCompletenessCalculator
 {
+    public function __construct(private readonly PlatformSettings $settings) {}
+
     /**
      * @var array<string, int>
      */
@@ -24,7 +27,7 @@ final class ProfileCompletenessCalculator
 
     /**
      * @param  array<string, mixed>  $profile
-     * @return array{percentage: int, completed: list<string>, missing: list<string>, can_apply: bool}
+     * @return array{percentage: int, completed: list<string>, missing: list<string>, can_apply: bool, required_percentage: int}
      */
     public function calculate(array $profile): array
     {
@@ -67,8 +70,23 @@ final class ProfileCompletenessCalculator
             'percentage' => $percentage,
             'completed' => $completed,
             'missing' => $missing,
-            'can_apply' => $percentage >= 80,
+            'can_apply' => $percentage >= $this->threshold(),
+            'required_percentage' => $this->threshold(),
         ];
+    }
+
+    public function threshold(): int
+    {
+        // Pure unit tests intentionally run without a bootstrapped Laravel
+        // application. Keep the product default available in that context.
+        if (! app()->bound('config')) {
+            return 80;
+        }
+
+        return min(100, max(50, (int) $this->settings->get(
+            'candidate_profile.minimum_completion',
+            80,
+        )));
     }
 
     /**

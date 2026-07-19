@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\AttachCorrelationId;
 use App\Http\Middleware\BlockSupportWrites;
+use App\Http\Middleware\EnsureCapability;
 use App\Http\Middleware\EnsureCompanyMember;
 use App\Http\Middleware\EnsureOnboardingComplete;
 use App\Http\Middleware\EnsurePasswordChangeCompleted;
@@ -11,6 +12,7 @@ use App\Http\Middleware\EnsureStaffTwoFactor;
 use App\Http\Middleware\EnsureSubscribedCompany;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\RecordUserActivity;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\TrackLastActivity;
 use Illuminate\Foundation\Application;
@@ -54,12 +56,14 @@ return Application::configure(basePath: dirname(__DIR__))
             EnsurePasswordChangeCompleted::class,
             BlockSupportWrites::class,
             TrackLastActivity::class,
+            RecordUserActivity::class,
             AddLinkHeadersForPreloadedAssets::class,
         ]);
 
         $middleware->alias([
             'role' => EnsureRole::class,
             'company.member' => EnsureCompanyMember::class,
+            'capability' => EnsureCapability::class,
             'company.subscribed' => EnsureSubscribedCompany::class,
             'onboarding.complete' => EnsureOnboardingComplete::class,
             'staff.2fa' => EnsureStaffTwoFactor::class,

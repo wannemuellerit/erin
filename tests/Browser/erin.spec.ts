@@ -35,6 +35,18 @@ const accounts = {
         email: 'support.e2e@wannemueller.dev',
         name: 'Erin E2E Support',
     },
+    companyAdmin: {
+        email: 'company.admin.e2e@wannemueller.dev',
+        name: 'Erin E2E Firmenadmin',
+    },
+    recruiter: {
+        email: 'recruiter.e2e@wannemueller.dev',
+        name: 'Erin E2E Recruiter',
+    },
+    viewer: {
+        email: 'viewer.e2e@wannemueller.dev',
+        name: 'Erin E2E Viewer',
+    },
     onboardingCandidate: {
         email: 'onboarding.candidate@wannemueller.dev',
     },
@@ -276,6 +288,39 @@ test.describe('Login und Rollenbereiche', () => {
         ).toBeVisible();
     });
 
+    test('zeigt dem Superadmin Uploadlimits, Dashboard-Anzeigen und Nutzerhistorien', async ({
+        page,
+    }) => {
+        await logIn(page, accounts.admin.email);
+        await page.goto('/admin/settings');
+
+        await expect(
+            page.getByRole('heading', {
+                level: 2,
+                name: 'Uploads & Speicher',
+            }),
+        ).toBeVisible();
+        await expect(
+            page.getByLabel('Maximale Dateigröße in MB'),
+        ).toBeVisible();
+        await expect(
+            page.getByLabel('Speicherlimit je Nutzer in MB'),
+        ).toBeVisible();
+        await expect(
+            page.getByRole('heading', {
+                level: 2,
+                name: 'Dashboard-Anzeige',
+            }),
+        ).toBeVisible();
+        await expect(page.getByLabel('Zielgruppe')).toBeVisible();
+
+        await page.goto('/admin/users');
+        await expect(
+            page.getByRole('link', { name: 'Aktivitätshistorie' }).first(),
+        ).toBeVisible();
+        await expectNoSeriousAccessibilityViolations(page);
+    });
+
     test('meldet eine Fachkraft an und zeigt ausschließlich ihre Navigation', async ({
         page,
     }) => {
@@ -464,6 +509,87 @@ test.describe('Login und Rollenbereiche', () => {
             expect(response?.status()).toBe(403);
         }
     });
+
+    test('zeigt dem Owner Recruiting-, Team- und Billing-Aktionen', async ({
+        page,
+    }) => {
+        await logIn(page, accounts.company.email);
+
+        await page.goto('/employer/jobs');
+        await expect(
+            page.getByRole('link', { name: 'Neue Stellenanzeige' }),
+        ).toBeVisible();
+        await page.goto('/employer/team');
+        await expect(
+            page.getByRole('button', { name: 'Mitglied einladen' }),
+        ).toBeVisible();
+        await page.goto('/employer/billing');
+        await expect(
+            page
+                .getByRole('button', { name: /Paket (wählen|wechseln)/ })
+                .first(),
+        ).toBeVisible();
+    });
+
+    test('begrenzt Firmenadmins auf Management ohne Billing und Owner-Transfer', async ({
+        page,
+    }) => {
+        await logIn(page, accounts.companyAdmin.email);
+
+        await page.goto('/employer/jobs');
+        await expect(
+            page.getByRole('link', { name: 'Neue Stellenanzeige' }),
+        ).toBeVisible();
+        await page.goto('/employer/team');
+        await expect(
+            page.getByRole('button', { name: 'Mitglied einladen' }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole('button', { name: 'Inhaberschaft übertragen' }),
+        ).toHaveCount(0);
+        await page.goto('/employer/billing');
+        await expect(
+            page.getByRole('button', { name: /Paket (wählen|wechseln)/ }),
+        ).toHaveCount(0);
+    });
+
+    test('gibt Recruitern Recruiting-Aktionen, aber keine Firmen- oder Teamverwaltung', async ({
+        page,
+    }) => {
+        await logIn(page, accounts.recruiter.email);
+
+        await page.goto('/employer/jobs');
+        await expect(
+            page.getByRole('link', { name: 'Neue Stellenanzeige' }),
+        ).toBeVisible();
+        await page.goto('/employer/company');
+        await expect(
+            page.getByRole('button', { name: 'Änderungen speichern' }),
+        ).toHaveCount(0);
+        await page.goto('/employer/team');
+        await expect(
+            page.getByRole('button', { name: 'Mitglied einladen' }),
+        ).toHaveCount(0);
+    });
+
+    test('zeigt Viewern nur Leseflächen und blockiert direkte Mutationsseiten', async ({
+        page,
+    }) => {
+        await logIn(page, accounts.viewer.email);
+
+        await page.goto('/employer/jobs');
+        await expect(
+            page.getByRole('link', { name: 'Neue Stellenanzeige' }),
+        ).toHaveCount(0);
+        await page.goto('/employer/candidates');
+        await expect(
+            page.getByText('Gespeicherte Suchen', { exact: true }),
+        ).toHaveCount(0);
+        await expect(page.locator('input[type="checkbox"]')).toHaveCount(0);
+
+        const response = await page.goto('/employer/jobs/create');
+        expect(response?.status()).toBe(403);
+    });
 });
 
 test.describe('Onboarding und Abrechnung', () => {
@@ -472,28 +598,53 @@ test.describe('Onboarding und Abrechnung', () => {
     }) => {
         await submitLogin(page, accounts.onboardingCandidate.email);
         await expect(page).toHaveURL(/\/onboarding$/);
-        await expect(page.getByTestId('candidate-onboarding')).toBeVisible();
-        await page
-            .getByRole('button', { name: 'Einrichtung abschließen' })
-            .hover();
         await expectNoSeriousAccessibilityViolations(page);
 
-        await page.locator('#occupation_id').selectOption({ index: 1 });
-        await page.getByLabel('Wunschposition *').fill('Elektriker');
-        await page.getByLabel('Jahre Berufserfahrung *').fill('5');
-        await page.getByLabel('Telefonnummer *').fill('+49 170 1234567');
-        await page.getByLabel('Aktuelles Land (ISO) *').fill('PL');
-        await page.getByLabel('Aktuelle Stadt *').fill('Wrocław');
+        await page.getByLabel('Vorname').fill('E2E');
+        await page.getByLabel('Nachname').fill('Kandidat');
+        await page.getByLabel('Aktuelles Land (ISO)').fill('PL');
+        await page.getByLabel('Aktuelle Stadt').fill('Wrocław');
+        await page.getByLabel('Telefonnummer').fill('+49 170 1234567');
+        await page.getByRole('button', { name: 'Speichern und weiter' }).click();
+
+        await page.getByLabel('Berufsfeld').selectOption({ index: 1 });
+        await page.getByLabel('Wunschposition').fill('Elektriker');
+        await page.getByLabel('Jahre Berufserfahrung').fill('5');
         await page
-            .getByPlaceholder(
-                'Beschreibe deine Erfahrung, Stärken und gewünschte Tätigkeit.',
-            )
+            .getByLabel('Kurzprofil')
             .fill(
                 'Ich bin ausgebildeter Elektriker mit fünf Jahren Berufserfahrung und möchte langfristig in einem deutschen Industriebetrieb arbeiten.',
             );
+        await page.getByRole('button', { name: 'Speichern und weiter' }).click();
+
         await page
-            .getByRole('button', { name: 'Einrichtung abschließen' })
+            .getByPlaceholder('Arbeitgeber *')
+            .fill('E2E Elektrotechnik');
+        await page.getByPlaceholder('Position *').fill('Elektriker');
+        await page.locator('input[type="date"]').first().fill('2020-01-01');
+        await page
+            .getByRole('button', { name: 'Ausbildung hinzufügen' })
             .click();
+        await page.getByPlaceholder('Institution *').fill('E2E Berufsschule');
+        await page
+            .getByPlaceholder('Abschluss *')
+            .fill('Elektroniker für Betriebstechnik');
+        await page.getByRole('button', { name: 'Speichern und weiter' }).click();
+
+        await page
+            .getByRole('button', { name: /Industrie|Elektr/i })
+            .first()
+            .click();
+        await page.locator('input[type="checkbox"]').first().check();
+        await page.getByRole('button', { name: 'Speichern und weiter' }).click();
+
+        await page
+            .getByText(
+                'Ich habe verstanden, dass Dokumente separat freigegeben werden und nicht öffentlich abrufbar sind.',
+            )
+            .click();
+        await page.getByRole('button', { name: 'Speichern und weiter' }).click();
+        await page.getByRole('button', { name: 'Einrichtung abschließen' }).click();
 
         await expect(page).toHaveURL(/\/candidate\/profile$/);
     });
@@ -506,19 +657,20 @@ test.describe('Onboarding und Abrechnung', () => {
         await expect(page.getByTestId('company-onboarding')).toBeVisible();
         await expectNoSeriousAccessibilityViolations(page);
 
-        await page.getByRole('button', { name: /Basic/ }).click();
+        await page.getByText('Basic', { exact: true }).click();
+        await page.getByRole('button', { name: 'Speichern und weiter' }).click();
         await page
-            .getByLabel('Rechtlicher Firmenname *')
+            .getByLabel('Rechtlicher Firmenname')
             .fill('E2E Onboarding GmbH');
         await page
-            .getByLabel('Rechnungs-E-Mail *')
+            .getByLabel('Rechnungs-E-Mail')
             .fill('rechnung.e2e@wannemueller.dev');
-        await page.getByLabel('Branche *').fill('Elektrotechnik');
-        await page.getByLabel('Mitarbeitende *').fill('25');
-        await page.getByLabel('Straße *').fill('Teststraße 42');
-        await page.getByLabel('Postleitzahl *').fill('40210');
-        await page.getByLabel('Stadt *').fill('Düsseldorf');
-        await page.getByLabel('Land (ISO) *').fill('DE');
+        await page.getByLabel('Branche').fill('Elektrotechnik');
+        await page.getByLabel('Mitarbeitende').fill('25');
+        await page.getByLabel('Straße und Hausnummer').fill('Teststraße 42');
+        await page.getByLabel('Postleitzahl').fill('40210');
+        await page.getByLabel('Stadt').fill('Düsseldorf');
+        await page.getByLabel('Land (ISO)').fill('DE');
         await page
             .getByRole('button', { name: 'Speichern und weiter' })
             .click();
@@ -535,6 +687,27 @@ test.describe('Onboarding und Abrechnung', () => {
 });
 
 test.describe('Support und Mandantentrennung', () => {
+    test('zeigt Superadmins die Trust- und Moderationszentrale', async ({
+        page,
+    }) => {
+        await logIn(page, accounts.admin.email);
+        await page.goto('/admin/support');
+
+        await expect(
+            page.getByRole('heading', {
+                level: 2,
+                name: 'Trust- und Moderationszentrale',
+            }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole('heading', {
+                level: 3,
+                name: 'Ausstehendes Feedback',
+            }),
+        ).toBeVisible();
+        await expectNoSeriousAccessibilityViolations(page);
+    });
+
     test('zeigt die Supportansicht dauerhaft schreibgeschützt', async ({
         page,
     }) => {

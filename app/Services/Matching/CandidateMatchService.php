@@ -14,7 +14,7 @@ class CandidateMatchService
     /**
      * The factors intentionally exclude nationality, origin, gender, age, and health data.
      *
-     * @return array{score: int, factors: array<string, array{score: int, weight: int, contribution: float}>}
+     * @return array{version: string, score: int, factors: array<string, array{score: int, weight: int, contribution: float}>}
      */
     public function for(CandidateProfile $candidate, JobPosting $job): array
     {

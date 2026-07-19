@@ -3,6 +3,7 @@ import { Head, Link } from '@inertiajs/vue3';
 import { ArrowRight, Check, Minus } from '@lucide/vue';
 import { useI18n } from 'vue-i18n';
 import PublicHeader from '@/components/product/PublicHeader.vue';
+import { useFormatters } from '@/composables/useFormatters';
 import { contact, register } from '@/routes';
 import legal from '@/routes/legal';
 
@@ -28,18 +29,17 @@ withDefaults(defineProps<{ plans?: Plan[] }>(), {
     plans: () => [],
 });
 
-const { locale, t, te } = useI18n();
+const { t, te } = useI18n();
+const { formatCurrency } = useFormatters();
 
 function money(plan: Plan): string {
     if (plan.price_cents === null) {
         return t('public.pricing.individual');
     }
 
-    return new Intl.NumberFormat(locale.value === 'en' ? 'en-GB' : 'de-DE', {
-        style: 'currency',
-        currency: plan.currency,
+    return formatCurrency(plan.price_cents / 100, plan.currency, {
         maximumFractionDigits: 0,
-    }).format(plan.price_cents / 100);
+    });
 }
 
 function limit(

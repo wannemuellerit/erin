@@ -176,7 +176,7 @@ services:
     image: node:22-bookworm-slim
     working_dir: /var/www/html
     user: "${UID:-1000}:${GID:-1000}"
-    command: ["npm", "ci", "--no-audit", "--no-fund"]
+    command: ["sh", "docker/node/setup.sh"]
     volumes:
       - .:/var/www/html
     restart: "no"
@@ -332,7 +332,7 @@ services:
 
   pest:
     <<: *php-service
-    command: ["vendor/bin/pest", "--colors=always"]
+    command: ["sh", "docker/php/test.sh"]
     profiles: ["tools"]
     restart: "no"
     environment:
@@ -380,6 +380,15 @@ services:
       laravel:
         condition: service_healthy
 
+  browser-test-setup:
+    <<: *php-service
+    profiles: ["tools"]
+    command: ["sh", "docker/php/browser-test-setup.sh"]
+    restart: "no"
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+
   playwright:
     image: mcr.microsoft.com/playwright:v1.61.1-noble
     profiles: ["tools"]
@@ -395,6 +404,8 @@ services:
     depends_on:
       laravel:
         condition: service_healthy
+      browser-test-setup:
+        condition: service_completed_successfully
       node-setup:
         condition: service_completed_successfully
 

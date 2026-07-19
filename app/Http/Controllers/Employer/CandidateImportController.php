@@ -7,6 +7,7 @@ use App\Jobs\ProcessCandidateImport;
 use App\Models\CandidateImport;
 use App\Services\Companies\CurrentCompany;
 use App\Services\Documents\ClamAvScanner;
+use App\Services\Documents\UploadPolicy;
 use App\Services\Imports\CandidateImportReader;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -37,15 +38,22 @@ class CandidateImportController extends Controller
         CurrentCompany $currentCompany,
         ClamAvScanner $scanner,
         CandidateImportReader $reader,
+        UploadPolicy $uploads,
     ): RedirectResponse {
         $company = $currentCompany->forRequest($request);
         abort_unless($currentCompany->membership($request)->role->canRecruit(), 403);
         $validated = $request->validate([
-            'file' => ['required', 'file', 'mimes:csv,txt,xlsx', 'max:10240'],
+            'file' => [
+                'required',
+                'file',
+                'mimes:csv,txt,xlsx',
+                'max:'.$uploads->maxFileKilobytes(10240),
+            ],
         ]);
         $user = $request->user();
         abort_if($user === null, 401);
         $file = $validated['file'];
+        $uploads->assertCanStore($user, $file);
         $path = $file->store("candidate-imports/{$company->getKey()}", 'private');
         abort_if($path === false, 500, __('Die Importdatei konnte nicht privat gespeichert werden.'));
         $stream = Storage::disk('private')->readStream($path);
@@ -98,6 +106,7 @@ class CandidateImportController extends Controller
             'original_filename' => $file->getClientOriginalName(),
             'disk' => 'private',
             'storage_path' => $path,
+            'size_bytes' => max(0, (int) $file->getSize()),
             'status' => 'awaiting_mapping',
             'mapping' => [
                 'headers' => $preview['headers'],

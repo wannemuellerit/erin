@@ -13,6 +13,7 @@ import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import MatchScore from '@/components/product/MatchScore.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
+import { useFormatters } from '@/composables/useFormatters';
 import de from '@/i18n/messages/product-components-de';
 import en from '@/i18n/messages/product-components-en';
 
@@ -53,11 +54,13 @@ const props = withDefaults(
         href?: string;
         selectable?: boolean;
         selected?: boolean;
+        canManage?: boolean;
     }>(),
     {
         href: '',
         selectable: false,
         selected: false,
+        canManage: true,
     },
 );
 
@@ -69,6 +72,7 @@ const { locale, t } = useI18n({
     useScope: 'local',
     messages: { de, en },
 });
+const { formatDate } = useFormatters();
 
 const reference = computed(
     () =>
@@ -129,15 +133,8 @@ const language = computed(() => {
           } ${first.level ?? ''}`.trim()
         : t('candidateCard.languageMissing');
 });
-const formatAvailabilityDate = (value: string) => {
-    const date = new Date(value);
-
-    return Number.isNaN(date.getTime())
-        ? value
-        : new Intl.DateTimeFormat(locale.value, {
-              dateStyle: 'medium',
-          }).format(date);
-};
+const formatAvailabilityDate = (value: string) =>
+    formatDate(value, { dateStyle: 'medium' });
 const available = computed(
     () =>
         props.candidate.available ??
@@ -219,6 +216,7 @@ const verified = computed(
                 </div>
             </div>
             <button
+                v-if="canManage"
                 type="button"
                 class="erin-focus rounded-lg p-2"
                 :class="
@@ -281,6 +279,7 @@ const verified = computed(
                 {{ t('candidateCard.viewProfile') }}
             </Link>
             <button
+                v-if="canManage"
                 type="button"
                 class="erin-focus grid size-10 place-items-center rounded-xl border border-slate-200 text-slate-500 hover:border-teal-300 hover:bg-teal-50 hover:text-teal-600"
                 :aria-label="t('candidateCard.invite')"

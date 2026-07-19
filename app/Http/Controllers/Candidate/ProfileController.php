@@ -14,6 +14,7 @@ use App\Models\Occupation;
 use App\Models\Skill;
 use App\Services\Audit\AuditLogger;
 use App\Services\Candidates\ProfileCompletenessCalculator;
+use App\Services\Documents\UploadPolicy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -21,6 +22,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -30,7 +32,14 @@ class ProfileController extends Controller
     public function show(Request $request, ProfileCompletenessCalculator $completeness): Response
     {
         $profile = $request->user()?->candidateProfile()
-            ->with(['occupation', 'experiences', 'educations', 'skills', 'languages', 'documents'])
+            ->with([
+                'occupation',
+                'experiences' => fn ($query) => $query->orderBy('sort_order'),
+                'educations' => fn ($query) => $query->orderBy('sort_order'),
+                'skills',
+                'languages',
+                'documents',
+            ])
             ->firstOrFail();
 
         return Inertia::render('candidate/Profile', [
@@ -67,6 +76,10 @@ class ProfileController extends Controller
                 )->values(),
             ],
             'profile_status' => $this->recalculate($profile, $completeness, false),
+            'account_email' => $request->user()?->email,
+            'availability' => $request->user()?->availabilitySlots()
+                ->orderBy('weekday')->orderBy('starts_at')
+                ->get(['id', 'weekday', 'starts_at', 'ends_at', 'timezone']) ?? [],
             'occupations' => Occupation::query()->where('is_active', true)->orderBy('name_de')->get(),
             'skills' => Skill::query()->where('is_active', true)->orderBy('name_de')->get(),
             'languages' => Language::query()->orderBy('name_de')->get(),
@@ -77,13 +90,29 @@ class ProfileController extends Controller
     public function uploadPhoto(
         Request $request,
         AuditLogger $audit,
+        UploadPolicy $uploads,
     ): RedirectResponse {
         $profile = $request->user()?->candidateProfile()->firstOrFail();
         $validated = $request->validate([
-            'photo' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png', 'max:10240', 'dimensions:max_width=10000,max_height=10000'],
+            'photo' => [
+                'required',
+                'file',
+                'image',
+                'mimes:jpg,jpeg,png',
+                'max:'.$uploads->maxFileKilobytes(10240),
+                'dimensions:max_width=10000,max_height=10000',
+            ],
         ]);
         $photo = $request->file('photo');
         abort_if($photo === null, 422);
+        $user = $request->user();
+        abort_if($user === null, 401);
+        $uploads->assertCanStore(
+            $user,
+            $photo,
+            'photo',
+            (int) ($profile->profile_photo_size_bytes ?? 0),
+        );
         $path = $photo->store("candidates/{$profile->getKey()}/profile/quarantine", 'private');
         abort_if($path === false, 500, __('Das Profilbild konnte nicht privat gespeichert werden.'));
         $previousQuarantine = $profile->profile_photo_quarantine_path;
@@ -184,6 +213,12 @@ class ProfileController extends Controller
         $validated = $request->validate([
             'first_name' => ['required', 'string', 'max:120'],
             'last_name' => ['required', 'string', 'max:120'],
+            'email' => [
+                'required',
+                'email',
+                'max:255',
+                Rule::unique('users', 'email')->ignore($request->user()?->getKey()),
+            ],
             'birth_date' => ['nullable', 'date', 'before:today'],
             'gender' => ['nullable', 'string', 'max:40'],
             'nationality_country_code' => ['nullable', 'string', 'size:2'],
@@ -217,6 +252,7 @@ class ProfileController extends Controller
             'languages.*.id' => ['required', 'exists:languages,id'],
             'languages.*.level' => ['required', Rule::in(['A1', 'A2', 'B1', 'B2', 'C1', 'C2'])],
             'experiences' => ['array'],
+            'experiences.*.id' => ['nullable', 'integer'],
             'experiences.*.employer' => ['required', 'string', 'max:180'],
             'experiences.*.position' => ['required', 'string', 'max:180'],
             'experiences.*.country_code' => ['nullable', 'string', 'size:2'],
@@ -225,6 +261,7 @@ class ProfileController extends Controller
             'experiences.*.is_current' => ['boolean'],
             'experiences.*.description' => ['nullable', 'string', 'max:3000'],
             'educations' => ['array'],
+            'educations.*.id' => ['nullable', 'integer'],
             'educations.*.institution' => ['required', 'string', 'max:180'],
             'educations.*.qualification' => ['required', 'string', 'max:180'],
             'educations.*.field' => ['nullable', 'string', 'max:180'],
@@ -232,11 +269,28 @@ class ProfileController extends Controller
             'educations.*.started_at' => ['nullable', 'date'],
             'educations.*.completed_at' => ['nullable', 'date'],
             'educations.*.description' => ['nullable', 'string', 'max:3000'],
+            'availability' => ['array', 'max:28'],
+            'availability.*.weekday' => ['required', 'integer', 'between:1,7'],
+            'availability.*.starts_at' => ['required', 'date_format:H:i'],
+            'availability.*.ends_at' => ['required', 'date_format:H:i'],
+            'availability.*.timezone' => ['required', 'timezone'],
         ]);
+        $this->assertAvailabilityDoesNotOverlap($validated['availability'] ?? []);
         $before = $profile->toArray();
+        $user = $request->user();
+        abort_if($user === null, 401);
+        $emailChanged = mb_strtolower($user->email) !== mb_strtolower($validated['email']);
 
-        DB::transaction(function () use ($profile, $validated, $completeness): void {
-            $profile->update(Arr::except($validated, ['skills', 'languages', 'experiences', 'educations']));
+        DB::transaction(function () use ($profile, $validated, $completeness, $user, $emailChanged): void {
+            $profile->update(Arr::except($validated, [
+                'email', 'skills', 'languages', 'experiences', 'educations', 'availability',
+            ]));
+            if ($emailChanged) {
+                $user->forceFill([
+                    'email' => mb_strtolower($validated['email']),
+                    'email_verified_at' => null,
+                ])->save();
+            }
             /** @var list<array{id: int, proficiency?: int|null, experience_years?: float|int|null}> $skills */
             $skills = is_array($validated['skills'] ?? null) ? array_values($validated['skills']) : [];
             $skillSync = [];
@@ -255,12 +309,16 @@ class ProfileController extends Controller
                 $languageSync[$language['id']] = ['level' => $language['level'], 'is_verified' => false];
             }
             $profile->languages()->sync($languageSync);
-            $profile->experiences()->delete();
-            $profile->experiences()->createMany($validated['experiences'] ?? []);
-            $profile->educations()->delete();
-            $profile->educations()->createMany($validated['educations'] ?? []);
+            $this->syncHistory($profile, 'experiences', $validated['experiences'] ?? []);
+            $this->syncHistory($profile, 'educations', $validated['educations'] ?? []);
+            $user->availabilitySlots()->delete();
+            $user->availabilitySlots()->createMany($validated['availability'] ?? []);
             $this->recalculate($profile, $completeness, true);
         });
+
+        if ($emailChanged) {
+            $user->sendEmailVerificationNotification();
+        }
 
         $audit->record('candidate.profile_updated', $profile, $before, $profile->fresh()->toArray());
 
@@ -271,16 +329,25 @@ class ProfileController extends Controller
         Request $request,
         ProfileCompletenessCalculator $completeness,
         AuditLogger $audit,
+        UploadPolicy $uploads,
     ): RedirectResponse {
         $profile = $request->user()?->candidateProfile()->firstOrFail();
         $validated = $request->validate([
             'type' => ['required', Rule::enum(CandidateDocumentType::class)],
             'title' => ['required', 'string', 'max:180'],
-            'file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,doc,docx', 'max:15360'],
+            'file' => [
+                'required',
+                'file',
+                'mimes:pdf,jpg,jpeg,png,doc,docx',
+                'max:'.$uploads->maxFileKilobytes(15360),
+            ],
             'expires_at' => ['nullable', 'date', 'after:today'],
         ]);
         $file = $request->file('file');
         abort_if($file === null, 422);
+        $user = $request->user();
+        abort_if($user === null, 401);
+        $uploads->assertCanStore($user, $file);
         $path = $file->store("candidates/{$profile->getKey()}/documents", 'private');
         abort_if($path === false, 500, __('Das Dokument konnte nicht privat gespeichert werden.'));
         $realPath = $file->getRealPath();
@@ -327,6 +394,13 @@ class ProfileController extends Controller
         if (! $profile->occupation_id || ! $profile->summary || ! $profile->current_country_code) {
             return back()->withErrors(['profile' => __('Beruf, Kurzprofil und aktuelles Land müssen vor der Veröffentlichung ausgefüllt sein.')]);
         }
+        if ($profile->published_at === null && ! $status['can_apply']) {
+            return back()->withErrors([
+                'profile' => __('Für die Veröffentlichung müssen mindestens :percentage % des Profils vollständig sein.', [
+                    'percentage' => $status['required_percentage'],
+                ]),
+            ]);
+        }
 
         $profile->update(['published_at' => $profile->published_at ? null : now()]);
         $audit->record(
@@ -341,7 +415,7 @@ class ProfileController extends Controller
     }
 
     /**
-     * @return array{percentage: int, completed: list<string>, missing: list<string>, can_apply: bool}
+     * @return array{percentage: int, completed: list<string>, missing: list<string>, can_apply: bool, required_percentage: int}
      */
     private function recalculate(
         CandidateProfile $profile,
@@ -375,5 +449,59 @@ class ProfileController extends Controller
         }
 
         return $result;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $items
+     */
+    private function syncHistory(CandidateProfile $profile, string $relation, array $items): void
+    {
+        $existingIds = $profile->{$relation}()->pluck('id');
+        $submittedIds = collect($items)->pluck('id')->filter()->map(
+            static fn ($id): int => (int) $id,
+        );
+        if ($submittedIds->diff($existingIds)->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                $relation => __('Ein Eintrag gehört nicht zu deinem Profil.'),
+            ]);
+        }
+        $profile->{$relation}()->whereIn('id', $existingIds->diff($submittedIds)->all())->delete();
+
+        foreach ($items as $sortOrder => $item) {
+            $id = isset($item['id']) ? (int) $item['id'] : null;
+            $attributes = [
+                ...Arr::except($item, ['id']),
+                'sort_order' => $sortOrder,
+            ];
+            if ($id !== null) {
+                $profile->{$relation}()->whereKey($id)->firstOrFail()->update($attributes);
+            } else {
+                $profile->{$relation}()->create($attributes);
+            }
+        }
+    }
+
+    /**
+     * @param  list<array{weekday: int, starts_at: string, ends_at: string, timezone: string}>  $slots
+     */
+    private function assertAvailabilityDoesNotOverlap(array $slots): void
+    {
+        foreach (collect($slots)->groupBy('weekday') as $daySlots) {
+            $sorted = $daySlots->sortBy('starts_at')->values();
+            foreach ($sorted as $index => $slot) {
+                if ($slot['starts_at'] >= $slot['ends_at']) {
+                    throw ValidationException::withMessages([
+                        'availability' => __('Das Ende muss nach dem Beginn liegen.'),
+                    ]);
+                }
+                if ($index > 0) {
+                    if ($sorted[$index - 1]['ends_at'] > $slot['starts_at']) {
+                        throw ValidationException::withMessages([
+                            'availability' => __('Verfügbarkeiten dürfen sich nicht überschneiden.'),
+                        ]);
+                    }
+                }
+            }
+        }
     }
 }

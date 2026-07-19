@@ -2,10 +2,11 @@
 
 namespace App\Policies;
 
-use App\Enums\CompanyMemberRole;
+use App\Enums\Capability;
 use App\Enums\CompanyStatus;
 use App\Models\Company;
 use App\Models\User;
+use App\Services\Authorization\CapabilityResolver;
 
 class CompanyPolicy
 {
@@ -24,10 +25,7 @@ class CompanyPolicy
     public function update(User $user, Company $company): bool
     {
         return $user->isSuperAdmin()
-            || $user->hasCompanyRole($company, [
-                CompanyMemberRole::Owner,
-                CompanyMemberRole::Admin,
-            ]);
+            || app(CapabilityResolver::class)->allows($user, Capability::CompanyManage, $company);
     }
 
     public function manageMembers(User $user, Company $company): bool
@@ -38,6 +36,6 @@ class CompanyPolicy
     public function delete(User $user, Company $company): bool
     {
         return $user->isSuperAdmin()
-            || $user->hasCompanyRole($company, [CompanyMemberRole::Owner]);
+            || app(CapabilityResolver::class)->allows($user, Capability::OwnershipTransfer, $company);
     }
 }

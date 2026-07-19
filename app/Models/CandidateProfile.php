@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Candidates\ProfileCompletenessCalculator;
 use Database\Factories\CandidateProfileFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -255,6 +256,7 @@ class CandidateProfile extends Model
             'salary_currency' => $this->salary_currency,
             'requires_visa' => (bool) $this->requires_visa,
             'has_work_permit' => (bool) $this->has_work_permit,
+            'profile_completeness' => (int) $this->completeness,
             'published_at' => $this->published_at?->getTimestamp(),
         ];
     }
@@ -291,7 +293,8 @@ class CandidateProfile extends Model
 
     public function canApply(): bool
     {
-        return $this->published_at !== null && $this->completeness >= 80;
+        return $this->published_at !== null
+            && $this->completeness >= app(ProfileCompletenessCalculator::class)->threshold();
     }
 
     public function anonymizedLabel(): string
