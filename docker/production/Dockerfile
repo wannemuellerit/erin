@@ -1,5 +1,6 @@
 ARG PHP_VERSION=8.4
 ARG ERIN_BUILD_SHA
+ARG ERIN_BUILD_ENV=production
 ARG ERIN_GOVERNANCE_TRUST_ROOT_SHA256
 
 FROM php:${PHP_VERSION}-fpm-bookworm@sha256:66a10c4b32b2f5886c32a4fb23c6cc3e727661e6a929c241befb335aaee0290e AS php-base
@@ -83,9 +84,10 @@ RUN npm ci --no-audit --no-fund \
 FROM php-base AS php
 
 ARG ERIN_BUILD_SHA
+ARG ERIN_BUILD_ENV=production
 ARG ERIN_GOVERNANCE_TRUST_ROOT_SHA256
 
-ENV APP_ENV=production \
+ENV APP_ENV=${ERIN_BUILD_ENV} \
     APP_DEBUG=false \
     ERIN_BUILD_SHA=${ERIN_BUILD_SHA} \
     LOG_CHANNEL=stderr
@@ -97,11 +99,13 @@ COPY --from=frontend-builder --chown=www-data:www-data /app/public/build /app/pu
 COPY --chown=www-data:www-data docker/production/entrypoint.sh /usr/local/bin/erin-entrypoint
 
 RUN printf '%s' "${ERIN_BUILD_SHA}" | grep -Eq '^[0-9a-f]{40}$' \
-    && printf '%s' "${ERIN_GOVERNANCE_TRUST_ROOT_SHA256}" | grep -Eq '^[0-9a-f]{64}$' \
+    && if [ "${ERIN_BUILD_ENV}" = "production" ]; then \
+        printf '%s' "${ERIN_GOVERNANCE_TRUST_ROOT_SHA256}" | grep -Eq '^[0-9a-f]{64}$' \
+        && printf '%s\n' "${ERIN_GOVERNANCE_TRUST_ROOT_SHA256}" > /app/.erin-governance-trust-root-sha256 \
+        && chmod 0444 /app/.erin-governance-trust-root-sha256; \
+    fi \
     && printf '%s\n' "${ERIN_BUILD_SHA}" > /app/.erin-build-sha \
-    && printf '%s\n' "${ERIN_GOVERNANCE_TRUST_ROOT_SHA256}" > /app/.erin-governance-trust-root-sha256 \
     && chmod 0444 /app/.erin-build-sha \
-    && chmod 0444 /app/.erin-governance-trust-root-sha256 \
     && chmod +x /usr/local/bin/erin-entrypoint \
     && mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
     && chown -R www-data:www-data storage bootstrap/cache
@@ -114,6 +118,7 @@ CMD ["php-fpm", "--nodaemonize"]
 FROM nginx:1.28-alpine@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236 AS nginx
 
 ARG ERIN_BUILD_SHA
+ARG ERIN_BUILD_ENV=production
 ARG ERIN_GOVERNANCE_TRUST_ROOT_SHA256
 
 LABEL org.opencontainers.image.revision="${ERIN_BUILD_SHA}"
@@ -122,4 +127,6 @@ COPY docker/production/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=php /app/public /app/public
 
 RUN printf '%s' "${ERIN_BUILD_SHA}" | grep -Eq '^[0-9a-f]{40}$' \
-    && printf '%s' "${ERIN_GOVERNANCE_TRUST_ROOT_SHA256}" | grep -Eq '^[0-9a-f]{64}$'
+    && if [ "${ERIN_BUILD_ENV}" = "production" ]; then \
+        printf '%s' "${ERIN_GOVERNANCE_TRUST_ROOT_SHA256}" | grep -Eq '^[0-9a-f]{64}$'; \
+    fi
