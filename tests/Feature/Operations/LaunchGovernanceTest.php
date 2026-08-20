@@ -640,6 +640,8 @@ it('keeps the hosted develop stack separate from production governance', functio
             'image: ${ERIN_APP_IMAGE:-erin-develop-app}',
             'image: ${ERIN_NGINX_IMAGE:-erin-develop-nginx}',
             'traefik.docker.network=${ERIN_TRAEFIK_NETWORK:-develop}',
+            'expose:',
+            '- "8080"',
             'name: ${ERIN_TRAEFIK_NETWORK:-develop}',
         )
         ->not->toContain(
@@ -648,6 +650,7 @@ it('keeps the hosted develop stack separate from production governance', functio
             'ERIN_GOVERNANCE_ATTESTATION_FILE',
             'ERIN_GOVERNANCE_TRUST_ROOT_FILE',
             'ERIN_GOVERNANCE_TRUST_ROOT_SHA256:',
+            '${HTTP_PORT:-80}:8080',
         );
 
     expect($productionCompose)->toBeString()
