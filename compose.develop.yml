@@ -433,7 +433,10 @@ services:
       - "traefik.http.routers.faden-develop.rule=Host(`faden.wannemueller.com`)"
       - "traefik.http.routers.faden-develop.entrypoints=websecure"
       - "traefik.http.routers.faden-develop.tls.certresolver=lets-encrypt"
-      - "traefik.http.services.faden-develop.loadbalancer.server.port=80"
+      - "traefik.http.services.faden-develop.loadbalancer.server.port=8080"
+    networks:
+      - default
+      - erin-develop
 
   queue:
     <<: *app-service
@@ -490,3 +493,6 @@ networks:
     ipam:
       config:
         - subnet: ${ERIN_INTERNAL_SUBNET:?ERIN_INTERNAL_SUBNET must be set}
+  erin-develop:
+    external: true
+    name: develop
