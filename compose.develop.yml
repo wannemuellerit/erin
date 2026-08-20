@@ -1,13 +1,12 @@
-name: erin-production
+name: erin-develop
 
 x-app-environment: &app-environment
   APP_NAME: ${APP_NAME:-Erin}
-  APP_ENV: production
-  APP_KEY: ${APP_KEY:-}
-  ERIN_RUNTIME_ENV_FILE: /run/secrets/erin_runtime_env
-  APP_DEBUG: "false"
+  APP_ENV: development
+  APP_KEY: ${APP_KEY:?APP_KEY must be set}
+  APP_DEBUG: "${APP_DEBUG:-false}"
   APP_URL: ${APP_URL:?APP_URL must be set}
-  APP_DEMO_MODE: "false"
+  APP_DEMO_MODE: "${APP_DEMO_MODE:-true}"
   APP_LOCALE: ${APP_LOCALE:-de}
   APP_FALLBACK_LOCALE: ${APP_FALLBACK_LOCALE:-de}
   APP_MAINTENANCE_DRIVER: cache
@@ -145,10 +144,6 @@ x-app-environment: &app-environment
   ERIN_PILOT_STOP_CRITERIA_TESTED: ${ERIN_PILOT_STOP_CRITERIA_TESTED:-false}
   ERIN_PILOT_ROLLBACK_TESTED: ${ERIN_PILOT_ROLLBACK_TESTED:-false}
   ERIN_PILOT_EVIDENCE_MAX_AGE_DAYS: ${ERIN_PILOT_EVIDENCE_MAX_AGE_DAYS:-90}
-  ERIN_GOVERNANCE_ATTESTATION_PATH: /run/secrets/erin_governance_attestation
-  ERIN_GOVERNANCE_TRUST_ROOT_PATH: /run/secrets/erin_governance_trust_root
-  ERIN_GOVERNANCE_SECRET_ROOT: /run/secrets
-  ERIN_GOVERNANCE_ATTESTATION_MAX_LIFETIME_HOURS: ${ERIN_GOVERNANCE_ATTESTATION_MAX_LIFETIME_HOURS:-168}
   MAIL_MAILER: smtp
   MAIL_HOST: ${MAIL_HOST:?MAIL_HOST must be set}
   MAIL_PORT: ${MAIL_PORT:-587}
@@ -209,14 +204,14 @@ x-app-environment: &app-environment
   VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
 
 x-app-service: &app-service
-  image: ${ERIN_APP_IMAGE:-erin-app}:${ERIN_APP_TAG:?ERIN_APP_TAG must be set}
+  image: ${ERIN_APP_IMAGE:-erin-develop-app}:${ERIN_APP_TAG:?ERIN_APP_TAG must be set}
   build:
     context: .
     dockerfile: docker/production/Dockerfile
     target: php
     args:
       ERIN_BUILD_SHA: ${ERIN_BUILD_SHA:?ERIN_BUILD_SHA must be set}
-      ERIN_GOVERNANCE_TRUST_ROOT_SHA256: ${ERIN_GOVERNANCE_TRUST_ROOT_SHA256:?ERIN_GOVERNANCE_TRUST_ROOT_SHA256 must be set}
+      ERIN_BUILD_ENV: development
       VITE_APP_NAME: ${APP_NAME:-Erin}
       VITE_BROADCAST_CONNECTION: reverb
       VITE_REVERB_PUBLIC_KEY: ${REVERB_APP_KEY:?REVERB_APP_KEY must be set}
@@ -231,16 +226,6 @@ x-app-service: &app-service
   read_only: true
   tmpfs:
     - /tmp:size=128m,mode=1777
-  secrets:
-    - source: erin_runtime_env
-      target: erin_runtime_env
-      mode: 0400
-    - source: erin_governance_attestation
-      target: erin_governance_attestation
-      mode: 0444
-    - source: erin_governance_trust_root
-      target: erin_governance_trust_root
-      mode: 0444
   restart: unless-stopped
   init: true
   depends_on:
@@ -306,7 +291,7 @@ services:
     image: getmeili/meilisearch:v1.16.0@sha256:c0c45cb82a96221d7c855d1cc36ca04ff4b3ce6330fbd8df5ba82e86e632a053
     restart: unless-stopped
     environment:
-      MEILI_ENV: production
+      MEILI_ENV: development
       MEILI_NO_ANALYTICS: "true"
       MEILI_MASTER_KEY: ${MEILISEARCH_KEY:?MEILISEARCH_KEY must be set}
     volumes:
@@ -391,14 +376,14 @@ services:
       start_period: 20s
 
   nginx:
-    image: ${ERIN_NGINX_IMAGE:-erin-nginx}:${ERIN_APP_TAG:?ERIN_APP_TAG must be set}
+    image: ${ERIN_NGINX_IMAGE:-erin-develop-nginx}:${ERIN_APP_TAG:?ERIN_APP_TAG must be set}
     build:
       context: .
       dockerfile: docker/production/Dockerfile
       target: nginx
       args:
         ERIN_BUILD_SHA: ${ERIN_BUILD_SHA:?ERIN_BUILD_SHA must be set}
-        ERIN_GOVERNANCE_TRUST_ROOT_SHA256: ${ERIN_GOVERNANCE_TRUST_ROOT_SHA256:?ERIN_GOVERNANCE_TRUST_ROOT_SHA256 must be set}
+        ERIN_BUILD_ENV: development
         VITE_APP_NAME: ${APP_NAME:-Erin}
         VITE_BROADCAST_CONNECTION: reverb
         VITE_REVERB_PUBLIC_KEY: ${REVERB_APP_KEY:?REVERB_APP_KEY must be set}
@@ -429,11 +414,11 @@ services:
       start_period: 20s
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=develop"
-      - "traefik.http.routers.faden-develop.rule=Host(`faden.wannemueller.com`)"
-      - "traefik.http.routers.faden-develop.entrypoints=websecure"
-      - "traefik.http.routers.faden-develop.tls.certresolver=lets-encrypt"
-      - "traefik.http.services.faden-develop.loadbalancer.server.port=8080"
+      - "traefik.docker.network=${ERIN_TRAEFIK_NETWORK:-develop}"
+      - "traefik.http.routers.erin-develop.rule=Host(`${ERIN_TRAEFIK_HOST:-faden.wannemueller.com}`)"
+      - "traefik.http.routers.erin-develop.entrypoints=websecure"
+      - "traefik.http.routers.erin-develop.tls.certresolver=${ERIN_TRAEFIK_CERT_RESOLVER:-lets-encrypt}"
+      - "traefik.http.services.erin-develop.loadbalancer.server.port=8080"
     networks:
       - default
       - erin-develop
@@ -471,14 +456,6 @@ services:
     restart: "no"
     command: ["php", "artisan", "migrate", "--force", "--isolated"]
 
-secrets:
-  erin_runtime_env:
-    file: ${ERIN_RUNTIME_ENV_SECRET_FILE:?ERIN_RUNTIME_ENV_SECRET_FILE must be set}
-  erin_governance_attestation:
-    file: ${ERIN_GOVERNANCE_ATTESTATION_FILE:?ERIN_GOVERNANCE_ATTESTATION_FILE must be set}
-  erin_governance_trust_root:
-    file: ${ERIN_GOVERNANCE_TRUST_ROOT_FILE:?ERIN_GOVERNANCE_TRUST_ROOT_FILE must be set}
-
 volumes:
   app-runtime:
   app-cache:
@@ -495,4 +472,4 @@ networks:
         - subnet: ${ERIN_INTERNAL_SUBNET:?ERIN_INTERNAL_SUBNET must be set}
   erin-develop:
     external: true
-    name: develop
+    name: ${ERIN_TRAEFIK_NETWORK:-develop}

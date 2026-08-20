@@ -627,6 +627,44 @@ it('binds production images to the build SHA and provisions only bucket-scoped M
         );
 })->group('ops');
 
+it('keeps the hosted develop stack separate from production governance', function () {
+    $developCompose = file_get_contents(base_path('compose.develop.yml'));
+    $productionCompose = file_get_contents(base_path('compose.production.yaml'));
+    $dockerfile = file_get_contents(base_path('docker/production/Dockerfile'));
+
+    expect($developCompose)->toBeString()
+        ->toContain(
+            'name: erin-develop',
+            'APP_ENV: development',
+            'ERIN_BUILD_ENV: development',
+            'image: ${ERIN_APP_IMAGE:-erin-develop-app}',
+            'image: ${ERIN_NGINX_IMAGE:-erin-develop-nginx}',
+            'traefik.docker.network=${ERIN_TRAEFIK_NETWORK:-develop}',
+            'name: ${ERIN_TRAEFIK_NETWORK:-develop}',
+        )
+        ->not->toContain(
+            'name: erin-production',
+            'ERIN_RUNTIME_ENV_SECRET_FILE',
+            'ERIN_GOVERNANCE_ATTESTATION_FILE',
+            'ERIN_GOVERNANCE_TRUST_ROOT_FILE',
+            'ERIN_GOVERNANCE_TRUST_ROOT_SHA256:',
+        );
+
+    expect($productionCompose)->toBeString()
+        ->toContain(
+            'name: erin-production',
+            'ERIN_GOVERNANCE_ATTESTATION_FILE',
+            'ERIN_GOVERNANCE_TRUST_ROOT_FILE',
+            'ERIN_GOVERNANCE_TRUST_ROOT_SHA256:',
+        );
+
+    expect($dockerfile)->toBeString()
+        ->toContain(
+            'ARG ERIN_BUILD_ENV=production',
+            'if [ "${ERIN_BUILD_ENV}" = "production" ]; then',
+        );
+})->group('ops');
+
 it('emits a machine-readable security audit without credentials', function () {
     configurePassingSecurityBaseline();
     config([
