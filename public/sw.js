@@ -11,7 +11,7 @@ self.addEventListener('push', (event) => {
         }
     }
 
-    const title = payload.title || 'Erin';
+    const title = payload.title || 'Faden';
     const options = {
         actions: payload.actions || [],
         badge: payload.badge,

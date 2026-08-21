@@ -371,7 +371,7 @@ function isAllowedVisibleText(value) {
     }
 
     const withoutBrands = text
-        .replace(/\b(?:Erin|erin|Laravel|PHP|ER)\b/gu, '')
+        .replace(/\b(?:Faden|faden|Laravel|PHP|ER)\b/gu, '')
         .replace(/[\d\s\p{P}\p{S}\p{M}]/gu, '');
 
     if (withoutBrands === '') {

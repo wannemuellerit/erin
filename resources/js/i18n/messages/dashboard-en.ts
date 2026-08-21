@@ -49,7 +49,7 @@ export default {
     admin: {
         eyebrow: 'Platform operations',
         title: 'Admin cockpit',
-        description: 'Users, processes and quality across the Erin platform.',
+        description: 'Users, processes and quality across the Faden platform.',
         users: 'Total users',
         companies: 'Companies',
         documentsInReview: 'Documents in review',

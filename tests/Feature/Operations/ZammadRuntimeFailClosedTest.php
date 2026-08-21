@@ -38,7 +38,7 @@ beforeEach(function () {
     config()->set('services.zammad.enabled', true);
     config()->set('services.zammad.url', 'https://zammad.example.test');
     config()->set('services.zammad.token', 'zammad-test-token');
-    config()->set('services.zammad.group', 'Erin Support');
+    config()->set('services.zammad.group', 'Faden Support');
     config()->set(
         'services.zammad.webhook_secret',
         'zammad-webhook-secret-with-32-chars',

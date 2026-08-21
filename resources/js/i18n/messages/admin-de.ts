@@ -423,7 +423,7 @@ export default {
             planCoverage:
                 '{configured} von {total} Startpaketen besitzen Produkt und Preis.',
             noSecrets:
-                'Aus Sicherheitsgründen zeigt Erin ausschließlich den Konfigurationsstatus und niemals Schlüssel oder Webhook-Secrets an.',
+                'Aus Sicherheitsgründen zeigt Faden ausschließlich den Konfigurationsstatus und niemals Schlüssel oder Webhook-Secrets an.',
             publishableKey: 'Veröffentlichbarer Schlüssel',
             secretKey: 'Geheimer Schlüssel',
             webhookSecret: 'Webhook-Secret',

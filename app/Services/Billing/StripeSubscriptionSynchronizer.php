@@ -105,7 +105,7 @@ class StripeSubscriptionSynchronizer
                 if (! $this->isCompanySubscription($companySnapshot, $target)) {
                     if ($expectedCurrentId === $subscriptionId) {
                         throw new RuntimeException(
-                            'Das aktuelle Stripe-Abonnement enthält kein gültiges Erin-Basispaket.',
+                            'Das aktuelle Stripe-Abonnement enthält kein gültiges Faden-Basispaket.',
                         );
                     }
 
@@ -588,7 +588,7 @@ class StripeSubscriptionSynchronizer
             if ($plan instanceof Plan) {
                 if (($quantities[$priceId] ?? null) !== 1) {
                     throw new RuntimeException(
-                        'Ein Erin-Basispaket muss in jeder Stripe-Schedule-Phase die Menge 1 besitzen.',
+                        'Ein Faden-Basispaket muss in jeder Stripe-Schedule-Phase die Menge 1 besitzen.',
                     );
                 }
                 $matched[] = $plan;
@@ -603,7 +603,7 @@ class StripeSubscriptionSynchronizer
         }
         if (count($matched) !== 1) {
             throw new RuntimeException(
-                'Eine Stripe-Schedule-Phase enthält nicht genau ein Erin-Basispaket.',
+                'Eine Stripe-Schedule-Phase enthält nicht genau ein Faden-Basispaket.',
             );
         }
 

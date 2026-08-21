@@ -383,7 +383,7 @@ it('builds localized database mail broadcast and web push payloads', function ()
         ])
         ->and($englishMail->subject)->toBe('New message')
         ->and($englishMail->greeting)->toBe('Hello Ada,')
-        ->and($englishMail->actionText)->toBe('View in Erin')
+        ->and($englishMail->actionText)->toBe('View in Faden')
         ->and($englishMail->actionUrl)->toBe('https://erin.example/messages/42')
         ->and($englishPush)
         ->toMatchArray([
@@ -398,7 +398,7 @@ it('builds localized database mail broadcast and web push payloads', function ()
         ])
         ->and($germanMail->subject)->toBe('Neue Nachricht')
         ->and($germanMail->greeting)->toBe('Hallo Emil,')
-        ->and($germanMail->actionText)->toBe('In Erin ansehen')
+        ->and($germanMail->actionText)->toBe('In Faden ansehen')
         ->and($germanPush)
         ->toMatchArray([
             'title' => 'Neue Nachricht',

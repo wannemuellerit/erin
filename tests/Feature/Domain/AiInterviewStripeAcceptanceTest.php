@@ -261,7 +261,7 @@ it('supports proposal, counterproposal and confirmation with participant-only si
     expect($candidateIcs->getContent())->toContain(
         'BEGIN:VCALENDAR',
         'DTSTART:'.$counterStart->utc()->format('Ymd\\THis\\Z'),
-        'SUMMARY:Erin Interview',
+        'SUMMARY:Faden Interview',
         'END:VCALENDAR',
     );
 

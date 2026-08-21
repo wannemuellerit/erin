@@ -51,7 +51,7 @@ class EnsurePlatformAccess
             $request->session()->regenerateToken();
 
             return redirect()->route('login')->withErrors([
-                'email' => __('Dein Erin-Konto ist derzeit gesperrt. Bitte kontaktiere den Support.'),
+                'email' => __('Dein Faden-Konto ist derzeit gesperrt. Bitte kontaktiere den Support.'),
             ]);
         }
 

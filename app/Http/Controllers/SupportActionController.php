@@ -204,15 +204,15 @@ class SupportActionController extends Controller
         if ($user->isPlatformStaff()) {
             $ticket->requester->notify(new ActivityNotification([
                 'event' => 'support.ticket_replied',
-                'title' => __('Antwort vom Erin-Support'),
+                'title' => __('Antwort vom Faden-Support'),
                 'message' => __('Dein Ticket :number wurde beantwortet.', ['number' => $ticket->number]),
                 'translations' => [
                     'de' => [
-                        'title' => 'Antwort vom Erin-Support',
+                        'title' => 'Antwort vom Faden-Support',
                         'message' => sprintf('Dein Ticket %s wurde beantwortet.', $ticket->number),
                     ],
                     'en' => [
-                        'title' => 'Reply from Erin support',
+                        'title' => 'Reply from Faden support',
                         'message' => sprintf('Your ticket %s has been answered.', $ticket->number),
                     ],
                 ],

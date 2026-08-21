@@ -395,7 +395,7 @@ source_quiesced=true
 
 docker exec "$scratch_container" sh -ec '
     umask 077
-    printf "Erin referenzierter Restore-Canary: %s\n" "$1" \
+    printf "Faden referenzierter Restore-Canary: %s\n" "$1" \
         > /scratch/database-object-canary.txt
 ' sh "$drill_id"
 docker exec "$scratch_container" chown "$container_user" /scratch/database-object-canary.txt
@@ -599,7 +599,7 @@ fi
 drill_canary_name="erin-drill-canary-${drill_id}.txt"
 object_storage_last_restored_record_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 docker exec "$scratch_container" sh -ec \
-    'printf "Erin local restore drill canary: %s\n" "$1" > "$2/$3"' \
+    'printf "Faden local restore drill canary: %s\n" "$1" > "$2/$3"' \
     sh "$drill_id" "$source_objects" "$drill_canary_name"
 
 manifest_for() {

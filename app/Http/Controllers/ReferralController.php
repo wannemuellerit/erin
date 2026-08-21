@@ -91,10 +91,10 @@ class ReferralController extends Controller
         $link = route('referrals.track', $code->code);
 
         Mail::raw(
-            ($validated['message'] ?? __('Ich möchte dir Erin empfehlen.'))."\n\n".$link,
+            ($validated['message'] ?? __('Ich möchte dir Faden empfehlen.'))."\n\n".$link,
             fn ($message) => $message
                 ->to($validated['email'])
-                ->subject(__('Einladung zu Erin')),
+                ->subject(__('Einladung zu Faden')),
         );
 
         return back()->with('success', __('Die Empfehlung wurde per E-Mail versendet.'));

@@ -292,7 +292,7 @@ export default {
         createTitle: 'Create a new job posting',
         editTitle: 'Edit job posting',
         description:
-            'Describe the position as clearly as possible – Erin handles the rest.',
+            'Describe the position as clearly as possible – Faden handles the rest.',
         backToJobs: 'Back to job postings',
         createWithAi: 'Create with AI',
         improveWithAi: 'Improve with AI',

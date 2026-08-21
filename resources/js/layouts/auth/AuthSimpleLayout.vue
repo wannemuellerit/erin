@@ -48,7 +48,7 @@ const copyrightYear = computed(() => new Date().getFullYear());
                 <AppLogoIcon class="size-11" />
                 <div>
                     <p class="text-xl font-extrabold tracking-tight">
-                        erin<span class="text-orange-400">.</span>
+                        faden<span class="text-orange-400">.</span>
                     </p>
                     <p
                         class="text-[10px] font-bold tracking-[0.16em] text-blue-200 uppercase"
@@ -124,7 +124,7 @@ const copyrightYear = computed(() => new Date().getFullYear());
                     <div class="hidden items-center gap-2 sm:flex lg:hidden">
                         <AppLogoIcon class="size-8" />
                         <span class="font-extrabold text-slate-950"
-                            >erin<span class="text-blue-600">.</span></span
+                            >faden<span class="text-blue-600">.</span></span
                         >
                     </div>
                 </div>
@@ -158,7 +158,7 @@ const copyrightYear = computed(() => new Date().getFullYear());
             </div>
 
             <div class="px-8 py-5 text-center text-[11px] text-slate-600">
-                © {{ copyrightYear }} Erin · {{ t('auth.privacy') }} ·
+                © {{ copyrightYear }} Faden · {{ t('auth.privacy') }} ·
                 {{ t('auth.imprint') }}
             </div>
         </main>

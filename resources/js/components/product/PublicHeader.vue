@@ -32,7 +32,7 @@ const links = computed(() => [
                     <p
                         class="text-lg leading-none font-extrabold tracking-tight text-slate-950"
                     >
-                        erin<span class="text-blue-600">.</span>
+                        faden<span class="text-blue-600">.</span>
                     </p>
                     <p
                         class="mt-1 text-[9px] font-bold tracking-[0.16em] text-slate-500 uppercase"

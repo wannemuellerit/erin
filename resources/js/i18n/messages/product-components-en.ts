@@ -79,7 +79,7 @@ export default {
             saturday: 'Saturday',
             sunday: 'Sunday',
         },
-        securityTitle: 'Secure interviews directly in Erin',
+        securityTitle: 'Secure interviews directly in Faden',
         securityDescription:
             'Video rooms are only opened for confirmed appointments; recordings are disabled.',
     },
@@ -104,7 +104,7 @@ export default {
     },
     referralDashboard: {
         eyebrow: 'Referral programme',
-        title: 'Recommend Erin',
+        title: 'Recommend Faden',
         description:
             'Share your personal link and track successful placements.',
         personalLink: 'Your personal referral link',
@@ -116,7 +116,7 @@ export default {
         email: 'Email',
         share: 'Share',
         createLink: 'Create referral link',
-        shareText: 'I would like to recommend Erin to you.',
+        shareText: 'I would like to recommend Faden to you.',
         recipientEmail: 'Recipient email',
         personalMessage: 'Personal message',
         sendRecommendation: 'Send recommendation',

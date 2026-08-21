@@ -613,7 +613,7 @@ class StripeSubscriptionScheduleBuilder
                 }
                 if ($normalized['quantity'] !== 1) {
                     throw new RuntimeException(
-                        'Ein Erin-Basispaket muss in jeder Stripe-Schedule-Phase die Menge 1 besitzen.',
+                        'Ein Faden-Basispaket muss in jeder Stripe-Schedule-Phase die Menge 1 besitzen.',
                     );
                 }
                 $base = $normalized;
@@ -632,7 +632,7 @@ class StripeSubscriptionScheduleBuilder
 
         if ($base === null || $basePrice === null) {
             throw new RuntimeException(
-                'Eine Stripe-Schedule-Phase enthält kein eindeutiges Erin-Basispaket.',
+                'Eine Stripe-Schedule-Phase enthält kein eindeutiges Faden-Basispaket.',
             );
         }
         if ($expectedBasePrice !== null && $basePrice !== $expectedBasePrice) {
@@ -949,7 +949,7 @@ class StripeSubscriptionScheduleBuilder
     {
         if (! is_string($plan->stripe_price_id) || $plan->stripe_price_id === '') {
             throw new RuntimeException(
-                'Ein Erin-Paket enthält keine gültige Stripe-Price-ID.',
+                'Ein Faden-Paket enthält keine gültige Stripe-Price-ID.',
             );
         }
 

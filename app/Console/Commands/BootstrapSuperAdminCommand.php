@@ -18,12 +18,12 @@ class BootstrapSuperAdminCommand extends Command
         {--expires=30 : Gültigkeit der einmaligen Einladung in Minuten}
         {--force : Eine bestehende Identität bewusst zum Superadmin hochstufen}';
 
-    protected $description = 'Erzeugt eine kurzlebige, einmalig verwendbare Einladung für den ersten Erin-Superadmin.';
+    protected $description = 'Erzeugt eine kurzlebige, einmalig verwendbare Einladung für den ersten Faden-Superadmin.';
 
     public function handle(AuditLogger $audit): int
     {
         $email = trim((string) ($this->option('email') ?: config('erin.bootstrap_admin.email')));
-        $name = trim((string) ($this->option('name') ?: config('erin.bootstrap_admin.name', 'Erin Superadmin')));
+        $name = trim((string) ($this->option('name') ?: config('erin.bootstrap_admin.name', 'Faden Superadmin')));
         $expires = (int) $this->option('expires');
         $allowRoleChange = (bool) $this->option('force');
 

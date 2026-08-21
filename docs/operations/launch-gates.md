@@ -1,7 +1,7 @@
 # Security-, Datenschutz-, Legal- und Pilot-Gates
 
 Ein öffentlicher Release ist nur zulässig, wenn die technische Baseline und
-alle extern verantworteten Gates erfüllt sind. Erin kann Nachweise prüfen, aber
+alle extern verantworteten Gates erfüllt sind. Faden kann Nachweise prüfen, aber
 weder eine Datenschutzbeauftragte, eine Rechtsberatung noch eine reale
 Pilotentscheidung ersetzen.
 
@@ -88,7 +88,7 @@ Die vollständigen Checklisten und das Evidenzschema stehen in
 
 Die Syntaxprüfung kann nicht beweisen, dass eine Person tatsächlich existiert
 oder die angegebene Rolle besitzt. Diese Identität und Befugnis ist Bestandteil
-der außerhalb von Erin aufbewahrten Freigabeevidenz.
+der außerhalb von Faden aufbewahrten Freigabeevidenz.
 
 ## Backup-/Restore-Gate
 
@@ -120,5 +120,5 @@ Exit-Code `0` bedeutet:
 - Das Evidenzschema ist vollständig, aktuell, releasegebunden und verletzt
   keine maschinell erkennbare Eigenfreigabe.
 
-Exit-Code `0` bedeutet ausdrücklich **nicht**, dass Erin selbst Rechtsberatung,
+Exit-Code `0` bedeutet ausdrücklich **nicht**, dass Faden selbst Rechtsberatung,
 Datenschutzprüfung, Penetrationstest oder Pilotentscheidung durchgeführt hat.

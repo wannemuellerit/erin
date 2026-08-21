@@ -66,7 +66,7 @@ function erinConfigureZammad(): void
         'zammad-message-marker-secret-current',
     );
     config()->set('services.zammad.previous_message_marker_secrets', []);
-    config()->set('services.zammad.group', 'Erin Support');
+    config()->set('services.zammad.group', 'Faden Support');
     config()->set('services.zammad.reconcile_initial_delay_seconds', 1);
     config()->set('services.zammad.reconcile_interval_seconds', 1);
     config()->set('services.zammad.reconcile_required_misses', 2);
@@ -247,7 +247,7 @@ it('synchronizes new tickets and replies with the authenticated Zammad API', fun
         }
 
         return $request->hasHeader('Authorization', 'Token token=zammad-test-token')
-            && $request['group'] === 'Erin Support'
+            && $request['group'] === 'Faden Support'
             && $request['customer_id'] === 'guess:'.$requester->email
             && $request['article']['subject'] === app(ZammadMessageMarker::class)->for($firstMessage)
             && $request['article']['sender'] === 'Customer'
@@ -1691,7 +1691,7 @@ it('keeps a webhook-confirmed message delivered when the outbound request times 
         ->and(SupportTicketMessage::query()->count())->toBe(1);
 });
 
-it('does not swallow an agent reply that repeats an Erin message marker', function () {
+it('does not swallow an agent reply that repeats an Faden message marker', function () {
     erinConfigureZammad();
     Bus::fake([ImportZammadAttachment::class]);
     Event::fake([SupportTicketMessageCreated::class]);
@@ -2273,7 +2273,7 @@ it('imports a foreign Agent response that copies a staff marker but changes the 
     ]);
     $outbound = $ticket->messages()->create([
         'author_id' => $staff->getKey(),
-        'body' => 'Ursprüngliche Erin-Antwort.',
+        'body' => 'Ursprüngliche Faden-Antwort.',
         'is_internal' => false,
     ]);
 

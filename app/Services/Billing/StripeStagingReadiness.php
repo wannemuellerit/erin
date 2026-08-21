@@ -104,7 +104,7 @@ class StripeStagingReadiness
                 : 'failed',
             Str::lower((string) config('cashier.currency')) === 'eur'
                 ? 'Cashier rechnet in EUR ab.'
-                : 'CASHIER_CURRENCY muss für Erin auf EUR gesetzt sein.',
+                : 'CASHIER_CURRENCY muss für Faden auf EUR gesetzt sein.',
         );
         $this->checkApplicationUrl();
 
@@ -272,7 +272,7 @@ class StripeStagingReadiness
             $valid ? 'passed' : 'failed',
             match (true) {
                 $valid => 'Eine eigenständige Price-ID ist lokal konfiguriert.',
-                $collidesWithPlan => 'Die konfigurierte Add-on-Price ist bereits einem Erin-Basispaket zugeordnet.',
+                $collidesWithPlan => 'Die konfigurierte Add-on-Price ist bereits einem Faden-Basispaket zugeordnet.',
                 $collidesWithOtherAddOn => 'Dieselbe Stripe-Price darf nicht mehreren Add-on-Rollen zugeordnet werden.',
                 default => 'Die konfigurierte Price-ID besitzt kein gültiges Format.',
             },

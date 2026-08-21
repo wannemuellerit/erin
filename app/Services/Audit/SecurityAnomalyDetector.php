@@ -99,8 +99,8 @@ class SecurityAnomalyDetector
                     'event' => 'security.anomaly_detected',
                     'title_de' => 'Sicherheitsauffälligkeit erkannt',
                     'title_en' => 'Security anomaly detected',
-                    'message_de' => "Erin hat das Muster „{$type}“ erkannt.",
-                    'message_en' => "Erin detected the pattern \"{$type}\".",
+                    'message_de' => "Faden hat das Muster „{$type}“ erkannt.",
+                    'message_en' => "Faden detected the pattern \"{$type}\".",
                     'url' => route('admin.audit.index'),
                 ])));
         }

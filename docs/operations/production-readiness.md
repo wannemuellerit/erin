@@ -158,7 +158,7 @@ Messung passend gewählt werden.
 Der private S3-Datenträger verwendet `PRIVATE_FILESYSTEM_PREFIX` ausschließlich
 als relativen Bucket-Präfix. Ein lokaler absoluter Pfad darf dort nicht stehen,
 weil er sonst Bestandteil jedes S3-Objektschlüssels würde. Nur beim
-`PRIVATE_FILESYSTEM_DRIVER=local` setzt Erin automatisch
+`PRIVATE_FILESYSTEM_DRIVER=local` setzt Faden automatisch
 `storage/app/private` als lokales Root-Verzeichnis.
 
 ## Aufbewahrung und Löschung

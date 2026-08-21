@@ -154,7 +154,7 @@ return new class extends Migration
             ->pluck('stripe_price_id');
         if ($duplicatePriceIds->isNotEmpty()) {
             throw new RuntimeException(
-                'Eine bestehende Stripe-Price-ID ist mehreren Erin-Paketen zugeordnet.',
+                'Eine bestehende Stripe-Price-ID ist mehreren Faden-Paketen zugeordnet.',
             );
         }
 
@@ -172,7 +172,7 @@ return new class extends Migration
                 ->exists()
         ) {
             throw new RuntimeException(
-                'Eine konfigurierte Stripe-Price ist zugleich einem Erin-Paket und einem Add-on zugeordnet.',
+                'Eine konfigurierte Stripe-Price ist zugleich einem Faden-Paket und einem Add-on zugeordnet.',
             );
         }
         if (
@@ -191,7 +191,7 @@ return new class extends Migration
                 ->exists()
         ) {
             throw new RuntimeException(
-                'Eine konfigurierte Add-on-Price ist bereits als historische Erin-Basis-Price registriert.',
+                'Eine konfigurierte Add-on-Price ist bereits als historische Faden-Basis-Price registriert.',
             );
         }
 
@@ -270,7 +270,7 @@ return new class extends Migration
                         )
                     ) {
                         throw new RuntimeException(
-                            'Eine bestehende Stripe-Preisversion widerspricht dem Erin-Paket.',
+                            'Eine bestehende Stripe-Preisversion widerspricht dem Faden-Paket.',
                         );
                     }
 
@@ -377,7 +377,7 @@ return new class extends Migration
                     ->exists()
             ) {
                 throw new RuntimeException(
-                    'Die konfigurierte Add-on-Price ist bereits als Erin-Basispaket registriert.',
+                    'Die konfigurierte Add-on-Price ist bereits als Faden-Basispaket registriert.',
                 );
             }
 

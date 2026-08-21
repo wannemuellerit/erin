@@ -56,7 +56,7 @@ token_id="$(printf '%s\n' "${bootstrap_output}" | sed -n 's/^ERIN_ZAMMAD_TOKEN_I
 unset bootstrap_output
 
 if [[ -z "${token}" || ! "${token_id}" =~ ^[1-9][0-9]*$ ]]; then
-    echo "Zammad hat kein API-Token für Erin zurückgegeben." >&2
+    echo "Zammad hat kein API-Token für Faden zurückgegeben." >&2
     exit 1
 fi
 
@@ -79,7 +79,7 @@ umask 077
 chmod 600 "${runtime_env}"
 
 if [[ ! -f "${ERIN_ROOT}/.env" ]]; then
-    echo "Erin-.env fehlt; die Integrationswerte liegen in docker/zammad/runtime/erin.env." >&2
+    echo "Faden-.env fehlt; die Integrationswerte liegen in docker/zammad/runtime/erin.env." >&2
     exit 1
 fi
 
@@ -95,7 +95,7 @@ docker compose --project-directory "${ERIN_ROOT}" restart laravel queue
 
 if ! docker compose --project-directory "${ERIN_ROOT}" exec -T \
     laravel php artisan erin:zammad:smoke; then
-    echo "Der neue Token konnte nicht bestätigt werden; bisherige Erin-Tokens bleiben als Rückfall erhalten." >&2
+    echo "Der neue Token konnte nicht bestätigt werden; bisherige Faden-Tokens bleiben als Rückfall erhalten." >&2
     echo "Nach Behebung erneut scripts/zammad/bootstrap.sh ausführen." >&2
     exit 1
 fi
@@ -112,12 +112,12 @@ finalize_output="$(
 unset token_id
 if [[ "${finalize_output}" != *"ERIN_ZAMMAD_TOKEN_FINALIZED=true"* ]]; then
     unset finalize_output
-    echo "Der neue Token funktioniert, aber ältere Erin-Tokens konnten nicht bereinigt werden." >&2
+    echo "Der neue Token funktioniert, aber ältere Faden-Tokens konnten nicht bereinigt werden." >&2
     echo "Führe den Bootstrap erneut aus oder bereinige die alten Tokens in Zammad." >&2
     exit 1
 fi
 unset finalize_output
 
 echo "Zammad-Gruppe, technischer Benutzer, API-Token, Webhook und Trigger sind eingerichtet."
-echo "Erin wurde lokal konfiguriert; sensible Werte stehen nur in ignorierten Dateien."
-echo "Der neue Token wurde geprüft; erst danach wurden ältere Erin-Tokens entfernt."
+echo "Faden wurde lokal konfiguriert; sensible Werte stehen nur in ignorierten Dateien."
+echo "Der neue Token wurde geprüft; erst danach wurden ältere Faden-Tokens entfernt."

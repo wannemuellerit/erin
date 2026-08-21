@@ -121,7 +121,7 @@ export default {
         eyebrow: 'Kommunikation',
         title: 'Nachrichtencenter',
         description:
-            'Unternehmen, Erin-Support und alle Unterlagen in einem sicheren Chat.',
+            'Unternehmen, Faden-Support und alle Unterlagen in einem sicheren Chat.',
     },
     referrals: {
         metaTitle: 'Referrals',
@@ -129,7 +129,7 @@ export default {
     ai: {
         metaTitle: 'KI Studio',
         eyebrow: 'Dein persönlicher Assistent',
-        title: 'Erin KI Studio',
+        title: 'Faden KI Studio',
         description:
             'Verbessere dein Profil, deine Unterlagen und deine Interviewvorbereitung.',
         creditsRemaining: '{remaining} von {limit} Credits',
@@ -144,7 +144,7 @@ export default {
             'Das Ergebnis ist ein Vorschlag und erfordert immer deine Prüfung.',
         consentRequired: 'Zweckgebundene Einwilligung erforderlich',
         consentDescription:
-            'Erin protokolliert Zweck, Datenkategorien, Promptversion und Ergebnis. Die Einwilligung kann jederzeit widerrufen werden.',
+            'Faden protokolliert Zweck, Datenkategorien, Promptversion und Ergebnis. Die Einwilligung kann jederzeit widerrufen werden.',
         grantConsent: 'Einwilligung erteilen',
         working: 'KI arbeitet …',
         createProposal: 'Vorschlag erzeugen',

@@ -1,6 +1,6 @@
 # Stripe-Staging und adversariale Abnahme
 
-Erin verwendet Stripe Billing mit Checkout Sessions. Die Anwendung schaltet
+Faden verwendet Stripe Billing mit Checkout Sessions. Die Anwendung schaltet
 Firmen nicht über den Browser-Redirect frei, sondern ausschließlich nach einem
 signierten Webhook und einer erneuten Abfrage des kanonischen Abonnements.
 
@@ -11,14 +11,14 @@ signierten Webhook und einer erneuten Abfrage des kanonischen Abonnements.
   zusätzlich Produktionsumgebung, öffentliche HTTPS-URL, `--allow-live` und
   eine interaktive Bestätigung.
 - Product- und Price-IDs werden gemeinsam persistiert. Eine Price ohne Product,
-  ein Product-Wechsel unter derselben Price oder mehrere Erin-Basispakete in
+  ein Product-Wechsel unter derselben Price oder mehrere Faden-Basispakete in
   einem Abonnement werden nicht automatisch übernommen.
 - Webhooks benötigen eine gültige Stripe-Signatur innerhalb der Toleranz, eine
   gültige Ereignisstruktur und einen zur Umgebung passenden `livemode`.
 - Wiederholte Ereignisse sind idempotent. Dieselbe Event-ID mit einem anderen
   Payload wird abgewiesen; verspätete Ereignisse können einen neueren
   Abonnementstand nicht überschreiben.
-- Einmalige Visakäufe enthalten zusätzlich eine Erin-Signatur über Firma,
+- Einmalige Visakäufe enthalten zusätzlich eine Faden-Signatur über Firma,
   Credit-Anzahl und Price-ID. Manipulierte Metadaten erzeugen keine Credits.
 - Providerfehler werden in Ausgaben und Integration Receipts nur generisch
   gespeichert. Schlüssel und rohe Stripe-Fehlermeldungen werden dort nicht
@@ -64,11 +64,11 @@ HTTPS-URL oder Webhook-Secret bleibt sie absichtlich rot.
 | Ereignismodus | `livemode=false` mit Test-Key | Liveevent in Test, Testevent in Live, fehlender boolescher Modus |
 | Idempotenz | identischer Retry wird einmal verarbeitet | gleiche ID mit verändertem Payload, parallele Verarbeitung |
 | Reihenfolge | kanonischer Stripe-Stand gewinnt | verspätetes Update, altes Ersatzabonnement, gleiche Sekunde |
-| Abonnement | genau ein Erin-Basispaket plus Add-ons | fremde Firmenmetadaten, mehrere Basispakete, Product/Price-Drift |
+| Abonnement | genau ein Faden-Basispaket plus Add-ons | fremde Firmenmetadaten, mehrere Basispakete, Product/Price-Drift |
 | Tarifwechsel | Upgrade sofort mit Rechnung, Downgrade zur Verlängerung | gleicher/inaktiver/Enterprise-Tarif, Providerfehler vor lokaler Änderung |
 | Kündigung | bis einschließlich 14 Tage vor Ende | Frist unterschritten verschiebt um eine volle Paketlaufzeit |
 | Zusatzsitze | positive Ganzzahl und autorisierte Rolle | 0, negativ, Dezimalwert, über 100, Viewer/Recruiter |
-| Visakauf | bezahlter Payment-Checkout mit Erin-Signatur | manipulierte Firma/Credits/Price, unpaid, falscher Modus, Replay |
+| Visakauf | bezahlter Payment-Checkout mit Faden-Signatur | manipulierte Firma/Credits/Price, unpaid, falscher Modus, Replay |
 | Kontingent | tarifgebundene Credits zuerst, danach gekaufte | abgelaufene Credits, Erschöpfung, doppelter PaymentIntent |
 | Ausfälle | sicherer Retry mit identischem Ereignis | Timeout, HTTP 429, HTTP 5xx, keine Secrets in Antwort/Receipt |
 | Missbrauchsschutz | normale Billing-Aktion | zu viele Versuche ergeben lokal HTTP 429 |

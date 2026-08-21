@@ -842,7 +842,7 @@ it('rejects canonical Price Product drift for the current subscription atomicall
         ),
     )->toThrow(
         RuntimeException::class,
-        'Price und Erin-Produktzuordnung',
+        'Price und Faden-Produktzuordnung',
     );
 
     $company->refresh();
@@ -904,7 +904,7 @@ it('rejects canonical subscriptions containing more than one base package', func
             $payload,
             'whsec_http_acceptance',
         ),
-    )->toThrow(RuntimeException::class, 'mehrere Erin-Basispakete');
+    )->toThrow(RuntimeException::class, 'mehrere Faden-Basispakete');
 
     expect($company->subscriptions()->count())->toBe(0)
         ->and($company->fresh()?->current_plan_id)->toBeNull()

@@ -195,8 +195,8 @@ class PortalController extends Controller
         $url = route('company-invitations.track', $invitation->token);
 
         Mail::raw(
-            __('Du wurdest in das Erin-Team von :company eingeladen.', ['company' => $company->name])."\n\n".$url,
-            fn ($message) => $message->to($invitation->email)->subject(__('Einladung zum Erin-Firmenportal')),
+            __('Du wurdest in das Faden-Team von :company eingeladen.', ['company' => $company->name])."\n\n".$url,
+            fn ($message) => $message->to($invitation->email)->subject(__('Einladung zum Faden-Firmenportal')),
         );
 
         return back()->with('success', __('Die Teameinladung wurde versendet.'));

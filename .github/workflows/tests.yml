@@ -149,7 +149,7 @@ jobs:
           build-args: |
             ERIN_BUILD_SHA=${{ github.sha }}
             ERIN_GOVERNANCE_TRUST_ROOT_SHA256=0000000000000000000000000000000000000000000000000000000000000000
-            VITE_APP_NAME=Erin
+            VITE_APP_NAME=Faden
             VITE_BROADCAST_CONNECTION=reverb
             VITE_REVERB_HOST=localhost
             VITE_REVERB_PORT=443

@@ -48,7 +48,7 @@ if [[ "${with_admin}" == true ]]; then
             echo
         fi
         if [[ -z "${integration_email}" ]]; then
-            read -r -p "E-Mail des technischen Erin-Benutzers: " integration_email
+            read -r -p "E-Mail des technischen Faden-Benutzers: " integration_email
         fi
     fi
 
@@ -78,14 +78,14 @@ payload = {
     "Users": [
         {
             "login": os.environ["ZAMMAD_ADMIN_EMAIL"],
-            "firstname": "Erin",
+            "firstname": "Faden",
             "lastname": "Administrator",
             "email": os.environ["ZAMMAD_ADMIN_EMAIL"],
             "password": os.environ["ZAMMAD_ADMIN_PASSWORD"],
         }
     ],
     "Settings": [
-        {"name": "product_name", "value": "Erin Support"},
+        {"name": "product_name", "value": "Faden Support"},
         {"name": "system_online_service", "value": False},
     ],
 }

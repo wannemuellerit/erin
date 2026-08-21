@@ -321,12 +321,12 @@ class InterviewController extends Controller
         $interview->load('application.jobPosting.company');
         $this->authorizeApplication($request, $interview->application);
         abort_if($interview->starts_at === null || $interview->ends_at === null, 404);
-        $title = 'Erin Interview – '.$interview->application->jobPosting->title;
-        $description = 'Videointerview über Erin mit '.$interview->application->jobPosting->company->name;
+        $title = 'Faden Interview – '.$interview->application->jobPosting->title;
+        $description = 'Videointerview über Faden mit '.$interview->application->jobPosting->company->name;
         $content = implode("\r\n", [
             'BEGIN:VCALENDAR',
             'VERSION:2.0',
-            'PRODID:-//Erin//Recruiting OS//DE',
+            'PRODID:-//Faden//Recruiting OS//DE',
             'CALSCALE:GREGORIAN',
             'METHOD:PUBLISH',
             'BEGIN:VEVENT',

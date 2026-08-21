@@ -168,7 +168,7 @@ class SyncSupportMessageToProvider implements ShouldBeUnique, ShouldQueue
             || preg_match('/\A[1-9][0-9]*\z/D', (string) $ticketId) !== 1
         ) {
             throw new RuntimeException(
-                'Die Erin-Nachricht besitzt kein gültiges Supportticket.',
+                'Die Faden-Nachricht besitzt kein gültiges Supportticket.',
             );
         }
         $ticketId = (int) $ticketId;
@@ -189,7 +189,7 @@ class SyncSupportMessageToProvider implements ShouldBeUnique, ShouldQueue
                 && ! hash_equals($message->external_article_id, $externalArticleId)
             ) {
                 throw new RuntimeException(
-                    'Die Erin-Nachricht wurde mit widersprüchlichen Zammad-Artikeln bestätigt.',
+                    'Die Faden-Nachricht wurde mit widersprüchlichen Zammad-Artikeln bestätigt.',
                 );
             }
 
@@ -199,7 +199,7 @@ class SyncSupportMessageToProvider implements ShouldBeUnique, ShouldQueue
                 ->exists();
             if ($conflict) {
                 throw new RuntimeException(
-                    'Der Zammad-Artikel wurde bereits einer anderen Erin-Nachricht zugeordnet.',
+                    'Der Zammad-Artikel wurde bereits einer anderen Faden-Nachricht zugeordnet.',
                 );
             }
 

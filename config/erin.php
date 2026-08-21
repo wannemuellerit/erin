@@ -3,7 +3,7 @@
 return [
     'bootstrap_admin' => [
         'email' => env('ERIN_BOOTSTRAP_ADMIN_EMAIL'),
-        'name' => env('ERIN_BOOTSTRAP_ADMIN_NAME', 'Erin Superadmin'),
+        'name' => env('ERIN_BOOTSTRAP_ADMIN_NAME', 'Faden Superadmin'),
     ],
     'health' => [
         'search_required' => (bool) env('ERIN_HEALTH_SEARCH_REQUIRED', true),

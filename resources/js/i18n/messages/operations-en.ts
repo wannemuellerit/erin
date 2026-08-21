@@ -3,7 +3,7 @@ export default {
         title: 'Support',
         eyebrow: 'Direct help',
         description:
-            'Create a ticket and chat with Erin support in a continuous conversation.',
+            'Create a ticket and chat with Faden support in a continuous conversation.',
         newTicket: 'New ticket',
         ticketList: 'Your tickets',
         noTickets: 'No support tickets yet',
@@ -41,16 +41,16 @@ export default {
             rejected: 'File rejected',
         },
         internal: 'Internal note',
-        supportTeam: 'Erin support',
+        supportTeam: 'Faden support',
         you: 'You',
         synced: 'Synced with Zammad',
-        local: 'Local in Erin',
+        local: 'Local in Faden',
         delivery: {
             pending: 'Pending',
             sending: 'Transferring',
             delivered: 'Delivered',
             failed: 'Failed',
-            local_only: 'Erin only',
+            local_only: 'Faden only',
         },
         statuses: {
             open: 'Open',
@@ -83,7 +83,7 @@ export default {
         due: 'Due',
         imports: 'CSV/Excel import',
         importDescription:
-            'Import up to 500 company-owned prospects. No Erin accounts are created without consent.',
+            'Import up to 500 company-owned prospects. No Faden accounts are created without consent.',
         selectFile: 'Select a CSV or XLSX file',
         upload: 'Validate file',
         template: 'Download CSV template',

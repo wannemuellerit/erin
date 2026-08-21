@@ -293,7 +293,7 @@ export default {
         createTitle: 'Neue Stellenanzeige erstellen',
         editTitle: 'Stellenanzeige bearbeiten',
         description:
-            'Beschreiben Sie die Position möglichst konkret – Erin übernimmt den Rest.',
+            'Beschreiben Sie die Position möglichst konkret – Faden übernimmt den Rest.',
         backToJobs: 'Zurück zu Stellenanzeigen',
         createWithAi: 'Mit KI erstellen',
         improveWithAi: 'Mit KI verbessern',

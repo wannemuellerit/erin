@@ -78,7 +78,7 @@ export default {
             saturday: 'Samstag',
             sunday: 'Sonntag',
         },
-        securityTitle: 'Sichere Interviews direkt in Erin',
+        securityTitle: 'Sichere Interviews direkt in Faden',
         securityDescription:
             'Videoräume werden erst für bestätigte Termine freigeschaltet; Aufzeichnungen sind deaktiviert.',
     },
@@ -103,7 +103,7 @@ export default {
     },
     referralDashboard: {
         eyebrow: 'Empfehlungsprogramm',
-        title: 'Erin weiterempfehlen',
+        title: 'Faden weiterempfehlen',
         description:
             'Teilen Sie Ihren persönlichen Link und verfolgen Sie erfolgreiche Vermittlungen.',
         personalLink: 'Ihr persönlicher Empfehlungslink',
@@ -115,7 +115,7 @@ export default {
         email: 'E-Mail',
         share: 'Teilen',
         createLink: 'Empfehlungslink erstellen',
-        shareText: 'Ich möchte dir Erin empfehlen.',
+        shareText: 'Ich möchte dir Faden empfehlen.',
         recipientEmail: 'Empfänger-E-Mail',
         personalMessage: 'Persönliche Nachricht',
         sendRecommendation: 'Empfehlung senden',

@@ -14,7 +14,7 @@ require_zammad_env
 "${SCRIPT_DIR}/healthcheck.sh"
 
 if [[ "$(env_value ZAMMAD_ENABLED "${ERIN_ROOT}/.env")" != "true" ]]; then
-    echo "Die lokale Erin-Zammad-Integration ist nicht aktiviert." >&2
+    echo "Die lokale Faden-Zammad-Integration ist nicht aktiviert." >&2
     echo "Führe zuerst scripts/zammad/bootstrap.sh aus." >&2
     exit 1
 fi
@@ -28,7 +28,7 @@ external_ticket_id="$(jq -er '.external_ticket_id' "${state_file}")"
 marker="$(jq -er '.marker' "${state_file}")"
 reply_body="Öffentliche Zammad-E2E-Antwort ${marker}."
 reply_contents="%PDF-1.4
-% Zammad zu Erin ${marker}
+% Zammad zu Faden ${marker}
 %%EOF"
 reply_checksum="$(printf '%s' "${reply_contents}" | sha256sum | cut -d' ' -f1)"
 reply_data="$(printf '%s' "${reply_contents}" | base64 -w 0)"
@@ -87,7 +87,7 @@ done
 
 unset token reply_data reply_payload
 if [[ "${verified}" != true ]]; then
-    echo "Die Zammad-Antwort oder ihr Anhang wurde nicht innerhalb von 60 Sekunden nach Erin importiert." >&2
+    echo "Die Zammad-Antwort oder ihr Anhang wurde nicht innerhalb von 60 Sekunden nach Faden importiert." >&2
     echo "Prüfe Queue, Zammad-Scheduler und Webhook mit scripts/zammad/logs.sh." >&2
     exit 1
 fi

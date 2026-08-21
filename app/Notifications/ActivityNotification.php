@@ -73,14 +73,14 @@ class ActivityNotification extends Notification implements ShouldQueue
 
         if (is_string($payload['url'] ?? null) && $payload['url'] !== '') {
             $message->action(
-                $locale === 'en' ? 'View in Erin' : 'In Erin ansehen',
+                $locale === 'en' ? 'View in Faden' : 'In Faden ansehen',
                 $payload['url'],
             );
         }
 
         return $message->salutation($locale === 'en'
-            ? 'Your Erin team'
-            : 'Dein Erin-Team');
+            ? 'Your Faden team'
+            : 'Dein Faden-Team');
     }
 
     public function toWebPush(
@@ -190,6 +190,6 @@ class ActivityNotification extends Notification implements ShouldQueue
      */
     private function fallbackTitle(string $locale): string
     {
-        return $locale === 'en' ? 'News from Erin' : 'Neuigkeiten von Erin';
+        return $locale === 'en' ? 'News from Faden' : 'Neuigkeiten von Faden';
     }
 }

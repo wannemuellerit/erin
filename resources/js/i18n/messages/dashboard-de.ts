@@ -48,7 +48,7 @@ export default {
     admin: {
         eyebrow: 'Plattformsteuerung',
         title: 'Admin Cockpit',
-        description: 'Nutzer, Prozesse und Qualität der Erin-Plattform.',
+        description: 'Nutzer, Prozesse und Qualität der Faden-Plattform.',
         users: 'Nutzer gesamt',
         companies: 'Unternehmen',
         documentsInReview: 'Dokumente in Prüfung',

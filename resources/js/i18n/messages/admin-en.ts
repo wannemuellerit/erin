@@ -420,7 +420,7 @@ export default {
             planCoverage:
                 '{configured} of {total} launch plans have a product and price.',
             noSecrets:
-                'For security, Erin only shows configuration state and never exposes keys or webhook secrets.',
+                'For security, Faden only shows configuration state and never exposes keys or webhook secrets.',
             publishableKey: 'Publishable key',
             secretKey: 'Secret key',
             webhookSecret: 'Webhook secret',

@@ -3,7 +3,7 @@ export default {
         title: 'Support',
         eyebrow: 'Direkte Hilfe',
         description:
-            'Erstelle ein Ticket und schreibe mit dem Erin-Support wie in einem Chat.',
+            'Erstelle ein Ticket und schreibe mit dem Faden-Support wie in einem Chat.',
         newTicket: 'Neues Ticket',
         ticketList: 'Deine Tickets',
         noTickets: 'Noch keine Supporttickets',
@@ -40,16 +40,16 @@ export default {
             rejected: 'Datei abgelehnt',
         },
         internal: 'Interne Notiz',
-        supportTeam: 'Erin-Support',
+        supportTeam: 'Faden-Support',
         you: 'Du',
         synced: 'Mit Zammad synchronisiert',
-        local: 'Lokal in Erin',
+        local: 'Lokal in Faden',
         delivery: {
             pending: 'Ausstehend',
             sending: 'Wird übertragen',
             delivered: 'Zugestellt',
             failed: 'Fehlgeschlagen',
-            local_only: 'Nur Erin',
+            local_only: 'Nur Faden',
         },
         statuses: {
             open: 'Offen',
@@ -82,7 +82,7 @@ export default {
         due: 'Fällig',
         imports: 'CSV-/Excel-Import',
         importDescription:
-            'Importiere bis zu 500 firmeneigene Interessenten. Es werden keine Erin-Konten ohne Einwilligung erstellt.',
+            'Importiere bis zu 500 firmeneigene Interessenten. Es werden keine Faden-Konten ohne Einwilligung erstellt.',
         selectFile: 'CSV- oder XLSX-Datei auswählen',
         upload: 'Datei prüfen',
         template: 'CSV-Vorlage herunterladen',
