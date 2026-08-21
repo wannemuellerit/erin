@@ -592,6 +592,9 @@ it('pins the Zammad webhook body limit and strips untrusted forwarded headers in
             'proxy_set_header Forwarded "";',
             'fastcgi_param HTTP_X_FORWARDED_FOR $remote_addr;',
             'fastcgi_param HTTP_FORWARDED "";',
+            'fastcgi_buffer_size 32k;',
+            'fastcgi_buffers 8 32k;',
+            'fastcgi_busy_buffers_size 64k;',
         )
         ->not->toContain('$proxy_add_x_forwarded_for');
 })->group('ops');
@@ -640,6 +643,8 @@ it('keeps the hosted develop stack separate from production governance', functio
             'image: ${ERIN_APP_IMAGE:-erin-develop-app}',
             'image: ${ERIN_NGINX_IMAGE:-erin-develop-nginx}',
             'traefik.docker.network=${ERIN_TRAEFIK_NETWORK:-develop}',
+            'expose:',
+            '- "8080"',
             'name: ${ERIN_TRAEFIK_NETWORK:-develop}',
         )
         ->not->toContain(
@@ -648,6 +653,7 @@ it('keeps the hosted develop stack separate from production governance', functio
             'ERIN_GOVERNANCE_ATTESTATION_FILE',
             'ERIN_GOVERNANCE_TRUST_ROOT_FILE',
             'ERIN_GOVERNANCE_TRUST_ROOT_SHA256:',
+            '${HTTP_PORT:-80}:8080',
         );
 
     expect($productionCompose)->toBeString()
