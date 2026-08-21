@@ -18,7 +18,7 @@
         "types:check": "vue-tsc --noEmit"
     },
     "devDependencies": {
-        "@intlify/message-compiler": "^11.4.6",
+        "@intlify/message-compiler": "^11.4.8",
         "@axe-core/playwright": "^4.12.1",
         "@eslint/js": "^9.19.0",
         "@laravel/echo-vue": "^2.4.0",
