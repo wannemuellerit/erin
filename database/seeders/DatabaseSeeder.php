@@ -16,7 +16,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(DomainCatalogSeeder::class);
 
-        if (app()->environment('local') && config('app.demo_mode')) {
+        if (! app()->isProduction() && config('app.demo_mode')) {
             $this->call(DemoDataSeeder::class);
         }
     }

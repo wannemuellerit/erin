@@ -288,6 +288,28 @@ test.describe('Login und Rollenbereiche', () => {
         ).toBeVisible();
     });
 
+    test('rendert leere Admin-Listen ohne Frontendfehler', async ({ page }) => {
+        const pageErrors: Error[] = [];
+        page.on('pageerror', (error) => pageErrors.push(error));
+
+        await logIn(page, accounts.admin.email);
+        await page.goto('/admin/companies?search=keine-demo-firma');
+
+        await expect(
+            page.getByRole('heading', {
+                level: 1,
+                name: 'Unternehmen',
+            }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole('heading', {
+                level: 2,
+                name: 'Keine Einträge vorhanden',
+            }),
+        ).toBeVisible();
+        expect(pageErrors).toEqual([]);
+    });
+
     test('zeigt dem Superadmin Uploadlimits, Dashboard-Anzeigen und Nutzerhistorien', async ({
         page,
     }) => {

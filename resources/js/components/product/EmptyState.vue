@@ -15,7 +15,6 @@ const props = withDefaults(
         panel?: boolean;
     }>(),
     {
-        icon: Inbox,
         compact: false,
         panel: false,
     },
@@ -30,6 +29,7 @@ const resolvedTitle = computed(() => props.title ?? t('emptyState.title'));
 const resolvedDescription = computed(
     () => props.description ?? t('emptyState.description'),
 );
+const resolvedIcon = computed(() => props.icon ?? Inbox);
 </script>
 
 <template>
@@ -45,7 +45,10 @@ const resolvedDescription = computed(
                 class="mx-auto grid place-items-center rounded-2xl bg-slate-100 text-slate-400"
                 :class="compact ? 'size-11' : 'size-14'"
             >
-                <component :is="icon" :class="compact ? 'size-5' : 'size-6'" />
+                <component
+                    :is="resolvedIcon"
+                    :class="compact ? 'size-5' : 'size-6'"
+                />
             </span>
             <h2
                 class="mt-4 font-bold text-slate-900"
