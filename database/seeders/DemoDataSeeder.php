@@ -24,6 +24,7 @@ use App\Models\TalentList;
 use App\Models\TalentListMember;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use LogicException;
 
 class DemoDataSeeder extends Seeder
@@ -34,25 +35,32 @@ class DemoDataSeeder extends Seeder
             throw new LogicException('Demo-Daten dürfen nur bei aktiviertem APP_DEMO_MODE angelegt werden.');
         }
 
-        $admin = User::query()->updateOrCreate(
-            ['email' => 'admin@wannemueller.dev'],
-            [
-                'name' => 'Wannemüller Admin',
-                'email_verified_at' => now(),
-                'password' => 'password',
-                'role' => UserRole::SuperAdmin,
-                'status' => UserStatus::Active,
-                'locale' => 'de',
-                'timezone' => 'Europe/Berlin',
-                'onboarding_completed_at' => now(),
-            ],
-        );
+        DB::transaction(function (): void {
+            // Der Demo-Seeder muss auch nach einem reinen `migrate` eigenständig
+            // funktionieren. Die Katalogdaten werden idempotent vorbereitet,
+            // bevor Firmen und Fachkräfte darauf verweisen.
+            $this->call(DomainCatalogSeeder::class);
 
-        $companies = $this->seedCompanies();
-        $candidates = $this->seedCandidates();
-        $this->seedMarketplace($companies, $candidates);
+            $admin = User::query()->updateOrCreate(
+                ['email' => 'admin@wannemueller.dev'],
+                [
+                    'name' => 'Wannemüller Admin',
+                    'email_verified_at' => now(),
+                    'password' => 'password',
+                    'role' => UserRole::SuperAdmin,
+                    'status' => UserStatus::Active,
+                    'locale' => 'de',
+                    'timezone' => 'Europe/Berlin',
+                    'onboarding_completed_at' => now(),
+                ],
+            );
 
-        $admin->forceFill(['last_active_at' => now()])->save();
+            $companies = $this->seedCompanies();
+            $candidates = $this->seedCandidates();
+            $this->seedMarketplace($companies, $candidates);
+
+            $admin->forceFill(['last_active_at' => now()])->save();
+        });
     }
 
     /**

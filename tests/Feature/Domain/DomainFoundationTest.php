@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\Gate;
 uses(RefreshDatabase::class);
 
 it('seeds the immutable launch catalog and verified demo identities', function () {
+    config()->set('app.demo_mode', false);
     $this->seed(DatabaseSeeder::class);
 
     expect(Plan::query()->pluck('slug')->sort()->values()->all())
@@ -49,6 +50,37 @@ it('seeds the immutable launch catalog and verified demo identities', function (
         ->and($candidate->skills)->not->toBeEmpty()
         ->and($application->pipelineStage())->toBe('interesting')
         ->and($application->jobPosting->company->memberships)->not->toBeEmpty();
+});
+
+it('seeds the complete demo dataset directly into an empty development database', function () {
+    config()->set('app.demo_mode', true);
+
+    $this->seed(DemoDataSeeder::class);
+
+    expect(Plan::query()->count())->toBe(4)
+        ->and(Company::query()->count())->toBe(2)
+        ->and(CandidateProfile::query()->count())->toBe(10)
+        ->and(User::query()->where('role', UserRole::Company)->count())->toBe(2)
+        ->and(User::query()->where('role', UserRole::Candidate)->count())->toBe(10)
+        ->and(JobPosting::query()->count())->toBe(2)
+        ->and(JobApplication::query()->count())->toBe(2);
+});
+
+it('includes demo data through the database seeder in non-production demo mode', function () {
+    config()->set('app.demo_mode', true);
+
+    $this->seed(DatabaseSeeder::class);
+    $this->seed(DatabaseSeeder::class);
+
+    expect(Company::query()->count())->toBe(2)
+        ->and(CandidateProfile::query()->count())->toBe(10)
+        ->and(User::query()->whereIn('email', [
+            'admin@wannemueller.dev',
+            'unternehmen.mueller@wannemueller.dev',
+            'unternehmen.rheincargo@wannemueller.dev',
+        ])->count())->toBe(3)
+        ->and(JobPosting::query()->count())->toBe(2)
+        ->and(JobApplication::query()->count())->toBe(2);
 });
 
 it('enforces tenant membership and keeps support access read only', function () {
