@@ -60,7 +60,7 @@ export default {
         markAllRead: 'Alle als gelesen markieren',
         profileSettings: 'Profil & Einstellungen',
         helpSupport: 'Hilfe & Support',
-        userFallback: 'Erin Nutzer',
+        userFallback: 'Faden Nutzer',
         language: 'Sprache',
         german: 'Deutsch',
         english: 'Englisch',
@@ -73,11 +73,11 @@ export default {
     },
     auth: {
         backHome: 'Zurück zur Startseite',
-        welcomeEyebrow: 'Willkommen bei Erin',
+        welcomeEyebrow: 'Willkommen bei Faden',
         welcomeBack: 'Schön, Sie wiederzusehen',
         welcomeBackDescription:
             'Melden Sie sich an, um Ihr Recruiting fortzusetzen.',
-        createAccountTitle: 'Ihr Erin-Konto erstellen',
+        createAccountTitle: 'Ihr Faden-Konto erstellen',
         createAccountDescription:
             'Wählen Sie Ihren Bereich und starten Sie in wenigen Minuten.',
         signInTitle: 'Anmelden',
@@ -148,7 +148,7 @@ export default {
             language: 'Sprache',
             german: 'Deutsch',
             english: 'Englisch',
-            copyright: '© {year} Erin Recruiting OS. Alle Rechte vorbehalten.',
+            copyright: '© {year} Faden Recruiting OS. Alle Rechte vorbehalten.',
             privacy: 'Datenschutz',
             imprint: 'Impressum',
             terms: 'AGB',
@@ -163,13 +163,13 @@ export default {
         welcome: {
             metaTitle: 'Internationales Recruiting, das ankommt',
             metaDescription:
-                'Erin verbindet internationale Fachkräfte mit Unternehmen in Deutschland – vom Match bis zum erfolgreichen Arbeitsbeginn.',
+                'Faden verbindet internationale Fachkräfte mit Unternehmen in Deutschland – vom Match bis zum erfolgreichen Arbeitsbeginn.',
             hero: {
                 badge: 'Internationales Recruiting Operating System',
                 titleLead: 'Die besten Fachkräfte.',
                 titleAccent: 'Grenzenlos gefunden.',
                 description:
-                    'Erin verbindet Unternehmen in Deutschland mit qualifizierten Menschen aus Europa und der Welt – vom ersten Match bis zum erfolgreichen Arbeitsbeginn.',
+                    'Faden verbindet Unternehmen in Deutschland mit qualifizierten Menschen aus Europa und der Welt – vom ersten Match bis zum erfolgreichen Arbeitsbeginn.',
                 companyCta: 'Fachkräfte finden',
                 candidateCta: 'Als Fachkraft registrieren',
                 freeCandidates: 'Für Fachkräfte kostenlos',
@@ -198,7 +198,7 @@ export default {
                 profileCta: 'Anonymisiertes Profil ansehen',
             },
             professions: {
-                eyebrow: 'Gefragte Fachrichtungen auf Erin',
+                eyebrow: 'Gefragte Fachrichtungen auf Faden',
                 electrician: 'Elektriker',
                 electronicsTechnician: 'Elektroniker',
                 truckDriver: 'LKW-Fahrer',
@@ -214,7 +214,7 @@ export default {
                 features: {
                     matching: {
                         title: 'Erklärbares Matching',
-                        text: 'Nicht nur ein Score: Erin zeigt transparent, warum Fachkraft und Stelle zusammenpassen.',
+                        text: 'Nicht nur ein Score: Faden zeigt transparent, warum Fachkraft und Stelle zusammenpassen.',
                     },
                     visa: {
                         title: 'Visa & Relocation',
@@ -250,7 +250,7 @@ export default {
                 },
             },
             process: {
-                eyebrow: 'So funktioniert Erin',
+                eyebrow: 'So funktioniert Faden',
                 title: 'Vom Profil bis zum ersten Arbeitstag',
                 steps: {
                     profile: {
@@ -331,7 +331,7 @@ export default {
             unpublishedText:
                 'Dieser Rechtstext wurde noch nicht veröffentlicht. Er muss vor dem öffentlichen Launch durch die zuständige Rechts- beziehungsweise Datenschutzprüfung bereitgestellt und freigegeben werden.',
             unpublishedHint:
-                'Erin zeigt an dieser Stelle bewusst keinen erfundenen oder ungeprüften Rechtstext.',
+                'Faden zeigt an dieser Stelle bewusst keinen erfundenen oder ungeprüften Rechtstext.',
             publishedLabel: 'Veröffentlichte Fassung',
             backHome: 'Zur Startseite',
         },
@@ -352,7 +352,7 @@ export default {
     },
     onboarding: {
         metaTitle: 'Konto einrichten',
-        eyebrow: 'Willkommen bei Erin',
+        eyebrow: 'Willkommen bei Faden',
         progress: 'Einrichtung',
         wizard: {
             resumable:
@@ -498,7 +498,7 @@ export default {
         notifications: {
             title: 'Benachrichtigungen',
             description:
-                'Lege fest, wie Erin dich bei wichtigen Vorgängen erreichen darf.',
+                'Lege fest, wie Faden dich bei wichtigen Vorgängen erreichen darf.',
             inApp: 'In-App',
             email: 'E-Mail',
             browserPush: 'Browser-Push',
@@ -509,7 +509,7 @@ export default {
                 'Browser-Push ist noch nicht serverseitig eingerichtet. Hinterlege zuerst die VAPID-Schlüssel.',
             pushTitle: 'Browser-Push auf diesem Gerät',
             pushDescription:
-                'Registriere diesen Browser, damit freigegebene Ereignisse auch bei geschlossenem Erin-Tab ankommen.',
+                'Registriere diesen Browser, damit freigegebene Ereignisse auch bei geschlossenem Faden-Tab ankommen.',
             pushActive: 'Auf diesem Gerät aktiv',
             pushInactive: 'Auf diesem Gerät nicht aktiv',
             pushUnsupported:
@@ -544,7 +544,7 @@ export default {
                 },
                 message: {
                     title: 'Nachrichten',
-                    description: 'Neue Nachrichten im Erin-Nachrichtencenter.',
+                    description: 'Neue Nachrichten im Faden-Nachrichtencenter.',
                 },
                 reminder: {
                     title: 'Erinnerungen',
@@ -609,7 +609,7 @@ export default {
             title: 'Zwei-Faktor-Authentifizierung',
             description: 'Zusätzlichen Anmeldeschutz verwalten',
             disabledDescription:
-                'Nach der Aktivierung fragt Erin bei der Anmeldung einen sicheren Code aus deiner Authenticator-App ab.',
+                'Nach der Aktivierung fragt Faden bei der Anmeldung einen sicheren Code aus deiner Authenticator-App ab.',
             enabledDescription:
                 'Bei der Anmeldung wird ein sicherer Code aus deiner Authenticator-App abgefragt.',
             continueSetup: 'Einrichtung fortsetzen',

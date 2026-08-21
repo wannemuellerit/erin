@@ -236,7 +236,7 @@ class OperationalReadinessCommand extends Command
                 }
 
                 try {
-                    fwrite($stream, 'Erin operational readiness probe');
+                    fwrite($stream, 'Faden operational readiness probe');
                     rewind($stream);
                     if ($scanner->scan($stream) !== 'clean') {
                         throw new \RuntimeException('ClamAV meldet die Testdatei nicht als sauber.');

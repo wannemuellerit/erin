@@ -9,7 +9,7 @@ return [
     | Stripe / Cashier
     |--------------------------------------------------------------------------
     |
-    | Erin intentionally keeps the public environment variable names supplied
+    | Faden intentionally keeps the public environment variable names supplied
     | by the project. Cashier reads those names through this mapping.
     |
     */

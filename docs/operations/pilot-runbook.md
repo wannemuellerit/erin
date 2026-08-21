@@ -1,4 +1,4 @@
-# Begleiteter Erin-Pilot
+# Begleiteter Faden-Pilot
 
 Der Pilot ist eine kontrollierte Produktionsphase mit kleinem Nutzerkreis. Er
 beginnt erst nach technischer, Security-, Datenschutz-, Legal- und
@@ -56,7 +56,7 @@ Mindestgrenzen:
 - null unautorisierte Dokumentdownloads;
 - null KI-bedingte automatische Statusänderungen;
 - 100 % signaturgeprüfte und idempotent verarbeitete Webhooks;
-- 100 % der Supporttickets in Erin und Zammad konsistent;
+- 100 % der Supporttickets in Faden und Zammad konsistent;
 - 100 % der Interviews nur für berechtigte Teilnehmende zugänglich;
 - keine offenen kritischen/hohen Incidents;
 - Bewerbungs-, Interview-, Dokument- und Visa-Timelines fachlich konsistent;

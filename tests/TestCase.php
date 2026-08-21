@@ -21,7 +21,7 @@ abstract class TestCase extends BaseTestCase
             || ($driver !== 'sqlite' && ! str_contains(mb_strtolower($database), 'test'))
         ) {
             throw new RuntimeException(
-                "Refusing to run Erin tests against unsafe database [{$database}].",
+                "Refusing to run Faden tests against unsafe database [{$database}].",
             );
         }
     }

@@ -172,7 +172,7 @@ class ZammadWebhookController extends Controller
                 if ($existingMessage !== null) {
                     if ($existingMessage->support_ticket_id !== $ticket->getKey()) {
                         throw new RuntimeException(
-                            'Ein Zammad-Artikel wurde einem anderen Erin-Ticket zugeordnet.',
+                            'Ein Zammad-Artikel wurde einem anderen Faden-Ticket zugeordnet.',
                         );
                     }
                     app(ZammadArticleReceiptRecorder::class)->record(
@@ -256,9 +256,9 @@ class ZammadWebhookController extends Controller
     }
 
     /**
-     * A Zammad trigger can call Erin before the outbound HTTP request has
+     * A Zammad trigger can call Faden before the outbound HTTP request has
      * returned to its queue job. In that window the external article ID is not
-     * stored yet, so correlate the echo through the immutable Erin marker
+     * stored yet, so correlate the echo through the immutable Faden marker
      * instead of creating a second local message.
      *
      * @param  array<string, mixed>  $article
@@ -316,7 +316,7 @@ class ZammadWebhookController extends Controller
             ->exists();
         if ($conflict) {
             throw new RuntimeException(
-                'Ein Zammad-Artikel wurde bereits einer anderen Erin-Nachricht zugeordnet.',
+                'Ein Zammad-Artikel wurde bereits einer anderen Faden-Nachricht zugeordnet.',
             );
         }
 
@@ -386,7 +386,7 @@ class ZammadWebhookController extends Controller
         foreach ($receipts as $receipt) {
             if ($receipt->support_ticket_id !== $ticket->getKey()) {
                 throw new RuntimeException(
-                    'Ein Zammad-Artikelbeleg gehört bereits zu einem anderen Erin-Ticket.',
+                    'Ein Zammad-Artikelbeleg gehört bereits zu einem anderen Faden-Ticket.',
                 );
             }
             $seen[$receipt->external_article_id] = true;
@@ -398,7 +398,7 @@ class ZammadWebhookController extends Controller
         foreach ($messages as $message) {
             if ($message->support_ticket_id !== $ticket->getKey()) {
                 throw new RuntimeException(
-                    'Ein Zammad-Artikel gehört bereits zu einem anderen Erin-Ticket.',
+                    'Ein Zammad-Artikel gehört bereits zu einem anderen Faden-Ticket.',
                 );
             }
             $seen[(string) $message->external_article_id] = true;

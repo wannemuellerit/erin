@@ -33,7 +33,7 @@ class BrowserTestSeeder extends Seeder
         $support = User::query()->updateOrCreate(
             ['email' => 'support.e2e@wannemueller.dev'],
             [
-                'name' => 'Erin E2E Support',
+                'name' => 'Faden E2E Support',
                 'email_verified_at' => now(),
                 'password' => 'password',
                 'role' => UserRole::Support,
@@ -126,17 +126,17 @@ class BrowserTestSeeder extends Seeder
         foreach ([
             [
                 'email' => 'company.admin.e2e@wannemueller.dev',
-                'name' => 'Erin E2E Firmenadmin',
+                'name' => 'Faden E2E Firmenadmin',
                 'role' => CompanyMemberRole::Admin,
             ],
             [
                 'email' => 'recruiter.e2e@wannemueller.dev',
-                'name' => 'Erin E2E Recruiter',
+                'name' => 'Faden E2E Recruiter',
                 'role' => CompanyMemberRole::Recruiter,
             ],
             [
                 'email' => 'viewer.e2e@wannemueller.dev',
-                'name' => 'Erin E2E Viewer',
+                'name' => 'Faden E2E Viewer',
                 'role' => CompanyMemberRole::Viewer,
             ],
         ] as $account) {

@@ -46,5 +46,5 @@ jobs:
           test -n "${ALERT_WEBHOOK}"
           curl --fail --silent --show-error \
             -H "Content-Type: application/json" \
-            --data "{\"text\":\"Erin production backup failed: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}" \
+            --data "{\"text\":\"Faden production backup failed: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}" \
             "${ALERT_WEBHOOK}"

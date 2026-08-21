@@ -183,13 +183,13 @@ class StripeSubscriptionItemClassifier
 
             if ($item['product'] !== $base['product']) {
                 throw new RuntimeException(
-                    'Stripe-Price und Erin-Produktzuordnung stimmen nicht überein.',
+                    'Stripe-Price und Faden-Produktzuordnung stimmen nicht überein.',
                 );
             }
 
             if ($item['quantity'] !== 1) {
                 throw new RuntimeException(
-                    'Ein Erin-Basispaket muss als genau eine Stripe-Position mit Menge 1 vorliegen.',
+                    'Ein Faden-Basispaket muss als genau eine Stripe-Position mit Menge 1 vorliegen.',
                 );
             }
 
@@ -201,7 +201,7 @@ class StripeSubscriptionItemClassifier
 
         if (count($baseMatches) > 1) {
             throw new RuntimeException(
-                'Ein Stripe-Abonnement enthält mehrere Erin-Basispakete.',
+                'Ein Stripe-Abonnement enthält mehrere Faden-Basispakete.',
             );
         }
 

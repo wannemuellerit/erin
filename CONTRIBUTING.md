@@ -1,6 +1,6 @@
-# Mitarbeit an Erin
+# Mitarbeit an Faden
 
-Erin verarbeitet Recruiting-, Kommunikations- und Dokumentdaten. Änderungen
+Faden verarbeitet Recruiting-, Kommunikations- und Dokumentdaten. Änderungen
 müssen deshalb fachlich nachvollziehbar, mandantensicher und ohne reale
 personenbezogene Testdaten erfolgen.
 

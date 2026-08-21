@@ -56,7 +56,7 @@ jobs:
           build-args: |
             ERIN_BUILD_SHA=${{ github.sha }}
             ERIN_GOVERNANCE_TRUST_ROOT_SHA256=${{ secrets.ERIN_GOVERNANCE_TRUST_ROOT_SHA256 }}
-            VITE_APP_NAME=Erin
+            VITE_APP_NAME=Faden
             VITE_BROADCAST_CONNECTION=reverb
             VITE_REVERB_PUBLIC_KEY=${{ vars.VITE_REVERB_PUBLIC_KEY }}
             VITE_REVERB_HOST=${{ vars.VITE_REVERB_HOST }}
@@ -78,7 +78,7 @@ jobs:
           build-args: |
             ERIN_BUILD_SHA=${{ github.sha }}
             ERIN_GOVERNANCE_TRUST_ROOT_SHA256=${{ secrets.ERIN_GOVERNANCE_TRUST_ROOT_SHA256 }}
-            VITE_APP_NAME=Erin
+            VITE_APP_NAME=Faden
             VITE_BROADCAST_CONNECTION=reverb
             VITE_REVERB_PUBLIC_KEY=${{ vars.VITE_REVERB_PUBLIC_KEY }}
             VITE_REVERB_HOST=${{ vars.VITE_REVERB_HOST }}

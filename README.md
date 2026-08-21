@@ -1,6 +1,6 @@
-# Erin
+# Faden
 
-Erin is a Laravel 13, Inertia 3 and Vue 3 recruiting platform. The repository
+Faden is a Laravel 13, Inertia 3 and Vue 3 recruiting platform. The repository
 is based on the official
 [`laravel/vue-starter-kit`](https://github.com/laravel/vue-starter-kit) and
 ships with a Docker-first development environment.
@@ -182,7 +182,7 @@ und
 
 ## Billing and external services
 
-Laravel Cashier uses Stripe Billing and Checkout. Erin deliberately maps
+Laravel Cashier uses Stripe Billing and Checkout. Faden deliberately maps
 Cashier to these project variables:
 
 ```dotenv
@@ -205,7 +205,7 @@ wait for a verified, idempotently processed Stripe webhook. Subscription
 webhooks are serialized per customer and reloaded from Stripe before Cashier is
 mutated; opaque event IDs are used only for exact deduplication.
 Signed events are additionally rejected when their `livemode` does not match
-the configured Secret Key. One-time visa purchases carry an Erin HMAC over
+the configured Secret Key. One-time visa purchases carry an Faden HMAC over
 company, quantity and immutable Price reference, so paid sessions created
 outside the application cannot forge credits through metadata alone.
 
@@ -256,7 +256,7 @@ documented in `docs/operations/stripe-staging.md`; production products, prices,
 webhook endpoints and keys must be configured through the protected deployment
 process.
 
-Zammad remains an external managed service. Erin stores every support message
+Zammad remains an external managed service. Faden stores every support message
 locally first and then synchronizes tickets and public replies through queued,
 retryable API jobs. Stable operation markers reconcile uncertain writes before
 a retry creates anything remotely. Configure a dedicated Zammad agent token
@@ -276,9 +276,9 @@ ZAMMAD_TIMEOUT=10
 
 The Zammad webhook endpoint is
 `https://<erin-domain>/integrations/zammad/webhook`. Set the same HMAC-SHA1
-signature token as `ZAMMAD_WEBHOOK_SECRET`; Erin validates `X-Hub-Signature`
+signature token as `ZAMMAD_WEBHOOK_SECRET`; Faden validates `X-Hub-Signature`
 and deduplicates deliveries by `X-Zammad-Delivery`. Internal Zammad notes stay
-staff-only, while public replies appear live in the shared Erin support chat.
+staff-only, while public replies appear live in the shared Faden support chat.
 
 OpenAI and LiveKit are external managed services and therefore do not get local
 containers. Their placeholders live in `.env.example`. Sensitive-document AI

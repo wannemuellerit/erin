@@ -222,7 +222,7 @@ class AiController extends Controller
      */
     private function prompt(string $task): array
     {
-        $base = 'Du bist Erin, ein Recruiting-Assistent. Antworte ausschließlich im vorgegebenen JSON-Schema. '
+        $base = 'Du bist Faden, ein Recruiting-Assistent. Antworte ausschließlich im vorgegebenen JSON-Schema. '
             .'Triff niemals Einstellungs-, Ablehnungs- oder Statusentscheidungen. Nutze weder Herkunft, Nationalität, '
             .'Geschlecht, Alter noch Gesundheitsdaten für Bewertungen. Benenne Unsicherheiten transparent.';
 

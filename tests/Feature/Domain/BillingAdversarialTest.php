@@ -364,7 +364,7 @@ it('shows the localized support warning for a terminal manual-review plan change
     ],
     'English' => [
         'en',
-        'The plan change was modified outside Erin in Stripe and was not applied automatically. Support has been notified for manual review.',
+        'The plan change was modified outside Faden in Stripe and was not applied automatically. Support has been notified for manual review.',
     ],
 ]);
 

@@ -120,8 +120,8 @@ it('replaces the dead contact redirect with a configurable public contact page',
         [
             'email' => 'recruiting@example.test',
             'phone' => '+49 30 123456',
-            'address_de' => "Erin Recruiting\nBerlin",
-            'address_en' => "Erin Recruiting\nBerlin, Germany",
+            'address_de' => "Faden Recruiting\nBerlin",
+            'address_en' => "Faden Recruiting\nBerlin, Germany",
         ],
         'contact',
         true,
@@ -135,5 +135,5 @@ it('replaces the dead contact redirect with a configurable public contact page',
             ->where('contact.available', true)
             ->where('contact.email', 'recruiting@example.test')
             ->where('contact.phone', '+49 30 123456')
-            ->where('contact.address', "Erin Recruiting\nBerlin, Germany"));
+            ->where('contact.address', "Faden Recruiting\nBerlin, Germany"));
 });

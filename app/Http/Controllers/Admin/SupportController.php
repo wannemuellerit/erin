@@ -231,11 +231,11 @@ class SupportController extends AdminController
                 'event' => 'support.ticket_replied',
                 'translations' => [
                     'de' => [
-                        'title' => 'Antwort vom Erin-Support',
+                        'title' => 'Antwort vom Faden-Support',
                         'message' => sprintf('Dein Ticket %s wurde beantwortet.', $ticket->number),
                     ],
                     'en' => [
-                        'title' => 'Reply from Erin support',
+                        'title' => 'Reply from Faden support',
                         'message' => sprintf('Your ticket %s has been answered.', $ticket->number),
                     ],
                 ],

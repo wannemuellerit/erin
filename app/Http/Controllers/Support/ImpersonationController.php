@@ -73,7 +73,7 @@ class ImpersonationController extends AdminController
 
         return redirect()->route('dashboard')->with(
             'warning',
-            __('Du siehst Erin jetzt schreibgeschützt aus Sicht von :name.', ['name' => $user->name]),
+            __('Du siehst Faden jetzt schreibgeschützt aus Sicht von :name.', ['name' => $user->name]),
         );
     }
 

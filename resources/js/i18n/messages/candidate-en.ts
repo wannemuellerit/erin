@@ -120,7 +120,7 @@ export default {
         eyebrow: 'Communication',
         title: 'Message centre',
         description:
-            'Companies, Erin support and all documents in one secure chat.',
+            'Companies, Faden support and all documents in one secure chat.',
     },
     referrals: {
         metaTitle: 'Referrals',
@@ -128,7 +128,7 @@ export default {
     ai: {
         metaTitle: 'AI Studio',
         eyebrow: 'Your personal assistant',
-        title: 'Erin AI Studio',
+        title: 'Faden AI Studio',
         description:
             'Improve your profile, documents and interview preparation.',
         creditsRemaining: '{remaining} of {limit} credits',
@@ -142,7 +142,7 @@ export default {
             'The result is a suggestion and always requires your review.',
         consentRequired: 'Purpose-specific consent required',
         consentDescription:
-            'Erin records the purpose, data categories, prompt version and result. You can withdraw your consent at any time.',
+            'Faden records the purpose, data categories, prompt version and result. You can withdraw your consent at any time.',
         grantConsent: 'Give consent',
         working: 'AI is working …',
         createProposal: 'Create suggestion',

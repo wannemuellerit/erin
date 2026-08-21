@@ -14,7 +14,7 @@ it('records successful logins with request context and no credentials', function
 
     $this
         ->withServerVariables(['REMOTE_ADDR' => '203.0.113.10'])
-        ->withHeader('User-Agent', 'Erin Security Test/1.0')
+        ->withHeader('User-Agent', 'Faden Security Test/1.0')
         ->post(route('login.store'), [
             'email' => $user->email,
             'password' => 'password',
@@ -28,7 +28,7 @@ it('records successful logins with request context and no credentials', function
         ->and($history->event)->toBe('login')
         ->and($history->successful)->toBeTrue()
         ->and($history->ip_address)->toBe('203.0.113.10')
-        ->and($history->user_agent)->toBe('Erin Security Test/1.0')
+        ->and($history->user_agent)->toBe('Faden Security Test/1.0')
         ->and($history->failure_reason)->toBeNull()
         ->and(json_encode($history->getAttributes(), JSON_THROW_ON_ERROR))
         ->not->toContain('password');
@@ -42,7 +42,7 @@ it('records failed logins without persisting the supplied password', function ()
 
     $this
         ->withServerVariables(['REMOTE_ADDR' => '203.0.113.11'])
-        ->withHeader('User-Agent', 'Erin Security Test/2.0')
+        ->withHeader('User-Agent', 'Faden Security Test/2.0')
         ->post(route('login.store'), [
             'email' => $user->email,
             'password' => 'definitely-not-the-password',
@@ -68,7 +68,7 @@ it('records logout events separately from successful logins', function () {
 
     $this->actingAs($user)
         ->withServerVariables(['REMOTE_ADDR' => '203.0.113.12'])
-        ->withHeader('User-Agent', 'Erin Security Test/3.0')
+        ->withHeader('User-Agent', 'Faden Security Test/3.0')
         ->post(route('logout'))
         ->assertRedirect(route('home'));
 

@@ -1,7 +1,7 @@
 name: erin-develop
 
 x-app-environment: &app-environment
-  APP_NAME: ${APP_NAME:-Erin}
+  APP_NAME: ${APP_NAME:-Faden}
   APP_ENV: development
   APP_KEY: ${APP_KEY:?APP_KEY must be set}
   APP_DEBUG: "${APP_DEBUG:-false}"
@@ -212,7 +212,7 @@ x-app-service: &app-service
     args:
       ERIN_BUILD_SHA: ${ERIN_BUILD_SHA:?ERIN_BUILD_SHA must be set}
       ERIN_BUILD_ENV: development
-      VITE_APP_NAME: ${APP_NAME:-Erin}
+      VITE_APP_NAME: ${APP_NAME:-Faden}
       VITE_BROADCAST_CONNECTION: reverb
       VITE_REVERB_PUBLIC_KEY: ${REVERB_APP_KEY:?REVERB_APP_KEY must be set}
       VITE_REVERB_HOST: ${VITE_REVERB_HOST:?VITE_REVERB_HOST must be set}
@@ -384,7 +384,7 @@ services:
       args:
         ERIN_BUILD_SHA: ${ERIN_BUILD_SHA:?ERIN_BUILD_SHA must be set}
         ERIN_BUILD_ENV: development
-        VITE_APP_NAME: ${APP_NAME:-Erin}
+        VITE_APP_NAME: ${APP_NAME:-Faden}
         VITE_BROADCAST_CONNECTION: reverb
         VITE_REVERB_PUBLIC_KEY: ${REVERB_APP_KEY:?REVERB_APP_KEY must be set}
         VITE_REVERB_HOST: ${VITE_REVERB_HOST:?VITE_REVERB_HOST must be set}

@@ -2,7 +2,7 @@
 
 # This file runs inside the pinned Zammad Rails container. It intentionally
 # receives configuration through process-local environment variables and
-# prints only the newly generated Erin API token with a machine-readable marker.
+# prints only the newly generated Faden API token with a machine-readable marker.
 
 require 'securerandom'
 
@@ -19,18 +19,18 @@ UserInfo.current_user_id = admin.id
 if action == 'finalize'
   keep_token_id = Integer(ENV.fetch('ERIN_ZAMMAD_KEEP_TOKEN_ID'), 10)
   integration_user = User.find_by(login: integration_email)
-  raise 'Configured Erin integration user was not found.' if integration_user.nil?
+  raise 'Configured Faden integration user was not found.' if integration_user.nil?
 
   keep_token = Token.find_by(
     id: keep_token_id,
     user_id: integration_user.id,
     action: 'api',
   )
-  raise 'Prepared Erin integration token was not found.' if keep_token.nil?
-  raise 'Prepared token does not belong to Erin.' unless keep_token.name.start_with?('Erin local integration')
+  raise 'Prepared Faden integration token was not found.' if keep_token.nil?
+  raise 'Prepared token does not belong to Faden.' unless keep_token.name.start_with?('Faden local integration')
 
   Token.where(user_id: integration_user.id, action: 'api')
-    .where("name LIKE ?", 'Erin local integration%')
+    .where("name LIKE ?", 'Faden local integration%')
     .where.not(id: keep_token.id)
     .delete_all
 
@@ -55,7 +55,7 @@ ActiveRecord::Base.transaction do
     active: true,
     follow_up_possible: 'yes',
     follow_up_assignment: true,
-    note: 'Supporttickets aus Erin.',
+    note: 'Supporttickets aus Faden.',
     created_by_id: group.created_by_id || admin.id,
     updated_by_id: admin.id,
   )
@@ -64,7 +64,7 @@ ActiveRecord::Base.transaction do
   agent_role = Role.find_by!(name: 'Agent')
   integration_user = User.find_or_initialize_by(login: integration_email)
   integration_user.assign_attributes(
-    firstname: 'Erin',
+    firstname: 'Faden',
     lastname: 'Integration',
     email: integration_email,
     active: true,
@@ -76,7 +76,7 @@ ActiveRecord::Base.transaction do
   integration_user.group_ids_access_map = { group.id => 'full' }
   integration_user.save!
 
-  webhook = Webhook.find_or_initialize_by(name: 'Erin Support Bridge')
+  webhook = Webhook.find_or_initialize_by(name: 'Faden Support Bridge')
   webhook.assign_attributes(
     endpoint: callback_url,
     http_method: 'post',
@@ -84,13 +84,13 @@ ActiveRecord::Base.transaction do
     signature_token: webhook_secret,
     active: true,
     customized_payload: false,
-    note: 'Synchronisiert öffentliche Zammad-Antworten nach Erin.',
+    note: 'Synchronisiert öffentliche Zammad-Antworten nach Faden.',
     created_by_id: webhook.created_by_id || admin.id,
     updated_by_id: admin.id,
   )
   webhook.save!
 
-  trigger = Trigger.find_or_initialize_by(name: 'Erin Support Bridge')
+  trigger = Trigger.find_or_initialize_by(name: 'Faden Support Bridge')
   trigger.assign_attributes(
     activator: 'action',
     execution_condition_mode: 'selective',
@@ -106,7 +106,7 @@ ActiveRecord::Base.transaction do
       },
     },
     active: true,
-    note: 'Übermittelt Änderungen aus der Erin-Support-Gruppe an Erin.',
+    note: 'Übermittelt Änderungen aus der Faden-Support-Gruppe an Faden.',
     created_by_id: trigger.created_by_id || admin.id,
     updated_by_id: admin.id,
   )
@@ -116,15 +116,15 @@ ActiveRecord::Base.transaction do
     user_id: integration_user.id,
     action: 'api',
     persistent: true,
-    name: "Erin local integration #{Time.now.utc.strftime('%Y%m%d%H%M%S')}-#{SecureRandom.hex(4)}",
+    name: "Faden local integration #{Time.now.utc.strftime('%Y%m%d%H%M%S')}-#{SecureRandom.hex(4)}",
     preferences: { permission: ['ticket.agent'] },
   )
   token_value = token.token
   token_id = token.id
 end
 
-raise 'Zammad did not generate an Erin API token.' if token_value.nil? || token_value.empty?
-raise 'Zammad did not persist the Erin API token.' if token_id.nil?
+raise 'Zammad did not generate an Faden API token.' if token_value.nil? || token_value.empty?
+raise 'Zammad did not persist the Faden API token.' if token_id.nil?
 
 puts "ERIN_ZAMMAD_TOKEN=#{token_value}"
 puts "ERIN_ZAMMAD_TOKEN_ID=#{token_id}"

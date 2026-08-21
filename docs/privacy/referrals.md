@@ -1,6 +1,6 @@
 # Referral-Datenschutz und Attribution
 
-Erin speichert beim Öffnen eines Empfehlungslinks einen zufälligen Besucher-Token. Bei einer
+Faden speichert beim Öffnen eines Empfehlungslinks einen zufälligen Besucher-Token. Bei einer
 Registrierung wird dieser Token dem neuen Konto zugeordnet; die E-Mail-Adresse wird ausschließlich
 als SHA-256-Hash gespeichert. Die Attribution dient der transparent ausgewiesenen
 Referral-Provision und wird nicht für Werbeprofile oder automatisierte Entscheidungen verwendet.

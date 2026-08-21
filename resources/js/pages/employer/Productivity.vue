@@ -213,7 +213,7 @@ const activityLabel = (entry: ActivityEntry) => {
     const payload = entry.payload ?? {};
 
     return t(te(key) ? key : 'operations.productivity.activities.fallback', {
-        actor: entry.actor?.name ?? 'Erin',
+        actor: entry.actor?.name ?? 'Faden',
         title: payload.title ?? '',
         candidate: payload.candidate_label ?? '',
         job: payload.job_title ?? '',

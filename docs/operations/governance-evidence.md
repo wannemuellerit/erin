@@ -1,8 +1,8 @@
 # Governance-Evidenz für Security, Datenschutz und Recht
 
 Dieses Dokument definiert die Mindestprüfung und das Evidenzformat für einen
-Erin-Release. Formale Freigaben werden von real verantwortlichen Personen
-außerhalb der Anwendung erteilt. Erin speichert nur nicht geheime Referenzen und
+Faden-Release. Formale Freigaben werden von real verantwortlichen Personen
+außerhalb der Anwendung erteilt. Faden speichert nur nicht geheime Referenzen und
 prüft deren Struktur.
 
 ## Gemeinsames Evidenzschema

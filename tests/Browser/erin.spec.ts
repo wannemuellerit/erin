@@ -33,19 +33,19 @@ const accounts = {
     },
     support: {
         email: 'support.e2e@wannemueller.dev',
-        name: 'Erin E2E Support',
+        name: 'Faden E2E Support',
     },
     companyAdmin: {
         email: 'company.admin.e2e@wannemueller.dev',
-        name: 'Erin E2E Firmenadmin',
+        name: 'Faden E2E Firmenadmin',
     },
     recruiter: {
         email: 'recruiter.e2e@wannemueller.dev',
-        name: 'Erin E2E Recruiter',
+        name: 'Faden E2E Recruiter',
     },
     viewer: {
         email: 'viewer.e2e@wannemueller.dev',
-        name: 'Erin E2E Viewer',
+        name: 'Faden E2E Viewer',
     },
     onboardingCandidate: {
         email: 'onboarding.candidate@wannemueller.dev',

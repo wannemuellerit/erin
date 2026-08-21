@@ -24,8 +24,8 @@ fi
 erin_network="$(env_value ERIN_DOCKER_NETWORK)"
 erin_network="${erin_network:-erin_default}"
 if ! docker network inspect "${erin_network}" >/dev/null 2>&1; then
-    echo "Das Erin-Netzwerk ${erin_network} existiert noch nicht." >&2
-    echo "Starte zuerst den Erin-Stack mit: docker compose up -d" >&2
+    echo "Das Faden-Netzwerk ${erin_network} existiert noch nicht." >&2
+    echo "Starte zuerst den Faden-Stack mit: docker compose up -d" >&2
     exit 1
 fi
 

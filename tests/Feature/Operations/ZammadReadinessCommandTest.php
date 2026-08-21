@@ -16,7 +16,7 @@ function configureZammadReadiness(): void
     config()->set('services.zammad.allow_local_http', false);
     config()->set('services.zammad.local_http_hosts', []);
     config()->set('services.zammad.token', 'never-print-this-zammad-token');
-    config()->set('services.zammad.group', 'Erin Support');
+    config()->set('services.zammad.group', 'Faden Support');
     config()->set('services.zammad.webhook_secret', str_repeat('w', 40));
     config()->set('services.zammad.timeout', 2);
 }
@@ -80,7 +80,7 @@ it('accepts only explicitly allowlisted Docker hosts in local environments', fun
     config()->set('services.zammad.allow_local_http', true);
     config()->set('services.zammad.local_http_hosts', ['zammad', 'laravel']);
     config()->set('services.zammad.token', 'local-zammad-token');
-    config()->set('services.zammad.group', 'Erin Support');
+    config()->set('services.zammad.group', 'Faden Support');
     config()->set('services.zammad.webhook_secret', str_repeat('l', 40));
     Http::fake([
         'http://zammad:8080/api/v1/users/me' => Http::response([
@@ -111,7 +111,7 @@ it('rejects local HTTP endpoints in production even when the flag and hosts are 
     config()->set('services.zammad.allow_local_http', true);
     config()->set('services.zammad.local_http_hosts', ['zammad', 'laravel']);
     config()->set('services.zammad.token', 'must-remain-private');
-    config()->set('services.zammad.group', 'Erin Support');
+    config()->set('services.zammad.group', 'Faden Support');
     config()->set('services.zammad.webhook_secret', str_repeat('p', 40));
     Http::fake();
 
@@ -219,18 +219,18 @@ it('keeps the pinned Zammad token schema and finalizes rotation only after smoke
 
     expect($bootstrap)->toBeString()
         ->toContain(
-            'name: "Erin local integration',
+            'name: "Faden local integration',
             "action == 'finalize'",
             '.where.not(id: keep_token.id)',
         )
-        ->not->toContain('label: "Erin local integration')
+        ->not->toContain('label: "Faden local integration')
         ->and($shellBootstrap)->toBeString()
         ->toContain('dotenv_quote "${group_name}"')
         ->toContain(
             'Der Zammad-Gruppenname darf keinen Zeilenumbruch enthalten.',
             'php artisan erin:zammad:smoke',
             'ERIN_ZAMMAD_BOOTSTRAP_ACTION=finalize',
-            'bisherige Erin-Tokens bleiben als Rückfall erhalten',
+            'bisherige Faden-Tokens bleiben als Rückfall erhalten',
         )
         ->and($smokePosition)->not->toBeFalse()
         ->and($finalizePosition)->not->toBeFalse()

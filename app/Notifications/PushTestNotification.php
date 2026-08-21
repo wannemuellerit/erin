@@ -31,8 +31,8 @@ class PushTestNotification extends Notification implements ShouldQueue
 
         return (new WebPushMessage)
             ->title($locale === 'en'
-                ? 'Erin test notification'
-                : 'Erin-Testbenachrichtigung')
+                ? 'Faden test notification'
+                : 'Faden-Testbenachrichtigung')
             ->body($locale === 'en'
                 ? 'Browser push is ready.'
                 : 'Browser-Push ist einsatzbereit.')

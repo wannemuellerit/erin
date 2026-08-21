@@ -66,7 +66,7 @@ if ($action === 'prepare') {
         'delivery_status' => 'pending',
     ]);
 
-    $outboundContents = "%PDF-1.4\n% Erin Zammad E2E {$marker}\n%%EOF";
+    $outboundContents = "%PDF-1.4\n% Faden Zammad E2E {$marker}\n%%EOF";
     $outboundPath = "support-tickets/{$ticket->getKey()}/erin/e2e-outbound.pdf";
     if (! Storage::disk('private')->put($outboundPath, $outboundContents)) {
         fwrite(STDERR, "Der E2E-Testanhang konnte nicht privat gespeichert werden.\n");
@@ -98,7 +98,7 @@ if ($action === 'prepare') {
         || $message->external_article_id === null
         || $attachment->scan_result !== 'clean'
     ) {
-        fwrite(STDERR, "Das Erin-Ticket wurde nicht vollständig nach Zammad übertragen.\n");
+        fwrite(STDERR, "Das Faden-Ticket wurde nicht vollständig nach Zammad übertragen.\n");
 
         exit(1);
     }
@@ -155,7 +155,7 @@ if ($action === 'verify') {
         exit(75);
     }
     if ($replyCount !== 1) {
-        fwrite(STDERR, "Die Zammad-Antwort wurde nicht genau einmal nach Erin importiert.\n");
+        fwrite(STDERR, "Die Zammad-Antwort wurde nicht genau einmal nach Faden importiert.\n");
 
         exit(1);
     }
@@ -166,7 +166,7 @@ if ($action === 'verify') {
         exit(75);
     }
     if ($message->files->count() !== 1) {
-        fwrite(STDERR, "Der Zammad-Testanhang wurde nicht genau einmal nach Erin importiert.\n");
+        fwrite(STDERR, "Der Zammad-Testanhang wurde nicht genau einmal nach Faden importiert.\n");
 
         exit(1);
     }

@@ -204,7 +204,7 @@ class SyncSupportTicketToProvider implements ShouldBeUnique, ShouldQueue
                 && ! hash_equals($ticket->external_id, $externalTicketId)
             ) {
                 throw new RuntimeException(
-                    'Das Erin-Ticket wurde widersprüchlichen Zammad-Tickets zugeordnet.',
+                    'Das Faden-Ticket wurde widersprüchlichen Zammad-Tickets zugeordnet.',
                 );
             }
             if (
@@ -220,7 +220,7 @@ class SyncSupportTicketToProvider implements ShouldBeUnique, ShouldQueue
                 ->whereKeyNot($message->getKey())
                 ->exists()) {
                 throw new RuntimeException(
-                    'Der Zammad-Eröffnungsartikel gehört bereits zu einer anderen Erin-Nachricht.',
+                    'Der Zammad-Eröffnungsartikel gehört bereits zu einer anderen Faden-Nachricht.',
                 );
             }
 

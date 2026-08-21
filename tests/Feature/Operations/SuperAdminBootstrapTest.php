@@ -35,8 +35,8 @@ it('accepts an invitation once and requires password rotation and two factor set
     ]);
 
     $response = $this->post(route('admin-bootstrap.store', $token), [
-        'password' => 'Erin!SicheresStartpasswort2026',
-        'password_confirmation' => 'Erin!SicheresStartpasswort2026',
+        'password' => 'Faden!SicheresStartpasswort2026',
+        'password_confirmation' => 'Faden!SicheresStartpasswort2026',
     ]);
 
     $admin = User::query()->where('email', 'security@wannemueller.dev')->firstOrFail();
@@ -46,14 +46,14 @@ it('accepts an invitation once and requires password rotation and two factor set
         ->and($admin->hasVerifiedEmail())->toBeTrue()
         ->and($admin->password_change_required_at)->not->toBeNull()
         ->and($admin->two_factor_confirmed_at)->toBeNull()
-        ->and(Hash::check('Erin!SicheresStartpasswort2026', $admin->password))->toBeTrue()
+        ->and(Hash::check('Faden!SicheresStartpasswort2026', $admin->password))->toBeTrue()
         ->and(AdminBootstrapInvitation::query()->firstOrFail()->used_at)->not->toBeNull();
 
     auth()->logout();
 
     $this->post(route('admin-bootstrap.store', $token), [
-        'password' => 'Erin!NochEinStartpasswort2026',
-        'password_confirmation' => 'Erin!NochEinStartpasswort2026',
+        'password' => 'Faden!NochEinStartpasswort2026',
+        'password_confirmation' => 'Faden!NochEinStartpasswort2026',
     ])->assertGone();
 });
 
@@ -83,15 +83,15 @@ it('rejects expired invitations and role changes without explicit force', functi
 it('clears the forced password change only after a successful password update', function () {
     $admin = User::factory()->create([
         'role' => UserRole::SuperAdmin,
-        'password' => 'Erin!SicheresStartpasswort2026',
+        'password' => 'Faden!SicheresStartpasswort2026',
         'password_change_required_at' => now(),
     ]);
 
     $this->actingAs($admin)
         ->put(route('user-password.update'), [
-            'current_password' => 'Erin!SicheresStartpasswort2026',
-            'password' => 'Erin!RotiertesStartpasswort2026',
-            'password_confirmation' => 'Erin!RotiertesStartpasswort2026',
+            'current_password' => 'Faden!SicheresStartpasswort2026',
+            'password' => 'Faden!RotiertesStartpasswort2026',
+            'password_confirmation' => 'Faden!RotiertesStartpasswort2026',
         ])
         ->assertSessionHasNoErrors();
 

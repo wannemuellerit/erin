@@ -95,7 +95,7 @@ class GdprExportBuilder
             ],
             'summary' => [
                 'language' => $user->locale,
-                'notice' => __('Dieses Paket enthält die in Erin gespeicherten personenbezogenen Daten und technischen Historien. Binäre Dokumentinhalte werden aus Sicherheitsgründen getrennt verwaltet.'),
+                'notice' => __('Dieses Paket enthält die in Faden gespeicherten personenbezogenen Daten und technischen Historien. Binäre Dokumentinhalte werden aus Sicherheitsgründen getrennt verwaltet.'),
             ],
         ];
     }

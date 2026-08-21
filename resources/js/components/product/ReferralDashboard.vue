@@ -111,7 +111,7 @@ const shareLink = async () => {
 
     if (navigator.share) {
         await navigator.share({
-            title: 'Erin',
+            title: 'Faden',
             text: t('referralDashboard.shareText'),
             url: props.code.url,
         });

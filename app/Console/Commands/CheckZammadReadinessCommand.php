@@ -65,7 +65,7 @@ class CheckZammadReadinessCommand extends Command
             'ZAMMAD_WEBHOOK_SECRET muss mindestens 32 zufällige Zeichen lang sein.',
         );
         $this->required(
-            'Erin-Callback',
+            'Faden-Callback',
             $callbackUrl !== null && route('integrations.zammad.webhook', [], false) === '/integrations/zammad/webhook',
             'Der Zammad-Callback ist sicher freigegeben.',
             'ZAMMAD_WEBHOOK_CALLBACK_URL muss HTTPS verwenden oder lokal explizit per Host-Allowlist freigegeben sein.',

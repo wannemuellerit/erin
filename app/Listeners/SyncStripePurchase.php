@@ -45,7 +45,7 @@ class SyncStripePurchase
 
         if (! $this->purchaseSignature->verify($metadata)) {
             Log::warning(
-                'Stripe-Visakauf mit ungültiger Erin-Signatur wurde verworfen.',
+                'Stripe-Visakauf mit ungültiger Faden-Signatur wurde verworfen.',
                 [
                     'event_id_hash' => hash(
                         'sha256',

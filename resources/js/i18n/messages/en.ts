@@ -60,7 +60,7 @@ export default {
         markAllRead: 'Mark all as read',
         profileSettings: 'Profile & settings',
         helpSupport: 'Help & support',
-        userFallback: 'Erin user',
+        userFallback: 'Faden user',
         language: 'Language',
         german: 'German',
         english: 'English',
@@ -72,10 +72,10 @@ export default {
     },
     auth: {
         backHome: 'Back to home',
-        welcomeEyebrow: 'Welcome to Erin',
+        welcomeEyebrow: 'Welcome to Faden',
         welcomeBack: 'Welcome back',
         welcomeBackDescription: 'Sign in to continue recruiting.',
-        createAccountTitle: 'Create your Erin account',
+        createAccountTitle: 'Create your Faden account',
         createAccountDescription:
             'Choose your area and get started in a few minutes.',
         signInTitle: 'Sign in',
@@ -145,7 +145,7 @@ export default {
             language: 'Language',
             german: 'German',
             english: 'English',
-            copyright: '© {year} Erin Recruiting OS. All rights reserved.',
+            copyright: '© {year} Faden Recruiting OS. All rights reserved.',
             privacy: 'Privacy',
             imprint: 'Legal notice',
             terms: 'Terms',
@@ -160,13 +160,13 @@ export default {
         welcome: {
             metaTitle: 'International recruiting that delivers',
             metaDescription:
-                'Erin connects international professionals with companies in Germany – from the first match to a successful start at work.',
+                'Faden connects international professionals with companies in Germany – from the first match to a successful start at work.',
             hero: {
                 badge: 'International Recruiting Operating System',
                 titleLead: 'The best professionals.',
                 titleAccent: 'Found without borders.',
                 description:
-                    'Erin connects companies in Germany with qualified people from Europe and around the world – from the first match to a successful start at work.',
+                    'Faden connects companies in Germany with qualified people from Europe and around the world – from the first match to a successful start at work.',
                 companyCta: 'Find professionals',
                 candidateCta: 'Register as a professional',
                 freeCandidates: 'Free for professionals',
@@ -195,7 +195,7 @@ export default {
                 profileCta: 'View anonymised profile',
             },
             professions: {
-                eyebrow: 'In-demand professions on Erin',
+                eyebrow: 'In-demand professions on Faden',
                 electrician: 'Electricians',
                 electronicsTechnician: 'Electronics technicians',
                 truckDriver: 'Truck drivers',
@@ -211,7 +211,7 @@ export default {
                 features: {
                     matching: {
                         title: 'Explainable matching',
-                        text: 'More than a score: Erin transparently shows why a professional and a position match.',
+                        text: 'More than a score: Faden transparently shows why a professional and a position match.',
                     },
                     visa: {
                         title: 'Visa & relocation',
@@ -247,7 +247,7 @@ export default {
                 },
             },
             process: {
-                eyebrow: 'How Erin works',
+                eyebrow: 'How Faden works',
                 title: 'From profile to the first day at work',
                 steps: {
                     profile: {
@@ -328,7 +328,7 @@ export default {
             unpublishedText:
                 'This legal text has not been published yet. It must be supplied and approved by the responsible legal or data protection review before public launch.',
             unpublishedHint:
-                'Erin deliberately does not display invented or unreviewed legal wording here.',
+                'Faden deliberately does not display invented or unreviewed legal wording here.',
             publishedLabel: 'Published version',
             backHome: 'Back to home',
         },
@@ -349,7 +349,7 @@ export default {
     },
     onboarding: {
         metaTitle: 'Set up account',
-        eyebrow: 'Welcome to Erin',
+        eyebrow: 'Welcome to Faden',
         progress: 'Setup',
         wizard: {
             resumable:
@@ -495,7 +495,7 @@ export default {
         notifications: {
             title: 'Notifications',
             description:
-                'Choose how Erin may contact you about important activity.',
+                'Choose how Faden may contact you about important activity.',
             inApp: 'In app',
             email: 'Email',
             browserPush: 'Browser push',
@@ -506,7 +506,7 @@ export default {
                 'Browser push is not configured on the server yet. Add the VAPID keys first.',
             pushTitle: 'Browser push on this device',
             pushDescription:
-                'Register this browser so enabled events can arrive while Erin is not open in a tab.',
+                'Register this browser so enabled events can arrive while Faden is not open in a tab.',
             pushActive: 'Active on this device',
             pushInactive: 'Not active on this device',
             pushUnsupported:
@@ -540,7 +540,7 @@ export default {
                 },
                 message: {
                     title: 'Messages',
-                    description: 'New messages in the Erin message centre.',
+                    description: 'New messages in the Faden message centre.',
                 },
                 reminder: {
                     title: 'Reminders',
@@ -605,7 +605,7 @@ export default {
             title: 'Two-factor authentication',
             description: 'Manage additional sign-in protection',
             disabledDescription:
-                'After enabling it, Erin will request a secure code from your authenticator app when you sign in.',
+                'After enabling it, Faden will request a secure code from your authenticator app when you sign in.',
             enabledDescription:
                 'A secure code from your authenticator app will be requested when you sign in.',
             continueSetup: 'Continue setup',

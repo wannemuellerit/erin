@@ -21,19 +21,19 @@ die Versionen in `docker/zammad/.env.example` aktualisiert und danach Backup und
 Restore getestet werden.
 
 Der separate Stack teilt nur das bereits vorhandene Docker-Netzwerk
-`erin_default` mit Erin:
+`erin_default` mit Faden:
 
-- Erin erreicht Zammad intern über `http://zammad:8080`.
-- Der Zammad-Scheduler erreicht Erins lokalen Webhook über
+- Faden erreicht Zammad intern über `http://zammad:8080`.
+- Der Zammad-Scheduler erreicht Fadens lokalen Webhook über
   `http://laravel:8000/integrations/zammad/webhook`.
 - Der Browser erreicht Zammad standardmäßig über
   `http://localhost:8090`. Der veröffentlichte Port ist dabei ausschließlich
   an `127.0.0.1` gebunden und nicht aus dem lokalen Netzwerk erreichbar.
 - PostgreSQL, Redis, Elasticsearch und Memcached veröffentlichen keine
-  Host-Ports und sind nicht Teil des Erin-Netzwerks.
+  Host-Ports und sind nicht Teil des Faden-Netzwerks.
 
 Internes HTTP ist ausschließlich für `local` und `testing` vorgesehen. Staging
-und Produktion müssen Zammad und den Erin-Callback über öffentliche HTTPS-URLs
+und Produktion müssen Zammad und den Faden-Callback über öffentliche HTTPS-URLs
 ansprechen.
 
 ## Voraussetzungen
@@ -45,7 +45,7 @@ Arbeitsspeicher und für Elasticsearch:
 sudo sysctl -w vm.max_map_count=262144
 ```
 
-Der Erin-Stack muss vor Zammad laufen, damit sein Netzwerk existiert:
+Der Faden-Stack muss vor Zammad laufen, damit sein Netzwerk existiert:
 
 ```bash
 docker compose up -d
@@ -80,7 +80,7 @@ scripts/zammad/configure.sh --with-admin
 ```
 
 Das Skript fragt Administrator-E-Mail, Administrator-Passwort und die E-Mail
-des technischen Erin-Benutzers verdeckt bzw. interaktiv ab. Es gibt keine
+des technischen Faden-Benutzers verdeckt bzw. interaktiv ab. Es gibt keine
 festen oder im Repository hinterlegten Zugangsdaten. Das Administrator-Passwort
 wird als Base64-Autowizard-Payload nur in der ignorierten lokalen `.env`
 zwischengespeichert und nach erfolgreichem Start automatisch entfernt.
@@ -107,7 +107,7 @@ scripts/zammad/start.sh
 Das Startskript prüft:
 
 - sichere lokale Secrets,
-- das gemeinsame Erin-Netzwerk,
+- das gemeinsame Faden-Netzwerk,
 - `vm.max_map_count`,
 - den erfolgreichen Zammad-Init-Container,
 - den Docker-Healthcheck des Zammad-Nginx,
@@ -137,17 +137,17 @@ http://localhost:8090
 - Mit Browser-Assistent: Verwende die dort selbst festgelegten Zugangsdaten.
 - Mit `configure.sh --with-admin`: Verwende die beim Skript eingegebene
   Administrator-E-Mail und das dort eingegebene Passwort.
-- Erin-Demokonten werden nicht automatisch zu Zammad-Konten.
-- Das Erin-API-Token ist kein Browser-Passwort.
+- Faden-Demokonten werden nicht automatisch zu Zammad-Konten.
+- Das Faden-API-Token ist kein Browser-Passwort.
 
-## Erin-Integration bootstrappen
+## Faden-Integration bootstrappen
 
 Wenn der Browser-Assistent verwendet wurde, müssen danach diese zwei Werte in
 der ignorierten Datei `docker/zammad/.env` ergänzt werden:
 
 ```dotenv
 ZAMMAD_BOOTSTRAP_ADMIN_EMAIL=<E-Mail des ersten Zammad-Administrators>
-ZAMMAD_INTEGRATION_EMAIL=<E-Mail des technischen Erin-Benutzers>
+ZAMMAD_INTEGRATION_EMAIL=<E-Mail des technischen Faden-Benutzers>
 ```
 
 Danach:
@@ -159,19 +159,19 @@ scripts/zammad/bootstrap.sh
 Der Bootstrap läuft direkt innerhalb des lokalen Zammad-Rails-Containers und:
 
 1. prüft, ob der konfigurierte Benutzer wirklich Zammad-Administrator ist,
-2. erstellt oder aktualisiert die Gruppe `Erin Support`,
+2. erstellt oder aktualisiert die Gruppe `Faden Support`,
 3. erstellt einen dedizierten technischen Agenten mit Vollzugriff nur auf diese
    Gruppe,
 4. legt einen neuen Token mit der Berechtigung `ticket.agent` parallel zum
    bisher gültigen Token an,
-5. erstellt oder aktualisiert den signierten Webhook zum Erin-Callback,
+5. erstellt oder aktualisiert den signierten Webhook zum Faden-Callback,
 6. erstellt oder aktualisiert einen selektiven Trigger, der ausschließlich
-   Tickets der Gruppe `Erin Support` an Erin übermittelt,
-7. schreibt die Erin-Konfiguration in die ignorierte Datei
-   `docker/zammad/runtime/erin.env` und in Erins lokale `.env`,
+   Tickets der Gruppe `Faden Support` an Faden übermittelt,
+7. schreibt die Faden-Konfiguration in die ignorierte Datei
+   `docker/zammad/runtime/erin.env` und in Fadens lokale `.env`,
 8. leert den Laravel-Konfigurationscache, startet Laravel und Queue neu und
    prüft den neuen Token mit dem read-only Smoke-Test,
-9. entfernt erst nach diesem erfolgreichen Test die älteren Erin-Tokens.
+9. entfernt erst nach diesem erfolgreichen Test die älteren Faden-Tokens.
 
 Gruppe, technischer Benutzer, Webhook, gruppenspezifischer Trigger und der neue
 Token werden in einer Datenbanktransaktion geschrieben. Das bisherige Token
@@ -205,42 +205,42 @@ scripts/zammad/e2e.sh
 
 Das Skript ist in `production` gesperrt und führt nacheinander aus:
 
-1. Eine verifizierte Demo-Fachkraft erstellt ein gekennzeichnetes Erin-Testticket
+1. Eine verifizierte Demo-Fachkraft erstellt ein gekennzeichnetes Faden-Testticket
    mit PDF-Anhang.
-2. Erin prüft den Anhang über ClamAV und überträgt Ticket und Datei im
-   bestätigten Normal- und Replayfall idempotent an die Gruppe `Erin Support`.
+2. Faden prüft den Anhang über ClamAV und überträgt Ticket und Datei im
+   bestätigten Normal- und Replayfall idempotent an die Gruppe `Faden Support`.
 3. Über das dedizierte technische Zammad-Token wird eine öffentliche
    Agentenantwort mit einem zweiten PDF erzeugt.
-4. Der echte signierte Zammad-Webhook importiert Antwort und Anhang nach Erin.
-5. Erin wartet auf den Queue-Import und prüft Zuordnung, Einmaligkeit, privaten
+4. Der echte signierte Zammad-Webhook importiert Antwort und Anhang nach Faden.
+5. Faden wartet auf den Queue-Import und prüft Zuordnung, Einmaligkeit, privaten
    Speicher, ClamAV-Freigabe und SHA-256-Inhalt.
 
 Zustands- und Antwortdateien werden ausschließlich mit `0600` unter
 `docker/zammad/runtime/` gespeichert. API-Token und Webhook-Secret erscheinen
-nicht in der Konsolenausgabe. Der Test erzeugt bewusst lokale Testdaten in Erin
+nicht in der Konsolenausgabe. Der Test erzeugt bewusst lokale Testdaten in Faden
 und Zammad; für eine reine Konfigurationsprüfung ist weiterhin
 `erin:zammad:smoke` zu verwenden.
 
 ## Manueller Ende-zu-Ende-Test
 
-1. In Erin als Firma ein Supportticket mit unkritischem Testinhalt anlegen.
+1. In Faden als Firma ein Supportticket mit unkritischem Testinhalt anlegen.
 2. Prüfen, ob Ticket und Eröffnungsnachricht im normalen Zustellpfad einmal in
-   der Gruppe `Erin Support` auftauchen.
+   der Gruppe `Faden Support` auftauchen.
 3. In Zammad eine öffentliche Agentenantwort verfassen.
-4. Prüfen, ob sie einmal und ohne Neuladen im Erin-Supportchat erscheint.
-5. Eine interne Zammad-Notiz verfassen und sicherstellen, dass sie in Erin nicht
+4. Prüfen, ob sie einmal und ohne Neuladen im Faden-Supportchat erscheint.
+5. Eine interne Zammad-Notiz verfassen und sicherstellen, dass sie in Faden nicht
    sichtbar wird.
-6. Zammad vorübergehend stoppen, in Erin antworten, Zammad wieder starten und
+6. Zammad vorübergehend stoppen, in Faden antworten, Zammad wieder starten und
    den persistierten Reconciliation- und Queue-Zustand prüfen.
 
 Der Webhook nutzt die Zammad-Header `X-Zammad-Delivery` und
 `X-Hub-Signature`. Da die Delivery-ID selbst nicht Bestandteil der
-Zammad-Signatur ist, verwendet Erin den SHA-256-Hash des signierten Rohbodys
+Zammad-Signatur ist, verwendet Faden den SHA-256-Hash des signierten Rohbodys
 als Idempotenzschlüssel; eine ausgetauschte Delivery-ID kann einen alten Body
 daher nicht erneut anwenden.
 
 Für jedes zugeordnete Ticket muss Zammad außerdem `ticket.updated_at`
-mitsenden. Erin speichert diesen Zeitpunkt als UTC-Epoch-Millisekunden unter
+mitsenden. Faden speichert diesen Zeitpunkt als UTC-Epoch-Millisekunden unter
 einer Datenbanksperre und übernimmt Betreff sowie Status nur von einem
 nachweislich neueren Event. Dadurch kann ein verspätetes `open`-Event keinen
 bereits neueren `closed`-Stand zurücksetzen.
@@ -260,7 +260,7 @@ verspätet gelieferter, aber tatsächlich neuerer Artikel darf damit
 zurückzusetzen. Gleich alte oder ältere Artikelzeiten bewegen
 `last_reply_at` niemals rückwärts.
 
-Ausgehende Artikel tragen einen HMAC-signierten Erin-Nachrichtenmarker, der
+Ausgehende Artikel tragen einen HMAC-signierten Faden-Nachrichtenmarker, der
 Ticket- und Nachrichten-ID bindet. `ZAMMAD_MESSAGE_MARKER_SECRET` kann diesen
 Schlüssel vom Webhook-Schlüssel trennen; während einer Rotation gehören alte
 Schlüssel in `ZAMMAD_PREVIOUS_MESSAGE_MARKER_SECRETS`, bis mindestens alle
@@ -270,20 +270,20 @@ Zustellbestätigung akzeptiert.
 
 ## Ausgehende Zustellung und Reconciliation
 
-Vor jedem erneuten schreibenden Zammad-Aufruf speichert Erin eine
+Vor jedem erneuten schreibenden Zammad-Aufruf speichert Faden eine
 `external_reconcile_not_before`-Frist in MySQL. Nach einem Timeout oder
-ungeklärten Queue-Abbruch liest Erin erst nach dieser Frist in Zammad und
+ungeklärten Queue-Abbruch liest Faden erst nach dieser Frist in Zammad und
 wiederholt diese Suche standardmäßig dreimal. Erst wenn alle konfigurierten
-Lesungen den signierten Erin-Marker, die erwartete Absenderrolle, den
+Lesungen den signierten Faden-Marker, die erwartete Absenderrolle, den
 `internal`-Status und den normalisierten Inhalt nicht finden, wird erneut
 geschrieben. Ein minütlicher Scheduler nimmt auch nach Worker-Neustarts alle
 fälligen `syncing`-/`failed`-Datensätze wieder auf.
 
 Die Grenzen sind bewusst als **at least once** dokumentiert: Zammad bietet für
-diese Schreiboperationen keinen von Erin kontrollierten Idempotency-Key. Ein
+diese Schreiboperationen keinen von Faden kontrollierten Idempotency-Key. Ein
 Artikel kann nach erfolgreicher Provider-Annahme noch nicht in den
 Reconciliation-Leseendpunkten sichtbar sein. Nach allen negativen Lesungen
-kann Erin deshalb erneut senden und in diesem seltenen Konsistenzfenster einen
+kann Faden deshalb erneut senden und in diesem seltenen Konsistenzfenster einen
 doppelten Zammad-Datensatz erzeugen. Persistierte Fristen, mehrere Lesungen,
 HMAC-Marker und Webhook-Korrelation verkleinern dieses Fenster, sind aber keine
 Exactly-once-Garantie.
@@ -319,7 +319,7 @@ E-Mail und Browser-Push:
 
 - Der Datenbankkanal ist durch eine deterministische Notification-UUID exakt
   idempotent.
-- Live-Broadcasts verwenden dieselbe UUID; die Erin-Glocke verwirft bereits
+- Live-Broadcasts verwenden dieselbe UUID; die Faden-Glocke verwirft bereits
   bekannte IDs. Supportchat-Nachrichten werden zusätzlich über ihre stabile
   Nachrichten-ID zusammengeführt.
 - E-Mail und Browser-Push werden pro Kanal dauerhaft erneut versucht. Bei
@@ -335,8 +335,8 @@ Scheduler wieder gestartet und die Outbox kontrolliert abgearbeitet.
 
 ## Frühe Webhooks und lokale Zuordnung
 
-Ein signierter Zammad-Webhook kann Erin erreichen, bevor die Antwort auf das
-Erstellen des zugehörigen Tickets die externe ID lokal gespeichert hat. Erin
+Ein signierter Zammad-Webhook kann Faden erreichen, bevor die Antwort auf das
+Erstellen des zugehörigen Tickets die externe ID lokal gespeichert hat. Faden
 legt diesen Body deshalb vorübergehend in
 `support_zammad_webhook_inbox` ab. Die Deduplizierung erfolgt über den
 SHA-256-Wert des bereits verifizierten Bodys; wechselnde Delivery-Header
@@ -344,7 +344,7 @@ erzeugen keine zweite Inbox-Zeile. Pro Body werden höchstens acht
 Delivery-Aliase gespeichert; weitere Aliase brechen fail-closed ab. Nach
 Verarbeitung oder Terminalisierung werden für Replays keine neuen Aliase mehr
 persistiert. Wird eine bereits gespeicherte Delivery-ID für einen anderen Body
-wiederverwendet, bricht Erin ebenfalls fail-closed ab.
+wiederverwendet, bricht Faden ebenfalls fail-closed ab.
 
 Nach der Ticketzuordnung wird der unveränderte Body erneut durch dieselbe
 Webhook-Validierung verarbeitet. Vorher wird seine Prüfsumme nochmals
@@ -357,7 +357,7 @@ Versuchszahlen, `terminal_at` und `last_error` berücksichtigen.
 
 ## Anhänge
 
-Der Erin-Dateipfad für Supportanhänge ist vollständig umgesetzt:
+Der Faden-Dateipfad für Supportanhänge ist vollständig umgesetzt:
 
 - Uploads werden anhand einer festen Erweiterungs- und MIME-Allowlist geprüft.
 - Standardmäßig sind höchstens acht Dateien mit jeweils maximal 10 MB und
@@ -366,7 +366,7 @@ Der Erin-Dateipfad für Supportanhänge ist vollständig umgesetzt:
 - Jeder Upload bleibt bis zum erfolgreichen ClamAV-Scan gesperrt.
 - Infizierte, fehlende, veränderte oder nicht vollständig geprüfte Dateien
   werden fail-closed weder ausgeliefert noch an Zammad übertragen.
-- Erin-Anhänge werden nach erfolgreicher Prüfung mit Dateiname, MIME-Typ und
+- Faden-Anhänge werden nach erfolgreicher Prüfung mit Dateiname, MIME-Typ und
   Inhalt an Zammad übertragen.
 - Zammad-Anhänge verwenden den deterministischen privaten Pfad
   `support-tickets/{ticket}/zammad/{attachment}.{extension}`. Ein Retry
@@ -406,7 +406,7 @@ Die lokalen HTTP-Werte dürfen nicht übernommen werden. Erforderlich sind:
 ZAMMAD_ENABLED=true
 ZAMMAD_URL=https://support.example.com
 ZAMMAD_TOKEN=<Deployment-Secret>
-ZAMMAD_GROUP=Erin Support
+ZAMMAD_GROUP=Faden Support
 ZAMMAD_WEBHOOK_SECRET=<mindestens 32 zufällige Zeichen>
 ZAMMAD_TIMEOUT=10
 ZAMMAD_RECONCILE_INITIAL_DELAY_SECONDS=30
@@ -418,7 +418,7 @@ ZAMMAD_LOCAL_HTTP_HOSTS=
 ZAMMAD_WEBHOOK_CALLBACK_URL=https://app.example.com/integrations/zammad/webhook
 ```
 
-In Zammad muss der Webhook auf die öffentliche Erin-HTTPS-Adresse zeigen,
+In Zammad muss der Webhook auf die öffentliche Faden-HTTPS-Adresse zeigen,
 SSL-Prüfung muss aktiv sein und der Signatur-Token muss exakt dem
 `ZAMMAD_WEBHOOK_SECRET` entsprechen. Das technische Token gehört in den
 Deployment-Secret-Store; persönliche Admin-Token sind nicht zulässig.

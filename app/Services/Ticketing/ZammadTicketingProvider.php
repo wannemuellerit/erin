@@ -140,7 +140,7 @@ class ZammadTicketingProvider implements TicketingProvider
 
         if (count($matches) > 1) {
             throw new RuntimeException(
-                'Mehrere Zammad-Tickets besitzen denselben Erin-Zustellmarker.',
+                'Mehrere Zammad-Tickets besitzen denselben Faden-Zustellmarker.',
             );
         }
         if ($matches !== []) {
@@ -149,7 +149,7 @@ class ZammadTicketingProvider implements TicketingProvider
 
         if ($matchedTicketWithoutOpeningArticle) {
             throw new RuntimeException(
-                'Das Zammad-Ticket wurde gefunden, aber sein markierter Erin-Eröffnungsartikel ist noch nicht verfügbar.',
+                'Das Zammad-Ticket wurde gefunden, aber sein markierter Faden-Eröffnungsartikel ist noch nicht verfügbar.',
             );
         }
 
@@ -161,7 +161,7 @@ class ZammadTicketingProvider implements TicketingProvider
         SupportTicketMessage $message,
     ): array {
         if ($ticket->external_id === null) {
-            throw new RuntimeException('Das Erin-Ticket besitzt noch keine Zammad-ID.');
+            throw new RuntimeException('Das Faden-Ticket besitzt noch keine Zammad-ID.');
         }
 
         $message->loadMissing('author:id,name,email,role');
@@ -250,7 +250,7 @@ class ZammadTicketingProvider implements TicketingProvider
 
         if (count($matches) > 1) {
             throw new RuntimeException(
-                'Mehrere Zammad-Artikel besitzen denselben Erin-Zustellmarker.',
+                'Mehrere Zammad-Artikel besitzen denselben Faden-Zustellmarker.',
             );
         }
 
