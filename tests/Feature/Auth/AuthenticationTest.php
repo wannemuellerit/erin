@@ -8,6 +8,7 @@ use Database\Seeders\DomainCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Vite;
 use Inertia\Testing\AssertableInertia as Assert;
 use Laravel\Fortify\Features;
 use Tests\TestCase;
@@ -21,6 +22,20 @@ class AuthenticationTest extends TestCase
         $response = $this->get(route('login'));
 
         $response->assertOk();
+    }
+
+    public function test_login_preload_header_stays_within_the_fastcgi_budget(): void
+    {
+        Vite::useHotFile(storage_path('framework/testing/nonexistent-vite-hot'));
+
+        $response = $this->get(route('login'));
+        $linkHeader = (string) $response->headers->get('Link');
+
+        $response->assertOk();
+
+        $this->assertNotSame('', $linkHeader);
+        $this->assertLessThanOrEqual(6, substr_count($linkHeader, '<'));
+        $this->assertLessThan(8192, strlen($linkHeader));
     }
 
     public function test_demo_credentials_can_be_disabled_for_non_demo_environments(): void

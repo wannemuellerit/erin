@@ -57,7 +57,7 @@ return Application::configure(basePath: dirname(__DIR__))
             BlockSupportWrites::class,
             TrackLastActivity::class,
             RecordUserActivity::class,
-            AddLinkHeadersForPreloadedAssets::class,
+            AddLinkHeadersForPreloadedAssets::using(6),
         ]);
 
         $middleware->alias([
