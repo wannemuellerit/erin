@@ -31,6 +31,13 @@ jobs:
         with:
           github-token: ${{ github.token }}
 
+      - name: Patch-Update freigeben
+        if: steps.metadata.outputs.update-type == 'version-update:semver-patch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr review --approve "$PR_URL"
+
       - name: Auto-Merge für Patch-Updates aktivieren
         if: steps.metadata.outputs.update-type == 'version-update:semver-patch'
         env:
