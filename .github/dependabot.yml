@@ -63,7 +63,9 @@ updates:
     open-pull-requests-limit: 5
 
   - package-ecosystem: "docker"
-    directory: "/"
+    directories:
+      - "/docker/php"
+      - "/docker/production"
     schedule:
       interval: "weekly"
       day: "monday"
