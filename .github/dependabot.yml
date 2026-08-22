@@ -9,6 +9,7 @@ updates:
       timezone: "Europe/Berlin"
     cooldown:
       default-days: 5
+      semver-patch-days: 1
     groups:
       composer-patches:
         applies-to: "version-updates"
@@ -39,6 +40,7 @@ updates:
       timezone: "Europe/Berlin"
     cooldown:
       default-days: 5
+      semver-patch-days: 1
     groups:
       npm-patches:
         applies-to: "version-updates"
