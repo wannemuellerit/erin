@@ -9,18 +9,27 @@ updates:
       timezone: "Europe/Berlin"
     cooldown:
       default-days: 5
+      semver-patch-days: 1
     groups:
-      laravel:
+      composer-patches:
+        applies-to: "version-updates"
         patterns:
-          - "laravel/*"
-          - "illuminate/*"
-      php-quality:
-        dependency-type: "development"
+          - "*"
+        update-types:
+          - "patch"
+      composer-minors:
+        applies-to: "version-updates"
         patterns:
-          - "pestphp/*"
-          - "larastan/*"
-          - "laravel/pint"
-    open-pull-requests-limit: 10
+          - "*"
+        update-types:
+          - "minor"
+      composer-security-patches:
+        applies-to: "security-updates"
+        patterns:
+          - "*"
+        update-types:
+          - "patch"
+    open-pull-requests-limit: 5
 
   - package-ecosystem: "npm"
     directory: "/"
@@ -31,21 +40,27 @@ updates:
       timezone: "Europe/Berlin"
     cooldown:
       default-days: 5
+      semver-patch-days: 1
     groups:
-      vue-and-inertia:
+      npm-patches:
+        applies-to: "version-updates"
         patterns:
-          - "vue"
-          - "@vue/*"
-          - "@inertiajs/*"
-      frontend-quality:
-        dependency-type: "development"
+          - "*"
+        update-types:
+          - "patch"
+      npm-minors:
+        applies-to: "version-updates"
         patterns:
-          - "eslint*"
-          - "prettier*"
-          - "typescript*"
-          - "vue-tsc"
-          - "@playwright/*"
-    open-pull-requests-limit: 10
+          - "*"
+        update-types:
+          - "minor"
+      npm-security-patches:
+        applies-to: "security-updates"
+        patterns:
+          - "*"
+        update-types:
+          - "patch"
+    open-pull-requests-limit: 5
 
   - package-ecosystem: "docker"
     directory: "/"
