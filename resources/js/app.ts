@@ -37,7 +37,7 @@ if (import.meta.env.VITE_BROADCAST_CONNECTION === 'pusher') {
     });
 }
 
-const appName = import.meta.env.VITE_APP_NAME || 'Faden';
+const appName = 'Faden';
 
 createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),

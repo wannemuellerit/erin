@@ -161,7 +161,7 @@ export default {
             pricing: 'Preise',
         },
         welcome: {
-            metaTitle: 'Internationales Recruiting, das ankommt',
+            metaTitle: 'Startseite',
             metaDescription:
                 'Faden verbindet internationale Fachkräfte mit Unternehmen in Deutschland – vom Match bis zum erfolgreichen Arbeitsbeginn.',
             hero: {

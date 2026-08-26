@@ -158,7 +158,7 @@ export default {
             pricing: 'Pricing',
         },
         welcome: {
-            metaTitle: 'International recruiting that delivers',
+            metaTitle: 'Home',
             metaDescription:
                 'Faden connects international professionals with companies in Germany – from the first match to a successful start at work.',
             hero: {
