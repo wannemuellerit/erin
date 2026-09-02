@@ -12,12 +12,14 @@ const props = withDefaults(
         maxFiles?: number;
         disabled?: boolean;
         compact?: boolean;
+        multiple?: boolean;
     }>(),
     {
         accept: '.jpg,.jpeg,.png,.gif,.pdf,.doc,.docx,.mp3,.m4a,.ogg,.wav,.webm',
         maxFiles: 8,
         disabled: false,
         compact: false,
+        multiple: true,
     },
 );
 
@@ -74,7 +76,7 @@ function removeFile(index: number): void {
                 :id="id"
                 ref="input"
                 type="file"
-                multiple
+                :multiple="multiple"
                 class="sr-only"
                 :accept="accept"
                 :disabled="disabled"

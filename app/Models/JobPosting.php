@@ -23,6 +23,8 @@ use Laravel\Scout\Searchable;
  * @property JobStatus $status
  * @property Carbon|null $boosted_until
  * @property Carbon|null $published_at
+ * @property Carbon|null $application_deadline
+ * @property Carbon|null $start_date
  */
 class JobPosting extends Model
 {
@@ -37,6 +39,9 @@ class JobPosting extends Model
             'status' => JobStatus::class,
             'is_remote' => 'boolean',
             'visa_package_available' => 'boolean',
+            'salary_visible' => 'boolean',
+            'application_deadline' => 'date',
+            'start_date' => 'date',
             'published_at' => 'datetime',
             'closed_at' => 'datetime',
             'boosted_until' => 'datetime',
@@ -214,7 +219,11 @@ class JobPosting extends Model
             'title' => $this->title,
             'slug' => $this->slug,
             'position' => $this->position,
+            'summary' => $this->summary,
             'description' => $this->description,
+            'responsibilities' => $this->responsibilities,
+            'requirements' => $this->requirements,
+            'benefits' => $this->benefits,
             'occupation_id' => $this->occupation_id,
             'occupation_slug' => $this->occupation === null
                 ? null
@@ -240,6 +249,10 @@ class JobPosting extends Model
             'compensation_max_cents' => $this->compensation_max_cents,
             'currency' => $this->currency,
             'compensation_interval' => $this->compensation_interval,
+            'salary_visible' => (bool) $this->salary_visible,
+            'application_deadline' => $this->application_deadline?->toDateString(),
+            'start_date' => $this->start_date?->toDateString(),
+            'vacancies' => $this->vacancies,
             'status' => $this->status->value,
             'is_remote' => (bool) $this->is_remote,
             'visa_package_available' => (bool) $this->visa_package_available,

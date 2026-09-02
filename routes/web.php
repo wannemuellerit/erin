@@ -5,6 +5,7 @@ use App\Http\Controllers\AdCampaignController;
 use App\Http\Controllers\AiController;
 use App\Http\Controllers\Auth\AdminBootstrapController;
 use App\Http\Controllers\BillingController;
+use App\Http\Controllers\Candidate\DocumentController as CandidateDocumentController;
 use App\Http\Controllers\Candidate\MarketplaceController;
 use App\Http\Controllers\Candidate\ProfileController as CandidateProfileController;
 use App\Http\Controllers\CommunicationController;
@@ -70,7 +71,7 @@ Route::middleware(['auth', 'verified', 'staff.2fa'])->group(function (): void {
     Route::post('onboarding/candidate/photo', [CandidateProfileController::class, 'uploadPhoto'])
         ->middleware(['role:candidate', 'capability:candidate.profile.manage'])
         ->name('onboarding.candidate.photo');
-    Route::post('onboarding/candidate/documents', [CandidateProfileController::class, 'uploadDocument'])
+    Route::post('onboarding/candidate/documents', [CandidateDocumentController::class, 'store'])
         ->middleware(['role:candidate', 'capability:candidate.profile.manage'])
         ->name('onboarding.candidate.documents');
     Route::put('onboarding/company', [OnboardingController::class, 'company'])
@@ -139,6 +140,8 @@ Route::middleware(['auth', 'verified', 'staff.2fa'])->group(function (): void {
         ->name('companies.media.download');
     Route::post('documents/{document}/applications/{application}/grant', [DocumentController::class, 'grant'])
         ->name('documents.grant');
+    Route::delete('documents/{document}/applications/{application}/grant', [DocumentController::class, 'revoke'])
+        ->name('documents.grant.revoke');
 
     Route::get('support', [SupportActionController::class, 'index'])->name('support.index');
     Route::post('support/tickets', [SupportActionController::class, 'createTicket'])
@@ -263,6 +266,9 @@ Route::middleware(['auth', 'verified', 'role:company', 'company.member', 'onboar
             Route::post('jobs', [EmployerJobController::class, 'store'])->middleware('capability:jobs.manage')->name('jobs.store');
             Route::get('jobs/{job}/edit', [EmployerJobController::class, 'edit'])->middleware('capability:jobs.manage')->name('jobs.edit');
             Route::put('jobs/{job}', [EmployerJobController::class, 'update'])->middleware('capability:jobs.manage')->name('jobs.update');
+            Route::post('jobs/{job}/duplicate', [EmployerJobController::class, 'duplicate'])->middleware('capability:jobs.manage')->name('jobs.duplicate');
+            Route::delete('jobs/{job}', [EmployerJobController::class, 'destroy'])->middleware('capability:jobs.manage')->name('jobs.destroy');
+            Route::delete('jobs/{job}/media/{media}', [EmployerJobController::class, 'destroyMedia'])->middleware('capability:jobs.manage')->name('jobs.media.destroy');
             Route::patch('jobs/{job}/status', [EmployerJobController::class, 'transition'])->middleware('capability:jobs.manage')->name('jobs.status');
             Route::post('jobs/{job}/boost', [EmployerJobController::class, 'boost'])->middleware('capability:jobs.manage')->name('jobs.boost');
 
@@ -317,9 +323,18 @@ Route::middleware(['auth', 'verified', 'role:candidate', 'onboarding.complete'])
         Route::get('profile/photo', [CandidateProfileController::class, 'photo'])
             ->middleware('signed')
             ->name('profile.photo');
-        Route::post('profile/documents', [CandidateProfileController::class, 'uploadDocument'])
+        Route::post('profile/documents', [CandidateDocumentController::class, 'store'])
             ->middleware('capability:candidate.profile.manage')
             ->name('profile.documents');
+        Route::patch('profile/documents/{document}', [CandidateDocumentController::class, 'update'])
+            ->middleware('capability:candidate.profile.manage')
+            ->name('profile.documents.update');
+        Route::post('profile/documents/{document}/replace', [CandidateDocumentController::class, 'replace'])
+            ->middleware('capability:candidate.profile.manage')
+            ->name('profile.documents.replace');
+        Route::delete('profile/documents/{document}', [CandidateDocumentController::class, 'destroy'])
+            ->middleware('capability:candidate.profile.manage')
+            ->name('profile.documents.destroy');
         Route::post('profile/publish', [CandidateProfileController::class, 'publish'])->middleware('capability:candidate.profile.manage')->name('profile.publish');
         Route::get('messages', [CommunicationController::class, 'index'])->name('messages');
         Route::get('interviews', [InterviewController::class, 'index'])->name('interviews');

@@ -27,6 +27,10 @@ type Job = {
     title: string;
     position?: string | null;
     description?: string | null;
+    summary?: string | null;
+    responsibilities?: string | null;
+    requirements?: string | null;
+    benefits?: string | null;
     expected_experience_years?: number | null;
     language_notes?: string | null;
     hours_min?: number | null;
@@ -36,6 +40,10 @@ type Job = {
     compensation_max_cents?: number | null;
     currency?: string | null;
     compensation_interval?: string | null;
+    salary_visible?: boolean;
+    application_deadline?: string | null;
+    start_date?: string | null;
+    vacancies?: number;
     visa_package_available?: boolean;
     already_applied?: boolean;
     match?: {
@@ -63,7 +71,9 @@ type Job = {
     screening_questions?: Array<{
         id: number;
         question: string;
+        type: string;
         is_required: boolean;
+        options?: string[] | null;
     }>;
     media?: Array<{
         id: number;
@@ -102,6 +112,10 @@ const location = computed(
         t('candidate.jobs.locationOpen'),
 );
 const compensation = computed(() => {
+    if (props.job.salary_visible === false) {
+        return t('candidate.jobs.compensationOnRequest');
+    }
+
     const values = [
         props.job.compensation_min_cents,
         props.job.compensation_max_cents,
@@ -173,6 +187,12 @@ const submit = () =>
         <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
             <div class="grid min-w-0 gap-5">
                 <SectionCard :title="t('candidate.jobDetail.overview')">
+                    <p
+                        v-if="job.summary"
+                        class="mb-5 text-base leading-7 font-semibold text-slate-800"
+                    >
+                        {{ job.summary }}
+                    </p>
                     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                         <div class="rounded-xl bg-slate-50 p-4">
                             <MapPin class="size-4 text-teal-600" />
@@ -205,6 +225,45 @@ const submit = () =>
                                           })
                                         : '—'
                                 }}
+                            </p>
+                        </div>
+                    </div>
+                    <div
+                        v-if="
+                            job.responsibilities ||
+                            job.requirements ||
+                            job.benefits
+                        "
+                        class="mt-6 grid gap-5 lg:grid-cols-2"
+                    >
+                        <div v-if="job.responsibilities">
+                            <h3 class="text-sm font-extrabold text-slate-900">
+                                {{ t('candidate.jobDetail.responsibilities') }}
+                            </h3>
+                            <p
+                                class="mt-2 text-sm leading-7 whitespace-pre-line text-slate-700"
+                            >
+                                {{ job.responsibilities }}
+                            </p>
+                        </div>
+                        <div v-if="job.requirements">
+                            <h3 class="text-sm font-extrabold text-slate-900">
+                                {{ t('candidate.jobDetail.requirements') }}
+                            </h3>
+                            <p
+                                class="mt-2 text-sm leading-7 whitespace-pre-line text-slate-700"
+                            >
+                                {{ job.requirements }}
+                            </p>
+                        </div>
+                        <div v-if="job.benefits" class="lg:col-span-2">
+                            <h3 class="text-sm font-extrabold text-slate-900">
+                                {{ t('candidate.jobDetail.benefits') }}
+                            </h3>
+                            <p
+                                class="mt-2 text-sm leading-7 whitespace-pre-line text-slate-700"
+                            >
+                                {{ job.benefits }}
                             </p>
                         </div>
                     </div>
@@ -351,9 +410,41 @@ const submit = () =>
                                 <span v-if="question.is_required">*</span>
                             </label>
                             <Textarea
+                                v-if="question.type === 'text'"
                                 v-model="form.answers[index].answer"
                                 rows="3"
                             />
+                            <select
+                                v-else-if="question.type === 'yes_no'"
+                                v-model="form.answers[index].answer"
+                                class="erin-focus h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                            >
+                                <option value="">
+                                    {{ t('candidate.jobDetail.chooseAnswer') }}
+                                </option>
+                                <option value="yes">
+                                    {{ t('candidate.jobDetail.yes') }}
+                                </option>
+                                <option value="no">
+                                    {{ t('candidate.jobDetail.no') }}
+                                </option>
+                            </select>
+                            <select
+                                v-else
+                                v-model="form.answers[index].answer"
+                                class="erin-focus h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                            >
+                                <option value="">
+                                    {{ t('candidate.jobDetail.chooseAnswer') }}
+                                </option>
+                                <option
+                                    v-for="option in question.options ?? []"
+                                    :key="option"
+                                    :value="option"
+                                >
+                                    {{ option }}
+                                </option>
+                            </select>
                         </div>
                         <p
                             v-if="applicationError"

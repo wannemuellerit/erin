@@ -24,6 +24,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -167,6 +168,22 @@ class MarketplaceController extends Controller
         /** @var list<array{question_id: int, answer?: string|null}> $answers */
         $answers = is_array($validated['answers'] ?? null) ? array_values($validated['answers']) : [];
         $answerMap = collect($answers)->keyBy('question_id');
+        $questionMap = $job->screeningQuestions->keyBy('id');
+
+        foreach ($answers as $answer) {
+            $question = $questionMap->get((int) $answer['question_id']);
+            if ($question === null) {
+                throw ValidationException::withMessages(['answers' => __('Eine Screening-Antwort gehört nicht zu dieser Stelle.')]);
+            }
+            $value = trim((string) ($answer['answer'] ?? ''));
+            if ($question->type === 'yes_no' && $value !== '' && ! in_array($value, ['yes', 'no'], true)) {
+                throw ValidationException::withMessages(['answers' => __('Bitte beantworte Ja-/Nein-Fragen nur mit Ja oder Nein.')]);
+            }
+            $options = $question->options ?? [];
+            if ($question->type === 'choice' && $value !== '' && ! in_array($value, $options, true)) {
+                throw ValidationException::withMessages(['answers' => __('Eine gewählte Antwort ist für diese Frage nicht zulässig.')]);
+            }
+        }
 
         foreach ($job->screeningQuestions->where('is_required', true) as $question) {
             if (! filled($answerMap->get($question->getKey())['answer'] ?? null)) {
@@ -194,10 +211,6 @@ class MarketplaceController extends Controller
             ]);
 
             foreach ($answers as $answer) {
-                if (! $job->screeningQuestions->contains('id', (int) $answer['question_id'])) {
-                    continue;
-                }
-
                 $application->screeningAnswers()->create([
                     'job_screening_question_id' => $answer['question_id'],
                     'answer' => $answer['answer'] ?? null,

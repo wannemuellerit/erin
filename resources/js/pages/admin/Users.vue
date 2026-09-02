@@ -7,7 +7,18 @@ import {
     Users as UsersIcon,
     X,
 } from '@lucide/vue';
-import { reactive } from 'vue';
+import { reactive, ref } from 'vue';
+import FormField from '@/components/product/FormField.vue';
+import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import EmptyState from '@/components/product/EmptyState.vue';
 import PageHeader from '@/components/product/PageHeader.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
@@ -66,6 +77,7 @@ const props = defineProps<{
     roles: string[];
     statuses: string[];
     platform_roles: Array<{ id: number; name: string }>;
+    occupations: Array<{ id: number; name_de: string; name_en: string }>;
 }>();
 
 const filters = reactive({
@@ -89,6 +101,22 @@ const platformRoleForm = useForm({
 
 const quotaForm = useForm({
     storage_quota_mb: null as number | null,
+});
+const createCandidateOpen = ref(false);
+const candidateForm = useForm({
+    first_name: '',
+    last_name: '',
+    email: '',
+    temporary_password: '',
+    email_verified: false,
+    locale: 'de',
+    current_country_code: '',
+    current_city: '',
+    phone: '',
+    occupation_id: null as number | null,
+    current_position: '',
+    desired_position: '',
+    summary: '',
 });
 
 const { t, formatDate, humanize } = useAdminI18n();
@@ -193,6 +221,16 @@ function updateQuota(user: UserRow): void {
         onFinish: () => quotaForm.reset(),
     });
 }
+
+function createCandidate(): void {
+    candidateForm.post('/admin/users/candidates', {
+        preserveScroll: true,
+        onSuccess: () => {
+            createCandidateOpen.value = false;
+            candidateForm.reset();
+        },
+    });
+}
 </script>
 
 <template>
@@ -204,7 +242,13 @@ function updateQuota(user: UserRow): void {
             :title="t('users.title')"
             :description="t('users.description', { count: users.total })"
             :icon="UsersIcon"
-        />
+        >
+            <template #actions>
+                <Button type="button" @click="createCandidateOpen = true">
+                    {{ t('users.createCandidate') }}
+                </Button>
+            </template>
+        </PageHeader>
 
         <SectionCard flush>
             <form
@@ -551,5 +595,159 @@ function updateQuota(user: UserRow): void {
             />
             <AdminPagination :paginator="users" />
         </SectionCard>
+
+        <Dialog v-model:open="createCandidateOpen">
+            <DialogContent class="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+                <DialogHeader>
+                    <DialogTitle>{{ t('users.createCandidate') }}</DialogTitle>
+                    <DialogDescription>{{
+                        t('users.createCandidateDescription')
+                    }}</DialogDescription>
+                </DialogHeader>
+                <form
+                    class="grid gap-4 sm:grid-cols-2"
+                    @submit.prevent="createCandidate"
+                >
+                    <FormField
+                        :label="t('users.fields.firstName')"
+                        :error="candidateForm.errors.first_name"
+                    >
+                        <Input
+                            v-model="candidateForm.first_name"
+                            required
+                            autocomplete="given-name"
+                        />
+                    </FormField>
+                    <FormField
+                        :label="t('users.fields.lastName')"
+                        :error="candidateForm.errors.last_name"
+                    >
+                        <Input
+                            v-model="candidateForm.last_name"
+                            required
+                            autocomplete="family-name"
+                        />
+                    </FormField>
+                    <FormField
+                        :label="t('users.fields.email')"
+                        :error="candidateForm.errors.email"
+                    >
+                        <Input
+                            v-model="candidateForm.email"
+                            required
+                            type="email"
+                            autocomplete="email"
+                        />
+                    </FormField>
+                    <FormField
+                        :label="t('users.fields.temporaryPassword')"
+                        :error="candidateForm.errors.temporary_password"
+                    >
+                        <Input
+                            v-model="candidateForm.temporary_password"
+                            required
+                            type="password"
+                            minlength="12"
+                            autocomplete="new-password"
+                        />
+                    </FormField>
+                    <FormField
+                        :label="t('users.fields.country')"
+                        :error="candidateForm.errors.current_country_code"
+                    >
+                        <Input
+                            v-model="candidateForm.current_country_code"
+                            maxlength="2"
+                            class="uppercase"
+                            placeholder="DE"
+                        />
+                    </FormField>
+                    <FormField
+                        :label="t('users.fields.city')"
+                        :error="candidateForm.errors.current_city"
+                    >
+                        <Input
+                            v-model="candidateForm.current_city"
+                            autocomplete="address-level2"
+                        />
+                    </FormField>
+                    <FormField
+                        :label="t('users.fields.phone')"
+                        :error="candidateForm.errors.phone"
+                    >
+                        <Input
+                            v-model="candidateForm.phone"
+                            autocomplete="tel"
+                        />
+                    </FormField>
+                    <FormField
+                        :label="t('users.fields.occupation')"
+                        :error="candidateForm.errors.occupation_id"
+                    >
+                        <select
+                            v-model="candidateForm.occupation_id"
+                            class="erin-focus h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
+                        >
+                            <option :value="null">
+                                {{ t('users.fields.notSpecified') }}
+                            </option>
+                            <option
+                                v-for="occupation in occupations"
+                                :key="occupation.id"
+                                :value="occupation.id"
+                            >
+                                {{ occupation.name_de }}
+                            </option>
+                        </select>
+                    </FormField>
+                    <FormField
+                        :label="t('users.fields.currentPosition')"
+                        :error="candidateForm.errors.current_position"
+                    >
+                        <Input v-model="candidateForm.current_position" />
+                    </FormField>
+                    <FormField
+                        :label="t('users.fields.desiredPosition')"
+                        :error="candidateForm.errors.desired_position"
+                    >
+                        <Input v-model="candidateForm.desired_position" />
+                    </FormField>
+                    <FormField
+                        class="sm:col-span-2"
+                        :label="t('users.fields.summary')"
+                        :error="candidateForm.errors.summary"
+                    >
+                        <textarea
+                            v-model="candidateForm.summary"
+                            rows="4"
+                            class="erin-focus min-h-24 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                        />
+                    </FormField>
+                    <label
+                        class="flex items-center gap-2 text-sm font-medium text-slate-700"
+                    >
+                        <input
+                            v-model="candidateForm.email_verified"
+                            type="checkbox"
+                            class="rounded border-slate-300"
+                        />
+                        {{ t('users.fields.emailVerified') }}
+                    </label>
+                    <DialogFooter class="sm:col-span-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            @click="createCandidateOpen = false"
+                            >{{ t('common.cancel') }}</Button
+                        >
+                        <Button
+                            type="submit"
+                            :disabled="candidateForm.processing"
+                            >{{ t('users.createCandidateSubmit') }}</Button
+                        >
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
     </div>
 </template>
