@@ -6,6 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property string $type
+ * @property bool $is_required
+ * @property array<int, string>|null $options
+ */
 class JobScreeningQuestion extends Model
 {
     protected $guarded = ['id'];

@@ -2,18 +2,17 @@
 
 namespace App\Http\Controllers\Candidate;
 
-use App\Enums\CandidateDocumentStatus;
 use App\Enums\CandidateDocumentType;
 use App\Http\Controllers\Controller;
-use App\Jobs\ScanCandidateDocument;
 use App\Jobs\ScanCandidateProfilePhoto;
 use App\Models\CandidateDocument;
 use App\Models\CandidateProfile;
+use App\Models\DocumentAccessGrant;
 use App\Models\Language;
 use App\Models\Occupation;
 use App\Models\Skill;
 use App\Services\Audit\AuditLogger;
-use App\Services\Candidates\ProfileCompletenessCalculator;
+use App\Services\Candidates\CandidateProfileStatus;
 use App\Services\Documents\UploadPolicy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -29,7 +28,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProfileController extends Controller
 {
-    public function show(Request $request, ProfileCompletenessCalculator $completeness): Response
+    public function show(Request $request, CandidateProfileStatus $profileStatus): Response
     {
         $profile = $request->user()?->candidateProfile()
             ->with([
@@ -38,7 +37,8 @@ class ProfileController extends Controller
                 'educations' => fn ($query) => $query->orderBy('sort_order'),
                 'skills',
                 'languages',
-                'documents',
+                'documents.grants.company',
+                'documents.grants.application',
             ])
             ->firstOrFail();
 
@@ -65,6 +65,19 @@ class ProfileController extends Controller
                         'rejection_reason' => $document->rejection_reason,
                         'expires_at' => $document->expires_at?->toIso8601String(),
                         'created_at' => $document->created_at?->toIso8601String(),
+                        'version' => $document->version,
+                        'replaced_at' => $document->replaced_at?->toIso8601String(),
+                        'active_grants_count' => $document->grants()
+                            ->whereNull('revoked_at')->where('expires_at', '>', now())->count(),
+                        'active_grants' => $document->grants
+                            ->filter(fn (DocumentAccessGrant $grant): bool => $grant->revoked_at === null
+                                && $grant->expires_at->isFuture()
+                                && $grant->application_id !== null)
+                            ->map(fn (DocumentAccessGrant $grant): array => [
+                                'application_id' => (int) $grant->application_id,
+                                'company_name' => (string) $grant->company->name,
+                                'expires_at' => $grant->expires_at->toIso8601String(),
+                            ])->values()->all(),
                         'download_url' => $document->scan_result === 'clean'
                             ? URL::temporarySignedRoute(
                                 'documents.download',
@@ -75,7 +88,7 @@ class ProfileController extends Controller
                     ],
                 )->values(),
             ],
-            'profile_status' => $this->recalculate($profile, $completeness, false),
+            'profile_status' => $profileStatus->calculate($profile, false),
             'account_email' => $request->user()?->email,
             'availability' => $request->user()?->availabilitySlots()
                 ->orderBy('weekday')->orderBy('starts_at')
@@ -147,7 +160,7 @@ class ProfileController extends Controller
 
     public function deletePhoto(
         Request $request,
-        ProfileCompletenessCalculator $completeness,
+        CandidateProfileStatus $profileStatus,
         AuditLogger $audit,
     ): RedirectResponse {
         $profile = $request->user()?->candidateProfile()->firstOrFail();
@@ -169,7 +182,7 @@ class ProfileController extends Controller
             'profile_photo_scan_result' => null,
             'profile_photo_scan_completed_at' => null,
         ]);
-        $this->recalculate($profile, $completeness, true);
+        $profileStatus->calculate($profile);
         $audit->record('candidate.profile_photo_deleted', $profile, before: $before);
 
         return back()->with('success', __('Dein Profilbild wurde gelöscht.'));
@@ -206,7 +219,7 @@ class ProfileController extends Controller
 
     public function update(
         Request $request,
-        ProfileCompletenessCalculator $completeness,
+        CandidateProfileStatus $profileStatus,
         AuditLogger $audit,
     ): RedirectResponse {
         $profile = $request->user()?->candidateProfile()->firstOrFail();
@@ -281,7 +294,7 @@ class ProfileController extends Controller
         abort_if($user === null, 401);
         $emailChanged = mb_strtolower($user->email) !== mb_strtolower($validated['email']);
 
-        DB::transaction(function () use ($profile, $validated, $completeness, $user, $emailChanged): void {
+        DB::transaction(function () use ($profile, $validated, $profileStatus, $user, $emailChanged): void {
             $profile->update(Arr::except($validated, [
                 'email', 'skills', 'languages', 'experiences', 'educations', 'availability',
             ]));
@@ -313,7 +326,7 @@ class ProfileController extends Controller
             $this->syncHistory($profile, 'educations', $validated['educations'] ?? []);
             $user->availabilitySlots()->delete();
             $user->availabilitySlots()->createMany($validated['availability'] ?? []);
-            $this->recalculate($profile, $completeness, true);
+            $profileStatus->calculate($profile);
         });
 
         if ($emailChanged) {
@@ -325,71 +338,13 @@ class ProfileController extends Controller
         return back()->with('success', __('Dein Profil wurde gespeichert.'));
     }
 
-    public function uploadDocument(
-        Request $request,
-        ProfileCompletenessCalculator $completeness,
-        AuditLogger $audit,
-        UploadPolicy $uploads,
-    ): RedirectResponse {
-        $profile = $request->user()?->candidateProfile()->firstOrFail();
-        $validated = $request->validate([
-            'type' => ['required', Rule::enum(CandidateDocumentType::class)],
-            'title' => ['required', 'string', 'max:180'],
-            'file' => [
-                'required',
-                'file',
-                'mimes:pdf,jpg,jpeg,png,doc,docx',
-                'max:'.$uploads->maxFileKilobytes(15360),
-            ],
-            'expires_at' => ['nullable', 'date', 'after:today'],
-        ]);
-        $file = $request->file('file');
-        abort_if($file === null, 422);
-        $user = $request->user();
-        abort_if($user === null, 401);
-        $uploads->assertCanStore($user, $file);
-        $path = $file->store("candidates/{$profile->getKey()}/documents", 'private');
-        abort_if($path === false, 500, __('Das Dokument konnte nicht privat gespeichert werden.'));
-        $realPath = $file->getRealPath();
-        abort_if($realPath === false, 500);
-
-        try {
-            $document = $profile->documents()->create([
-                'type' => $validated['type'],
-                'title' => $validated['title'],
-                'disk' => 'private',
-                'path' => $path,
-                'original_name' => $file->getClientOriginalName(),
-                'mime_type' => $file->getMimeType(),
-                'size_bytes' => $file->getSize(),
-                'sha256' => hash_file('sha256', $realPath),
-                'status' => CandidateDocumentStatus::Uploaded,
-                'scan_result' => 'pending',
-                'expires_at' => $validated['expires_at'] ?? null,
-            ]);
-        } catch (\Throwable $exception) {
-            Storage::disk('private')->delete($path);
-            throw $exception;
-        }
-
-        ScanCandidateDocument::dispatch($document->getKey());
-        $this->recalculate($profile, $completeness, true);
-        $audit->record('candidate.document_uploaded', $document, after: [
-            'type' => $document->type->value,
-            'status' => $document->status->value,
-            'sha256' => $document->sha256,
-        ]);
-
-        return back()->with('success', __('Dokument wurde hochgeladen und wird auf Schadsoftware geprüft.'));
-    }
-
     public function publish(
         Request $request,
-        ProfileCompletenessCalculator $completeness,
+        CandidateProfileStatus $profileStatus,
         AuditLogger $audit,
     ): RedirectResponse {
         $profile = $request->user()?->candidateProfile()->firstOrFail();
-        $status = $this->recalculate($profile, $completeness, true);
+        $status = $profileStatus->calculate($profile);
 
         if (! $profile->occupation_id || ! $profile->summary || ! $profile->current_country_code) {
             return back()->withErrors(['profile' => __('Beruf, Kurzprofil und aktuelles Land müssen vor der Veröffentlichung ausgefüllt sein.')]);
@@ -412,43 +367,6 @@ class ProfileController extends Controller
         return back()->with('success', $profile->published_at
             ? __('Dein anonymisiertes Profil ist jetzt auffindbar.')
             : __('Dein Profil ist nicht mehr öffentlich auffindbar.'));
-    }
-
-    /**
-     * @return array{percentage: int, completed: list<string>, missing: list<string>, can_apply: bool, required_percentage: int}
-     */
-    private function recalculate(
-        CandidateProfile $profile,
-        ProfileCompletenessCalculator $calculator,
-        bool $persist,
-    ): array {
-        $profile->loadCount(['experiences', 'skills', 'languages', 'educations']);
-        $profile->loadMissing('documents');
-        $data = [
-            ...$profile->toArray(),
-            'work_experiences_count' => $profile->experiences_count,
-            'skills_count' => $profile->skills_count,
-            'languages_count' => $profile->languages_count,
-            'educations_count' => $profile->educations_count,
-            'has_cv' => $profile->documents->contains(fn (CandidateDocument $document) => (
-                $document->type === CandidateDocumentType::Cv
-                && $document->scan_result === 'clean'
-            )),
-            'has_verified_certificate' => $profile->documents->contains(fn (CandidateDocument $document) => (
-                in_array($document->type, [
-                    CandidateDocumentType::LanguageCertificate,
-                    CandidateDocumentType::Qualification,
-                ], true)
-                && $document->status === CandidateDocumentStatus::Verified
-            )),
-        ];
-        $result = $calculator->calculate($data);
-
-        if ($persist && $profile->completeness !== $result['percentage']) {
-            $profile->updateQuietly(['completeness' => $result['percentage']]);
-        }
-
-        return $result;
     }
 
     /**
