@@ -55,7 +55,7 @@ fi
 container_user="$(id -u):$(id -g)"
 
 mysql_restore="${runtime_name}-mysql"
-minio_restore="${runtime_name}-minio"
+object_storage_restore="${runtime_name}-object-storage"
 network_restore="${runtime_name}-network"
 scratch_container="${runtime_name}-scratch"
 scratch_volume="${runtime_name}-scratch-tmpfs"
@@ -92,7 +92,7 @@ source_background_services_restored=false
 retain_restored_dump_for_diagnostics=true
 
 cleanup_runtime() {
-    docker rm -f "$mysql_restore" "$minio_restore" >/dev/null 2>&1 || true
+    docker rm -f "$mysql_restore" "$object_storage_restore" >/dev/null 2>&1 || true
     docker network rm "$network_restore" >/dev/null 2>&1 || true
     docker rm -f "$scratch_container" >/dev/null 2>&1 || true
     docker volume rm "$scratch_volume" >/dev/null 2>&1 || true
@@ -127,23 +127,24 @@ cleanup_source_object_canary() {
     fi
 
     docker run --rm \
-        --network "container:$source_minio_id" \
+        --network "container:$source_object_storage_id" \
         --user "$container_user" \
         --entrypoint /bin/sh \
         -e HOME=/tmp \
-        -e MC_CONFIG_DIR=/tmp/.mc \
-        -e "MINIO_ROOT_USER=$minio_user" \
-        -e "MINIO_ROOT_PASSWORD=$minio_password" \
+        -e "AWS_ACCESS_KEY_ID=$storage_access_key" \
+        -e "AWS_SECRET_ACCESS_KEY=$storage_secret_key" \
+        -e AWS_DEFAULT_REGION=eu-central-1 \
         -e "AWS_BUCKET=$bucket" \
         -e "CANARY_PATH=$database_canary_object_path" \
-        minio/mc:RELEASE.2025-08-13T08-35-41Z \
+        amazon/aws-cli:2.36.10@sha256:1ce4fd2ea9b640019af76a94e91adeed901d20363b4bb2ed095b45c75e5565cc \
         -ec '
-            mc alias set source http://127.0.0.1:9000 \
-                "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null
-            if mc stat "source/$AWS_BUCKET/$CANARY_PATH" >/dev/null 2>&1; then
-                mc rm --force "source/$AWS_BUCKET/$CANARY_PATH" >/dev/null
+            if aws --endpoint-url http://127.0.0.1:8333 s3api head-object \
+                --bucket "$AWS_BUCKET" --key "$CANARY_PATH" >/dev/null 2>&1; then
+                aws --endpoint-url http://127.0.0.1:8333 s3 rm \
+                    "s3://$AWS_BUCKET/$CANARY_PATH" --only-show-errors
             fi
-            ! mc stat "source/$AWS_BUCKET/$CANARY_PATH" >/dev/null 2>&1
+            ! aws --endpoint-url http://127.0.0.1:8333 s3api head-object \
+                --bucket "$AWS_BUCKET" --key "$CANARY_PATH" >/dev/null 2>&1
         '
     source_object_canary_inserted=false
 }
@@ -180,7 +181,7 @@ release_source_quiesce() {
     fi
 
     if [[ "$source_background_services_stopped" == "true" ]]; then
-        if docker compose -f "$compose_file" start queue scheduler >/dev/null; then
+        if docker compose -f "$compose_file" start horizon scheduler >/dev/null; then
             source_background_services_stopped=false
         else
             release_failed=true
@@ -188,7 +189,7 @@ release_source_quiesce() {
     fi
 
     if [[ "$source_background_services_stopped" == "false" ]]; then
-        if [[ "$(docker inspect --format '{{.State.Running}}' "$source_queue_id" 2>/dev/null)" == "true" \
+        if [[ "$(docker inspect --format '{{.State.Running}}' "$source_horizon_id" 2>/dev/null)" == "true" \
             && "$(docker inspect --format '{{.State.Running}}' "$source_scheduler_id" 2>/dev/null)" == "true" ]]; then
             source_background_services_restored=true
         else
@@ -231,13 +232,13 @@ cleanup_all() {
 trap cleanup_all EXIT
 
 source_mysql_id="$(docker compose -f "$compose_file" ps -q mysql)"
-source_minio_id="$(docker compose -f "$compose_file" ps -q minio)"
+source_object_storage_id="$(docker compose -f "$compose_file" ps -q object-storage)"
 source_laravel_id="$(docker compose -f "$compose_file" ps -q laravel)"
-source_queue_id="$(docker compose -f "$compose_file" ps -q queue)"
+source_horizon_id="$(docker compose -f "$compose_file" ps -q horizon)"
 source_scheduler_id="$(docker compose -f "$compose_file" ps -q scheduler)"
-if [[ -z "$source_mysql_id" || -z "$source_minio_id" || -z "$source_laravel_id" \
-    || -z "$source_queue_id" || -z "$source_scheduler_id" ]]; then
-    echo "MySQL, MinIO, Laravel, Queue und Scheduler müssen für den lokalen Drill laufen." >&2
+if [[ -z "$source_mysql_id" || -z "$source_object_storage_id" || -z "$source_laravel_id" \
+    || -z "$source_horizon_id" || -z "$source_scheduler_id" ]]; then
+    echo "MySQL, Objektspeicher, Laravel, Horizon und Scheduler müssen für den lokalen Drill laufen." >&2
     exit 1
 fi
 
@@ -348,7 +349,7 @@ verify_artifact_hmac() {
 }
 
 source_mysql_started="$(docker inspect --format '{{.State.StartedAt}}' "$source_mysql_id")"
-source_minio_started="$(docker inspect --format '{{.State.StartedAt}}' "$source_minio_id")"
+source_object_storage_started="$(docker inspect --format '{{.State.StartedAt}}' "$source_object_storage_id")"
 
 container_env() {
     local container_id="$1"
@@ -359,11 +360,11 @@ container_env() {
         | head -n 1
 }
 
-minio_user="$(container_env "$source_minio_id" MINIO_ROOT_USER)"
-minio_password="$(container_env "$source_minio_id" MINIO_ROOT_PASSWORD)"
+storage_access_key="$(container_env "$source_object_storage_id" AWS_ACCESS_KEY_ID)"
+storage_secret_key="$(container_env "$source_object_storage_id" AWS_SECRET_ACCESS_KEY)"
 bucket="$(container_env "$source_laravel_id" AWS_BUCKET)"
-if [[ -z "$minio_user" || -z "$minio_password" || -z "$bucket" ]]; then
-    echo "Lokale MinIO-Quellkonfiguration ist unvollständig." >&2
+if [[ -z "$storage_access_key" || -z "$storage_secret_key" || -z "$bucket" ]]; then
+    echo "Lokale Objektspeicher-Quellkonfiguration ist unvollständig." >&2
     exit 1
 fi
 
@@ -378,10 +379,10 @@ else
 fi
 
 source_background_services_stopped=true
-docker compose -f "$compose_file" stop --timeout 60 queue scheduler >/dev/null
-if [[ "$(docker inspect --format '{{.State.Running}}' "$source_queue_id")" != "false" \
+docker compose -f "$compose_file" stop --timeout 60 horizon scheduler >/dev/null
+if [[ "$(docker inspect --format '{{.State.Running}}' "$source_horizon_id")" != "false" \
     || "$(docker inspect --format '{{.State.Running}}' "$source_scheduler_id")" != "false" ]]; then
-    echo "Queue und Scheduler konnten für den konsistenten Snapshot nicht angehalten werden." >&2
+    echo "Horizon und Scheduler konnten für den konsistenten Snapshot nicht angehalten werden." >&2
     exit 1
 fi
 
@@ -401,23 +402,23 @@ docker exec "$scratch_container" sh -ec '
 docker exec "$scratch_container" chown "$container_user" /scratch/database-object-canary.txt
 source_object_canary_inserted=true
 docker run --rm \
-    --network "container:$source_minio_id" \
+    --network "container:$source_object_storage_id" \
     --user "$container_user" \
     --entrypoint /bin/sh \
     -e HOME=/tmp \
-    -e MC_CONFIG_DIR=/tmp/.mc \
-    -e "MINIO_ROOT_USER=$minio_user" \
-    -e "MINIO_ROOT_PASSWORD=$minio_password" \
+    -e "AWS_ACCESS_KEY_ID=$storage_access_key" \
+    -e "AWS_SECRET_ACCESS_KEY=$storage_secret_key" \
+    -e AWS_DEFAULT_REGION=eu-central-1 \
     -e "AWS_BUCKET=$bucket" \
     -e "CANARY_PATH=$database_canary_object_path" \
     -v "$scratch_volume:/scratch" \
-    minio/mc:RELEASE.2025-08-13T08-35-41Z \
+    amazon/aws-cli:2.36.10@sha256:1ce4fd2ea9b640019af76a94e91adeed901d20363b4bb2ed095b45c75e5565cc \
     -ec '
-        mc alias set source http://127.0.0.1:9000 \
-            "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null
-        mc cp /scratch/database-object-canary.txt \
-            "source/$AWS_BUCKET/$CANARY_PATH" >/dev/null
-        mc stat "source/$AWS_BUCKET/$CANARY_PATH" >/dev/null
+        aws --endpoint-url http://127.0.0.1:8333 s3 cp \
+            /scratch/database-object-canary.txt \
+            "s3://$AWS_BUCKET/$CANARY_PATH" --only-show-errors
+        aws --endpoint-url http://127.0.0.1:8333 s3api head-object \
+            --bucket "$AWS_BUCKET" --key "$CANARY_PATH" >/dev/null
     '
 docker exec "$scratch_container" rm -f /scratch/database-object-canary.txt
 
@@ -557,19 +558,20 @@ source_objects="$work_dir/source-objects"
 docker exec "$scratch_container" mkdir -m 0700 "$source_objects"
 docker exec "$scratch_container" chown "$container_user" "$source_objects"
 docker run --rm \
-    --network "container:$source_minio_id" \
+    --network "container:$source_object_storage_id" \
     --user "$container_user" \
     --entrypoint /bin/sh \
     -e HOME=/tmp \
-    -e MC_CONFIG_DIR=/tmp/.mc \
-    -e "MINIO_ROOT_USER=$minio_user" \
-    -e "MINIO_ROOT_PASSWORD=$minio_password" \
+    -e "AWS_ACCESS_KEY_ID=$storage_access_key" \
+    -e "AWS_SECRET_ACCESS_KEY=$storage_secret_key" \
+    -e AWS_DEFAULT_REGION=eu-central-1 \
     -e "AWS_BUCKET=$bucket" \
     -v "$scratch_volume:/scratch" \
-    minio/mc:RELEASE.2025-08-13T08-35-41Z \
+    amazon/aws-cli:2.36.10@sha256:1ce4fd2ea9b640019af76a94e91adeed901d20363b4bb2ed095b45c75e5565cc \
     -ec '
-        mc alias set source http://127.0.0.1:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null
-        mc mirror --overwrite "source/$AWS_BUCKET" /scratch/source-objects >/dev/null
+        aws --endpoint-url http://127.0.0.1:8333 s3 sync \
+            "s3://$AWS_BUCKET" /scratch/source-objects \
+            --no-progress --only-show-errors
     '
 
 docker exec "$scratch_container" sh -ec '
@@ -631,7 +633,7 @@ source_object_count="$(
 )"
 source_object_bytes="$(bytes_for "$source_objects")"
 
-echo "[$drill_id] Verschlüssele den lokalen MinIO-Snapshot."
+echo "[$drill_id] Verschlüssele den lokalen Objektspeicher-Snapshot."
 docker exec "$scratch_container" sh -ec '
     set -C
     tar -C /scratch/source-objects -cf - . \
@@ -719,8 +721,8 @@ tampered_mac_rejected=true
 echo "[$drill_id] Starte eine interne Docker-Umgebung ohne Host-Ports und mit tmpfs."
 docker network create --internal "$network_restore" >/dev/null
 mysql_password="$(openssl rand -hex 24)"
-minio_restore_user="erin-drill"
-minio_restore_password="$(openssl rand -hex 24)"
+object_storage_restore_user="erin-drill"
+object_storage_restore_password="$(openssl rand -hex 24)"
 
 docker run -d \
     --name "$mysql_restore" \
@@ -731,13 +733,14 @@ docker run -d \
     mysql:8.4 >/dev/null
 
 docker run -d \
-    --name "$minio_restore" \
+    --name "$object_storage_restore" \
     --network "$network_restore" \
     --tmpfs /data:rw,nosuid,nodev,noexec,size=1073741824 \
-    -e "MINIO_ROOT_USER=$minio_restore_user" \
-    -e "MINIO_ROOT_PASSWORD=$minio_restore_password" \
-    minio/minio:RELEASE.2025-09-07T16-13-09Z \
-    server /data --console-address :9001 >/dev/null
+    -e "AWS_ACCESS_KEY_ID=$object_storage_restore_user" \
+    -e "AWS_SECRET_ACCESS_KEY=$object_storage_restore_password" \
+    -e "S3_BUCKET=$bucket" \
+    chrislusf/seaweedfs:4.40@sha256:52194fba4fecd0083c842158b3a902ba6e04a63619b2b0efcd08007bdb6a4602 \
+    mini -dir=/data -ip.bind=0.0.0.0 >/dev/null
 for _ in $(seq 1 60); do
     if docker exec "$mysql_restore" mysqladmin ping \
         --host=127.0.0.1 --user=root --password="$mysql_password" --silent >/dev/null 2>&1; then
@@ -752,15 +755,15 @@ if ! docker exec "$mysql_restore" mysqladmin ping \
 fi
 
 for _ in $(seq 1 60); do
-    if docker exec "$minio_restore" curl --fail --silent \
-        http://127.0.0.1:9000/minio/health/ready >/dev/null 2>&1; then
+    if docker exec "$object_storage_restore" wget -q -O /dev/null \
+        http://127.0.0.1:9333/cluster/status >/dev/null 2>&1; then
         break
     fi
     sleep 1
 done
-if ! docker exec "$minio_restore" curl --fail --silent \
-    http://127.0.0.1:9000/minio/health/ready >/dev/null 2>&1; then
-    echo "Isoliertes Drill-MinIO wurde nicht rechtzeitig bereit." >&2
+if ! docker exec "$object_storage_restore" wget -q -O /dev/null \
+    http://127.0.0.1:9333/cluster/status >/dev/null 2>&1; then
+    echo "Isoliertes Drill-Objektspeicher wurde nicht rechtzeitig bereit." >&2
     exit 1
 fi
 
@@ -768,14 +771,14 @@ network_internal="$(
     docker network inspect --format '{{.Internal}}' "$network_restore"
 )"
 mysql_port_bindings="$(docker inspect --format '{{json .HostConfig.PortBindings}}' "$mysql_restore")"
-minio_port_bindings="$(docker inspect --format '{{json .HostConfig.PortBindings}}' "$minio_restore")"
+object_storage_port_bindings="$(docker inspect --format '{{json .HostConfig.PortBindings}}' "$object_storage_restore")"
 mysql_tmpfs="$(docker inspect --format '{{json .HostConfig.Tmpfs}}' "$mysql_restore")"
-minio_tmpfs="$(docker inspect --format '{{json .HostConfig.Tmpfs}}' "$minio_restore")"
-if [[ "$network_internal" != "true" || "$mysql_port_bindings" != "{}" || "$minio_port_bindings" != "{}" ]]; then
+object_storage_tmpfs="$(docker inspect --format '{{json .HostConfig.Tmpfs}}' "$object_storage_restore")"
+if [[ "$network_internal" != "true" || "$mysql_port_bindings" != "{}" || "$object_storage_port_bindings" != "{}" ]]; then
     echo "Isolationsprüfung fehlgeschlagen: Netzwerk oder Host-Ports sind unsicher." >&2
     exit 1
 fi
-if [[ "$mysql_tmpfs" != *"/var/lib/mysql"* || "$minio_tmpfs" != *"/data"* ]]; then
+if [[ "$mysql_tmpfs" != *"/var/lib/mysql"* || "$object_storage_tmpfs" != *"/data"* ]]; then
     echo "Isolationsprüfung fehlgeschlagen: Restore-Daten liegen nicht in tmpfs." >&2
     exit 1
 fi
@@ -1106,12 +1109,12 @@ orphan_storage_object_count="$(
         'wc -l < /scratch/orphan-storage-objects.list | tr -d " "'
 )"
 if (( missing_database_object_count != 0 || orphan_storage_object_count != 0 )); then
-    echo "Datenbankpfade und MinIO-Objekte bilden keinen vollständigen bijektiven Snapshot." >&2
+    echo "Datenbankpfade und Objektspeicher-Objekte bilden keinen vollständigen bijektiven Snapshot." >&2
     echo "Fehlende Objekte: $missing_database_object_count; Orphans: $orphan_storage_object_count" >&2
     exit 1
 fi
 if [[ "$database_object_reference_manifest_sha" != "$source_application_object_manifest_sha" ]]; then
-    echo "Die Pfadmanifeste von Datenbank und MinIO stimmen nicht überein." >&2
+    echo "Die Pfadmanifeste von Datenbank und Objektspeicher stimmen nicht überein." >&2
     exit 1
 fi
 
@@ -1173,37 +1176,39 @@ docker exec "$scratch_container" sh -ec '
         | tar -C /scratch/restored-objects -xf -
 ' sh "$iterations"
 
-mc_restore() {
+object_storage_cli() {
     docker run --rm \
-        --network "container:$minio_restore" \
+        --network "container:$object_storage_restore" \
         --user "$container_user" \
         --entrypoint /bin/sh \
         -e HOME=/tmp \
-        -e MC_CONFIG_DIR=/tmp/.mc \
-        -e "MINIO_ROOT_USER=$minio_restore_user" \
-        -e "MINIO_ROOT_PASSWORD=$minio_restore_password" \
+        -e "AWS_ACCESS_KEY_ID=$object_storage_restore_user" \
+        -e "AWS_SECRET_ACCESS_KEY=$object_storage_restore_password" \
+        -e AWS_DEFAULT_REGION=eu-central-1 \
         -e "AWS_BUCKET=$bucket" \
         -v "$scratch_volume:/scratch" \
         "$@"
 }
 
-mc_restore \
+object_storage_cli \
     -e "DRILL_CANARY_NAME=$drill_canary_name" \
-    minio/mc:RELEASE.2025-08-13T08-35-41Z \
+    amazon/aws-cli:2.36.10@sha256:1ce4fd2ea9b640019af76a94e91adeed901d20363b4bb2ed095b45c75e5565cc \
     -ec '
-        mc alias set restore http://127.0.0.1:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null
-        mc mb --ignore-existing "restore/$AWS_BUCKET" >/dev/null
         test -r "/scratch/restored-objects/$DRILL_CANARY_NAME"
-        mc cp --recursive /scratch/restored-objects/ "restore/$AWS_BUCKET/" >/dev/null
-        mc stat "restore/$AWS_BUCKET/$DRILL_CANARY_NAME" >/dev/null
+        aws --endpoint-url http://127.0.0.1:8333 s3 sync \
+            /scratch/restored-objects "s3://$AWS_BUCKET" \
+            --no-progress --only-show-errors
+        aws --endpoint-url http://127.0.0.1:8333 s3api head-object \
+            --bucket "$AWS_BUCKET" --key "$DRILL_CANARY_NAME" >/dev/null
     '
 
-mc_restore \
+object_storage_cli \
     -e "DRILL_CANARY_NAME=$drill_canary_name" \
-    minio/mc:RELEASE.2025-08-13T08-35-41Z \
+    amazon/aws-cli:2.36.10@sha256:1ce4fd2ea9b640019af76a94e91adeed901d20363b4bb2ed095b45c75e5565cc \
     -ec '
-        mc alias set restore http://127.0.0.1:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null
-        mc cp --recursive "restore/$AWS_BUCKET/" /scratch/verified-objects/ >/dev/null
+        aws --endpoint-url http://127.0.0.1:8333 s3 sync \
+            "s3://$AWS_BUCKET" /scratch/verified-objects \
+            --no-progress --only-show-errors
         test -r "/scratch/verified-objects/$DRILL_CANARY_NAME"
     '
 
@@ -1219,28 +1224,27 @@ restored_object_bytes="$(bytes_for "$verified_plain")"
 if [[ "$source_manifest_sha" != "$restored_manifest_sha" \
     || "$source_object_count" != "$restored_object_count" \
     || "$source_object_bytes" != "$restored_object_bytes" ]]; then
-    echo "MinIO-Restore stimmt nicht mit dem verschlüsselten Snapshot überein." >&2
+    echo "Objektspeicher-Restore stimmt nicht mit dem verschlüsselten Snapshot überein." >&2
     echo "Quelle: count=$source_object_count bytes=$source_object_bytes manifest=$source_manifest_sha" >&2
     echo "Restore: count=$restored_object_count bytes=$restored_object_bytes manifest=$restored_manifest_sha" >&2
     exit 1
 fi
 
 first_object_key="$drill_canary_name"
-mc_restore \
+object_storage_cli \
     -e "OBJECT_KEY=$first_object_key" \
-    minio/mc:RELEASE.2025-08-13T08-35-41Z \
+    amazon/aws-cli:2.36.10@sha256:1ce4fd2ea9b640019af76a94e91adeed901d20363b4bb2ed095b45c75e5565cc \
     -ec '
-        mc alias set restore http://127.0.0.1:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null
-        mc rm "restore/$AWS_BUCKET/$OBJECT_KEY" >/dev/null
+        aws --endpoint-url http://127.0.0.1:8333 s3 rm \
+            "s3://$AWS_BUCKET/$OBJECT_KEY" --only-show-errors
     '
-mc_restore \
+object_storage_cli \
     -e "DRILL_CANARY_NAME=$drill_canary_name" \
-    minio/mc:RELEASE.2025-08-13T08-35-41Z \
+    amazon/aws-cli:2.36.10@sha256:1ce4fd2ea9b640019af76a94e91adeed901d20363b4bb2ed095b45c75e5565cc \
     -ec '
-        mc alias set restore http://127.0.0.1:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null
-        if [ -n "$(mc ls --recursive "restore/$AWS_BUCKET/")" ]; then
-            mc cp --recursive "restore/$AWS_BUCKET/" /scratch/negative-objects/ >/dev/null
-        fi
+        aws --endpoint-url http://127.0.0.1:8333 s3 sync \
+            "s3://$AWS_BUCKET" /scratch/negative-objects \
+            --no-progress --only-show-errors
         test ! -e "/scratch/negative-objects/$DRILL_CANARY_NAME"
     '
 manifest_for "$negative_plain" "$work_dir/negative.manifest"
@@ -1253,12 +1257,13 @@ if [[ "$negative_manifest_sha" == "$source_manifest_sha" ]]; then
 fi
 missing_object_detected=true
 
-mc_restore \
+object_storage_cli \
     -e "OBJECT_KEY=$first_object_key" \
-    minio/mc:RELEASE.2025-08-13T08-35-41Z \
+    amazon/aws-cli:2.36.10@sha256:1ce4fd2ea9b640019af76a94e91adeed901d20363b4bb2ed095b45c75e5565cc \
     -ec '
-        mc alias set restore http://127.0.0.1:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null
-        mc cp "/scratch/restored-objects/$OBJECT_KEY" "restore/$AWS_BUCKET/$OBJECT_KEY" >/dev/null
+        aws --endpoint-url http://127.0.0.1:8333 s3 cp \
+            "/scratch/restored-objects/$OBJECT_KEY" \
+            "s3://$AWS_BUCKET/$OBJECT_KEY" --only-show-errors
     '
 
 object_storage_restored_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -1266,9 +1271,9 @@ object_storage_restored_epoch="$(date -u +%s)"
 
 source_identity_unchanged=false
 if [[ "$(docker compose -f "$compose_file" ps -q mysql)" == "$source_mysql_id" \
-    && "$(docker compose -f "$compose_file" ps -q minio)" == "$source_minio_id" \
+    && "$(docker compose -f "$compose_file" ps -q object-storage)" == "$source_object_storage_id" \
     && "$(docker inspect --format '{{.State.StartedAt}}' "$source_mysql_id")" == "$source_mysql_started" \
-    && "$(docker inspect --format '{{.State.StartedAt}}' "$source_minio_id")" == "$source_minio_started" ]]; then
+    && "$(docker inspect --format '{{.State.StartedAt}}' "$source_object_storage_id")" == "$source_object_storage_started" ]]; then
     source_identity_unchanged=true
 fi
 
@@ -1280,7 +1285,7 @@ if ! docker exec "$scratch_container" test -s "$key_file" \
 fi
 
 cleanup_runtime
-if docker inspect "$mysql_restore" "$minio_restore" >/dev/null 2>&1 \
+if docker inspect "$mysql_restore" "$object_storage_restore" >/dev/null 2>&1 \
     || docker network inspect "$network_restore" >/dev/null 2>&1 \
     || docker inspect "$scratch_container" >/dev/null 2>&1 \
     || docker volume inspect "$scratch_volume" >/dev/null 2>&1; then

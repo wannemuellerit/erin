@@ -13,6 +13,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $original_name
  * @property string|null $mime_type
  * @property int|null $size_bytes
+ * @property int|null $duration_seconds
+ * @property array<int, float>|null $waveform
  * @property string|null $scan_result
  */
 class MessageAttachment extends Model
@@ -21,7 +23,7 @@ class MessageAttachment extends Model
 
     protected function casts(): array
     {
-        return ['scan_completed_at' => 'datetime'];
+        return ['waveform' => 'array', 'scan_completed_at' => 'datetime'];
     }
 
     /**

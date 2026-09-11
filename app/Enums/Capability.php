@@ -34,6 +34,9 @@ enum Capability: string
     case CandidateAiUse = 'candidate.ai.use';
     case RecruitingAiUse = 'recruiting.ai.use';
     case SupportUse = 'support.use';
+    case PartnerCasesView = 'partner.cases.view';
+    case PartnerCasesManage = 'partner.cases.manage';
+    case PartnerCatalogManage = 'partner.catalog.manage';
     case PlatformView = 'platform.view';
     case PlatformSupportManage = 'platform.support.manage';
     case PlatformManage = 'platform.manage';

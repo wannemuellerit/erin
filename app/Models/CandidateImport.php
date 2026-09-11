@@ -20,6 +20,8 @@ class CandidateImport extends Model
             'mapping' => 'array',
             'errors' => 'array',
             'started_at' => 'datetime',
+            'cancellation_requested_at' => 'datetime',
+            'cancelled_at' => 'datetime',
             'completed_at' => 'datetime',
         ];
     }

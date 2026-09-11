@@ -17,7 +17,7 @@ const className = computed(() => props.class);
 <template>
     <SidebarInset
         v-if="props.variant === 'sidebar'"
-        :class="['min-w-0 bg-slate-50', className]"
+        :class="['min-w-0 bg-muted', className]"
     >
         <slot />
     </SidebarInset>

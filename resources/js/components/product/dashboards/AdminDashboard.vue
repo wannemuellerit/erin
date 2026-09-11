@@ -52,19 +52,19 @@ const { t } = useI18n();
         </section>
         <SectionCard :title="t('dashboard.admin.marketplace')">
             <dl class="grid gap-4 sm:grid-cols-2">
-                <div class="rounded-xl bg-slate-50 p-5">
-                    <dt class="text-xs text-slate-600">
+                <div class="rounded-xl bg-muted p-5">
+                    <dt class="text-xs text-muted-foreground">
                         {{ t('dashboard.admin.candidates') }}
                     </dt>
-                    <dd class="mt-1 text-3xl font-extrabold text-slate-950">
+                    <dd class="mt-1 text-3xl font-extrabold text-foreground">
                         {{ dashboard?.candidates ?? 0 }}
                     </dd>
                 </div>
-                <div class="rounded-xl bg-slate-50 p-5">
-                    <dt class="text-xs text-slate-600">
+                <div class="rounded-xl bg-muted p-5">
+                    <dt class="text-xs text-muted-foreground">
                         {{ t('dashboard.admin.applications') }}
                     </dt>
-                    <dd class="mt-1 text-3xl font-extrabold text-slate-950">
+                    <dd class="mt-1 text-3xl font-extrabold text-foreground">
                         {{ dashboard?.applications ?? 0 }}
                     </dd>
                 </div>

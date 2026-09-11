@@ -1,6 +1,7 @@
 import type { LucideIcon } from '@lucide/vue';
 
-export type ProductRole = 'candidate' | 'employer' | 'support' | 'super_admin';
+export type ProductRole =
+    'candidate' | 'employer' | 'partner' | 'support' | 'super_admin';
 
 export type ProductNavItem = {
     label: string;

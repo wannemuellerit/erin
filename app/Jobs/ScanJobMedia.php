@@ -19,7 +19,10 @@ class ScanJobMedia implements ShouldQueue
     /** @var list<int> */
     public array $backoff = [30, 120, 300, 900];
 
-    public function __construct(public readonly int $mediaId) {}
+    public function __construct(public readonly int $mediaId)
+    {
+        $this->onQueue('scans');
+    }
 
     public function handle(ClamAvScanner $scanner): void
     {

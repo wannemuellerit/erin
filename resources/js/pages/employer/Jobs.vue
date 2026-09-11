@@ -134,7 +134,7 @@ const deleteJob = (row: ProductTableRow) => {
             <template v-if="canManageJobs" #actions>
                 <Link
                     :href="create()"
-                    class="inline-flex h-10 items-center gap-2 rounded-xl bg-[var(--erin-primary)] px-4 text-sm font-bold text-white hover:bg-[var(--erin-primary-hover)]"
+                    class="inline-flex h-10 items-center gap-2 rounded-xl bg-[var(--erin-primary)] px-4 text-sm font-bold text-[var(--erin-primary-foreground)] hover:bg-[var(--erin-primary-hover)]"
                     ><Plus class="size-4" />
                     {{ t('employer.jobs.create') }}</Link
                 >
@@ -185,10 +185,10 @@ const deleteJob = (row: ProductTableRow) => {
                                     ? edit(Number(row.id))
                                     : '/employer/jobs'
                             "
-                            class="font-bold text-slate-900 hover:text-[var(--erin-primary)]"
+                            class="font-bold text-foreground hover:text-[var(--erin-primary-text)]"
                             >{{ row.title }}</Link
                         >
-                        <p class="mt-0.5 text-xs text-slate-400">
+                        <p class="mt-0.5 text-xs text-muted-foreground">
                             {{ employmentTypeLabel(row.employment_type) }}
                         </p>
                     </div></template
@@ -205,7 +205,7 @@ const deleteJob = (row: ProductTableRow) => {
                         "
                 /></template>
                 <template #cell-applications="{ value }"
-                    ><span class="font-bold text-slate-800">{{
+                    ><span class="font-bold text-foreground">{{
                         value
                     }}</span></template
                 >
@@ -213,7 +213,7 @@ const deleteJob = (row: ProductTableRow) => {
                     <div class="flex justify-end gap-2">
                         <Link
                             :href="edit(Number(row.id))"
-                            class="rounded-lg border border-slate-200 px-2.5 py-1.5 text-[10px] font-bold text-slate-600"
+                            class="rounded-lg border border-border px-2.5 py-1.5 text-[10px] font-bold text-muted-foreground"
                             >{{ t('employer.jobs.edit') }}</Link
                         >
                         <button
@@ -249,7 +249,7 @@ const deleteJob = (row: ProductTableRow) => {
                         </button>
                         <button
                             type="button"
-                            class="rounded-lg border border-slate-200 px-2.5 py-1.5 text-[10px] font-bold text-slate-600"
+                            class="rounded-lg border border-border px-2.5 py-1.5 text-[10px] font-bold text-muted-foreground hover:bg-muted"
                             @click="duplicateJob(Number(row.id))"
                         >
                             {{ t('employer.jobs.duplicate') }}

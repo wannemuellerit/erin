@@ -1,3 +1,5 @@
+@import './brand-tokens.css';
+
 @import 'tailwindcss';
 
 @import 'tw-animate-css';
@@ -89,96 +91,48 @@
     }
 }
 
-:root {
-    --background: #f8fafc;
-    --foreground: #0f172a;
-    --card: #ffffff;
-    --card-foreground: #0f172a;
-    --popover: #ffffff;
-    --popover-foreground: #0f172a;
-    --primary: #2563eb;
+.dark {
+    color-scheme: dark;
+    --background: #0f172a;
+    --foreground: #f8fafc;
+    --card: #172033;
+    --card-foreground: #f8fafc;
+    --popover: #172033;
+    --popover-foreground: #f8fafc;
     --primary-foreground: #ffffff;
-    --secondary: #14b8a6;
     --secondary-foreground: #ffffff;
-    --muted: #f1f5f9;
-    --muted-foreground: #475569;
-    --accent: #f97316;
-    --accent-foreground: #ffffff;
-    --destructive: #ef4444;
+    --muted: #1e293b;
+    --muted-foreground: #cbd5e1;
+    --accent-foreground: #f8fafc;
+    --destructive: #dc2626;
     --destructive-foreground: #ffffff;
-    --border: #e2e8f0;
-    --input: #cbd5e1;
-    --ring: #2563eb;
-    --chart-1: #2563eb;
-    --chart-2: #14b8a6;
-    --chart-3: #f97316;
-    --chart-4: #0ea5e9;
-    --chart-5: #22c55e;
-    --radius: 0.75rem;
-    --sidebar-background: #ffffff;
-    --sidebar-foreground: #475569;
-    --sidebar-primary: #2563eb;
+    --border: #334155;
+    --input: #475569;
+    --ring: #60a5fa;
+    --chart-1: #60a5fa;
+    --chart-2: #2dd4bf;
+    --chart-3: #fb923c;
+    --chart-4: #a78bfa;
+    --chart-5: #4ade80;
+    --sidebar-background: #0b1220;
+    --sidebar-foreground: #cbd5e1;
     --sidebar-primary-foreground: #ffffff;
-    --sidebar-accent: #eff6ff;
-    --sidebar-accent-foreground: #1d4ed8;
-    --sidebar-border: #e2e8f0;
-    --sidebar-ring: #2563eb;
-    --sidebar: #ffffff;
-    --erin-primary: #2563eb;
-    --erin-primary-hover: #1d4ed8;
-    --erin-secondary: #14b8a6;
-    --erin-accent: #f97316;
-    --erin-success: #22c55e;
-    --erin-warning: #f59e0b;
-    --erin-error: #ef4444;
-    --erin-info: #0ea5e9;
-    --color-blue-600: var(--erin-primary);
-    --color-blue-700: var(--erin-primary-hover);
-    --color-teal-500: var(--erin-secondary);
-    --color-teal-600: var(--erin-secondary);
-    --color-orange-500: var(--erin-accent);
-    --color-orange-600: color-mix(in srgb, var(--erin-accent) 86%, #000000);
-    --color-emerald-500: var(--erin-success);
-    --color-green-500: var(--erin-success);
-    --color-amber-500: var(--erin-warning);
-    --color-red-500: var(--erin-error);
-    --color-sky-500: var(--erin-info);
+    --sidebar-accent: #1e293b;
+    --sidebar-accent-foreground: #f8fafc;
+    --sidebar-border: #334155;
+    --sidebar-ring: #60a5fa;
+    --sidebar: #0b1220;
+    --erin-primary-text: #60a5fa;
+    --erin-primary-text-hover: #93c5fd;
 }
 
-.dark {
-    --background: hsl(0 0% 3.9%);
-    --foreground: hsl(0 0% 98%);
-    --card: hsl(0 0% 3.9%);
-    --card-foreground: hsl(0 0% 98%);
-    --popover: hsl(0 0% 3.9%);
-    --popover-foreground: hsl(0 0% 98%);
-    --primary: hsl(0 0% 98%);
-    --primary-foreground: hsl(0 0% 9%);
-    --secondary: hsl(0 0% 14.9%);
-    --secondary-foreground: hsl(0 0% 98%);
-    --muted: hsl(0 0% 16.08%);
-    --muted-foreground: hsl(0 0% 63.9%);
-    --accent: hsl(0 0% 14.9%);
-    --accent-foreground: hsl(0 0% 98%);
-    --destructive: hsl(0 84% 60%);
-    --destructive-foreground: hsl(0 0% 98%);
-    --border: hsl(0 0% 14.9%);
-    --input: hsl(0 0% 14.9%);
-    --ring: hsl(0 0% 83.1%);
-    --chart-1: hsl(220 70% 50%);
-    --chart-2: hsl(160 60% 45%);
-    --chart-3: hsl(30 80% 55%);
-    --chart-4: hsl(280 65% 60%);
-    --chart-5: hsl(340 75% 55%);
-    --sidebar-background: hsl(0 0% 7%);
-    --sidebar-foreground: hsl(0 0% 95.9%);
-    --sidebar-primary: hsl(360, 100%, 100%);
-    --sidebar-primary-foreground: hsl(0 0% 100%);
-    --sidebar-accent: hsl(0 0% 15.9%);
-    --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
-    --sidebar-border: hsl(0 0% 15.9%);
-    --sidebar-ring: hsl(217.2 91.2% 59.8%);
-    --sidebar: hsl(240 5.9% 10%);
+.dark .erin-theme-scope {
+    --erin-primary-text: color-mix(in srgb, var(--erin-primary) 55%, #ffffff);
+    --erin-primary-text-hover: color-mix(
+        in srgb,
+        var(--erin-primary) 35%,
+        #ffffff
+    );
 }
 
 @layer base {
@@ -193,6 +147,14 @@
     a {
         @apply transition-colors;
     }
+    button:not(:disabled),
+    [role='button']:not([aria-disabled='true']),
+    select:not(:disabled) {
+        cursor: pointer;
+    }
+    button:disabled {
+        cursor: not-allowed;
+    }
     ::selection {
         background: color-mix(in srgb, var(--erin-primary) 20%, transparent);
     }
@@ -200,7 +162,7 @@
 
 @layer components {
     .erin-panel {
-        @apply rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.03),0_8px_24px_rgba(15,23,42,0.035)];
+        @apply rounded-2xl border border-border bg-card text-card-foreground shadow-[0_1px_2px_rgba(15,23,42,0.03),0_8px_24px_rgba(15,23,42,0.035)];
     }
 
     .erin-page {
@@ -219,4 +181,128 @@
         );
         background-size: 22px 22px;
     }
+}
+
+/*
+ * Legacy product screens use Tailwind's light status palettes. Keep their
+ * semantic hue in dark mode, but move pale surfaces and dark foregrounds to
+ * accessible dark equivalents. This also covers tenant-configurable screens
+ * that share these status utilities.
+ */
+.dark .bg-blue-50,
+.dark .bg-blue-50\/40,
+.dark .bg-blue-50\/50,
+.dark .bg-blue-50\/70,
+.dark .bg-blue-100 {
+    background-color: color-mix(in srgb, #2563eb 18%, var(--card));
+}
+
+.dark .bg-teal-50,
+.dark .bg-teal-100 {
+    background-color: color-mix(in srgb, #0d9488 18%, var(--card));
+}
+
+.dark .bg-orange-50,
+.dark .bg-orange-100 {
+    background-color: color-mix(in srgb, #ea580c 18%, var(--card));
+}
+
+.dark .bg-red-50,
+.dark .bg-red-100,
+.dark .bg-rose-50 {
+    background-color: color-mix(in srgb, #dc2626 18%, var(--card));
+}
+
+.dark .bg-amber-50,
+.dark .bg-amber-50\/80 {
+    background-color: color-mix(in srgb, #d97706 18%, var(--card));
+}
+
+.dark .bg-emerald-50,
+.dark .bg-green-50,
+.dark .bg-green-100 {
+    background-color: color-mix(in srgb, #059669 18%, var(--card));
+}
+
+.dark .bg-violet-50,
+.dark .bg-violet-50\/50,
+.dark .bg-violet-100 {
+    background-color: color-mix(in srgb, #7c3aed 18%, var(--card));
+}
+
+.dark .text-blue-800,
+.dark .text-blue-900,
+.dark .text-blue-900\/75,
+.dark .text-blue-950 {
+    color: #bfdbfe;
+}
+
+.dark .text-teal-600,
+.dark .text-teal-700,
+.dark .text-teal-900 {
+    color: #5eead4;
+}
+
+.dark .text-orange-600,
+.dark .text-orange-700,
+.dark .text-orange-800,
+.dark .text-orange-900,
+.dark .text-orange-950 {
+    color: #fdba74;
+}
+
+.dark .text-red-600,
+.dark .text-red-700,
+.dark .text-red-800,
+.dark .text-rose-600,
+.dark .text-rose-700 {
+    color: #fca5a5;
+}
+
+.dark .text-amber-600,
+.dark .text-amber-700,
+.dark .text-amber-800,
+.dark .text-amber-800\/70,
+.dark .text-amber-900,
+.dark .text-amber-900\/80,
+.dark .text-amber-950 {
+    color: #fcd34d;
+}
+
+.dark .text-emerald-600,
+.dark .text-emerald-700,
+.dark .text-emerald-800,
+.dark .text-green-600,
+.dark .text-green-700,
+.dark .text-green-800 {
+    color: #6ee7b7;
+}
+
+.dark .text-violet-600,
+.dark .text-violet-700,
+.dark .text-violet-800,
+.dark .text-violet-900 {
+    color: #c4b5fd;
+}
+
+.dark
+    :is(
+        .border-blue-100,
+        .border-blue-200,
+        .border-blue-300,
+        .border-teal-100,
+        .border-teal-200,
+        .border-teal-300,
+        .border-orange-200,
+        .border-orange-300,
+        .border-red-100,
+        .border-red-200,
+        .border-amber-200,
+        .border-amber-300,
+        .border-emerald-200,
+        .border-green-100,
+        .border-violet-100,
+        .border-violet-200
+    ) {
+    border-color: color-mix(in srgb, currentColor 35%, var(--border));
 }

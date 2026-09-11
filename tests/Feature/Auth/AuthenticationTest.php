@@ -81,6 +81,24 @@ class AuthenticationTest extends TestCase
         $response->assertRedirect(route('dashboard', absolute: false));
     }
 
+    public function test_successful_logins_do_not_consume_the_failed_attempt_budget(): void
+    {
+        $user = User::factory()->create();
+
+        foreach (range(1, 6) as $attempt) {
+            $response = $this->post(route('login.store'), [
+                'email' => $user->email,
+                'password' => 'password',
+            ]);
+
+            $response->assertRedirect(route('dashboard', absolute: false));
+            $this->assertAuthenticatedAs($user);
+
+            $this->post(route('logout'))->assertRedirect(route('home'));
+            $this->assertGuest();
+        }
+    }
+
     public function test_seeded_demo_user_can_authenticate(): void
     {
         config()->set('app.demo_mode', true);

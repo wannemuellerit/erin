@@ -1,6 +1,17 @@
 <?php
 
 return [
+    'partners' => [
+        'webhook_secret' => env('PARTNER_WEBHOOK_SECRET'),
+        'webhook_max_bytes' => (int) env('PARTNER_WEBHOOK_MAX_BYTES', 256 * 1024),
+    ],
+    'payouts' => [
+        'provider' => env('PAYOUT_PROVIDER', 'null'),
+        'webhook_secret' => env('PAYOUT_WEBHOOK_SECRET'),
+        'webhook_max_bytes' => (int) env('PAYOUT_WEBHOOK_MAX_BYTES', 256 * 1024),
+        'fraud_review_score' => (int) env('PAYOUT_FRAUD_REVIEW_SCORE', 50),
+        'manual_review_amount_cents' => (int) env('PAYOUT_MANUAL_REVIEW_AMOUNT_CENTS', 50000),
+    ],
 
     /*
     |--------------------------------------------------------------------------
@@ -39,6 +50,7 @@ return [
         'publishable_key' => env('STRIPE_PUBLISHABLE_KEY'),
         'secret_key' => env('STRIPE_SECRET_KEY'),
         'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+        'billing_portal_configuration_id' => env('STRIPE_BILLING_PORTAL_CONFIGURATION_ID'),
         'basic_product_id' => env('STRIPE_PRODUCT_BASIC'),
         'basic_price_id' => env('STRIPE_PRICE_BASIC'),
         'business_product_id' => env('STRIPE_PRODUCT_BUSINESS'),
@@ -67,9 +79,30 @@ return [
         'url' => env('LIVEKIT_URL'),
         'api_key' => env('LIVEKIT_API_KEY'),
         'api_secret' => env('LIVEKIT_API_SECRET'),
+        'allow_insecure_local' => (bool) env('LIVEKIT_ALLOW_INSECURE_LOCAL', false),
         'token_ttl_minutes' => (int) env('LIVEKIT_TOKEN_TTL_MINUTES', 10),
         'e2ee_required' => (bool) env('LIVEKIT_E2EE_REQUIRED', true),
         'region' => env('LIVEKIT_REGION', 'eu'),
+        'webhook_max_bytes' => (int) env('LIVEKIT_WEBHOOK_MAX_BYTES', 256 * 1024),
+    ],
+
+    'mail_delivery' => [
+        'provider' => env('MAIL_DELIVERY_PROVIDER', 'postmark'),
+        'webhook_secret' => env('MAIL_DELIVERY_WEBHOOK_SECRET'),
+        'webhook_max_bytes' => (int) env('MAIL_DELIVERY_WEBHOOK_MAX_BYTES', 256 * 1024),
+    ],
+
+    'twilio' => [
+        'enabled' => (bool) env('TWILIO_ENABLED', false),
+        'account_sid' => env('TWILIO_ACCOUNT_SID'),
+        'auth_token' => env('TWILIO_AUTH_TOKEN'),
+        'sms_from' => env('TWILIO_SMS_FROM'),
+        'whatsapp_from' => env('TWILIO_WHATSAPP_FROM'),
+        'webhook_secret' => env('TWILIO_WEBHOOK_SECRET'),
+        'webhook_max_bytes' => (int) env('TWILIO_WEBHOOK_MAX_BYTES', 256 * 1024),
+        'allowed_countries' => array_values(array_filter(explode(',', (string) env('TWILIO_ALLOWED_COUNTRIES', 'DE')))),
+        'monthly_cost_limit_micros' => (int) env('TWILIO_MONTHLY_COST_LIMIT_MICROS', 100000000),
+        'user_hourly_limit' => (int) env('TWILIO_USER_HOURLY_LIMIT', 5),
     ],
 
     'zammad' => [

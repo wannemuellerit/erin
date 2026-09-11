@@ -12,6 +12,7 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property int $conversation_id
  * @property int|null $sender_id
+ * @property string|null $client_id
  * @property int|null $reply_to_id
  * @property string $type
  * @property string|null $body
@@ -59,5 +60,11 @@ class Message extends Model
     public function attachments(): HasMany
     {
         return $this->hasMany(MessageAttachment::class);
+    }
+
+    /** @return HasMany<MessageTranslation, $this> */
+    public function messageTranslations(): HasMany
+    {
+        return $this->hasMany(MessageTranslation::class);
     }
 }

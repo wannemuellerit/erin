@@ -9,6 +9,9 @@ use App\Models\FeatureFlag;
 use App\Models\GdprRequest;
 use App\Models\IntegrationReceipt;
 use App\Models\LoginHistory;
+use App\Models\MatchScoreVersion;
+use App\Services\Platform\PlatformSettings;
+use App\Services\Video\LiveKitConfiguration;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\URL;
 use Inertia\Inertia;
@@ -16,8 +19,27 @@ use Inertia\Response;
 
 class SystemController extends AdminController
 {
-    public function index(): Response
-    {
+    public function index(
+        PlatformSettings $settings,
+        LiveKitConfiguration $liveKit,
+    ): Response {
+        $maintenance = (array) $settings->get('platform.maintenance', []);
+        $maintenanceTranslations = array_fill_keys(
+            config('app.supported_locales', ['de', 'en']),
+            '',
+        );
+        if (is_array($maintenance['translations'] ?? null)) {
+            $maintenanceTranslations = array_replace(
+                $maintenanceTranslations,
+                $maintenance['translations'],
+            );
+        }
+        foreach (['de', 'en'] as $legacyLocale) {
+            if ($maintenanceTranslations[$legacyLocale] === '') {
+                $maintenanceTranslations[$legacyLocale] = (string) ($maintenance["message_{$legacyLocale}"] ?? '');
+            }
+        }
+
         return Inertia::render('admin/System', [
             'feature_flags' => FeatureFlag::query()
                 ->with('updater:id,name,email')
@@ -91,11 +113,14 @@ class SystemController extends AdminController
                 ->get(),
             'email_templates' => EmailTemplate::query()
                 ->with('updater:id,name,email')
-                ->whereIn('locale', ['de', 'en'])
+                ->whereIn('locale', config('app.supported_locales', ['de', 'en']))
                 ->orderBy('key')
                 ->orderBy('locale')
                 ->limit(100)
                 ->get(),
+            'match_score_versions' => MatchScoreVersion::query()
+                ->with(['creator:id,name', 'activator:id,name'])
+                ->latest()->limit(20)->get(),
             'gdpr' => [
                 'open' => GdprRequest::query()
                     ->whereNotIn('status', ['completed', 'rejected'])
@@ -117,11 +142,16 @@ class SystemController extends AdminController
                 'queue_connection' => config('queue.default'),
                 'failed_jobs' => DB::table('failed_jobs')->count(),
             ],
+            'maintenance' => array_replace([
+                'active' => false,
+                'translations' => $maintenanceTranslations,
+                'expected_end_at' => null,
+                'started_at' => null,
+            ], $maintenance, ['translations' => $maintenanceTranslations]),
             'integrations' => [
                 'stripe' => filled(config('cashier.secret') ?? config('services.stripe.secret')),
                 'openai' => filled(config('services.openai.api_key')),
-                'livekit' => filled(config('services.livekit.key'))
-                    && filled(config('services.livekit.secret')),
+                'livekit' => $liveKit->isJoinReady(),
                 'recent_failed_webhooks' => IntegrationReceipt::query()
                     ->where('status', 'failed')
                     ->where('created_at', '>=', now()->subDay())

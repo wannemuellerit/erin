@@ -8,7 +8,7 @@ import {
     MessagesSquare,
     UsersRound,
 } from '@lucide/vue';
-import { computed, reactive } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import DataTable from '@/components/product/DataTable.vue';
 import MetricBarList from '@/components/product/MetricBarList.vue';
@@ -62,6 +62,8 @@ const { t } = useI18n();
 const { formatNumber } = useFormatters();
 const { statusLabel } = useStatusLabels();
 const filters = reactive({ ...props.filters });
+const applying = ref(false);
+const applied = ref<{ from: string; to: string } | null>(null);
 const columns = computed<TableColumn[]>(() => [
     { key: 'title', label: t('operations.analytics.job') },
     {
@@ -112,10 +114,24 @@ const timelineHeight = (value: number) =>
     value <= 0 ? '0%' : `${Math.max(3, (value / maxTimeline.value) * 100)}%`;
 
 const applyFilters = () => {
+    if (applying.value) {
+        return;
+    }
+
+    applied.value = null;
     router.get('/employer/analytics', filters, {
         preserveScroll: true,
         preserveState: true,
         replace: true,
+        onStart: () => {
+            applying.value = true;
+        },
+        onSuccess: () => {
+            applied.value = { ...props.filters };
+        },
+        onFinish: () => {
+            applying.value = false;
+        },
     });
 };
 </script>
@@ -135,31 +151,44 @@ const applyFilters = () => {
                     class="flex flex-wrap items-end gap-2"
                     @submit.prevent="applyFilters"
                 >
-                    <label class="text-xs font-bold text-slate-600">
+                    <label class="text-xs font-bold text-muted-foreground">
                         {{ t('operations.analytics.from') }}
                         <input
                             v-model="filters.from"
                             type="date"
-                            class="erin-focus mt-1 block h-10 rounded-xl border border-slate-200 px-3 text-sm"
+                            class="erin-focus mt-1 block h-10 rounded-xl border border-border px-3 text-sm"
                         />
                     </label>
-                    <label class="text-xs font-bold text-slate-600">
+                    <label class="text-xs font-bold text-muted-foreground">
                         {{ t('operations.analytics.to') }}
                         <input
                             v-model="filters.to"
                             type="date"
-                            class="erin-focus mt-1 block h-10 rounded-xl border border-slate-200 px-3 text-sm"
+                            class="erin-focus mt-1 block h-10 rounded-xl border border-border px-3 text-sm"
                         />
                     </label>
                     <button
                         type="submit"
-                        class="erin-focus h-10 rounded-xl bg-blue-600 px-4 text-xs font-bold text-white"
+                        :disabled="applying"
+                        :aria-busy="applying"
+                        class="erin-focus h-10 rounded-xl bg-blue-600 px-4 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50"
                     >
                         {{ t('operations.analytics.apply') }}
                     </button>
+                    <a
+                        :href="`/employer/analytics/export?from=${encodeURIComponent(filters.from)}&to=${encodeURIComponent(filters.to)}`"
+                        class="erin-focus inline-flex h-10 items-center rounded-xl border border-border bg-card px-4 text-xs font-bold text-muted-foreground"
+                    >
+                        {{ t('operations.analytics.export') }}
+                    </a>
                 </form>
             </template>
         </PageHeader>
+
+        <p v-if="applied" role="status" class="text-sm text-foreground">
+            {{ t('operations.analytics.from') }}: {{ applied.from }} ·
+            {{ t('operations.analytics.to') }}: {{ applied.to }}
+        </p>
 
         <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
             <MetricCard
@@ -236,7 +265,9 @@ const applyFilters = () => {
             </table>
             <div
                 class="flex min-h-56 items-end gap-2 overflow-x-auto pb-2"
-                aria-hidden="true"
+                role="region"
+                tabindex="0"
+                :aria-label="t('operations.analytics.timeline')"
             >
                 <div
                     v-for="item in analytics.timeline"
@@ -268,13 +299,15 @@ const applyFilters = () => {
                             :title="`${item.hires} ${t('operations.analytics.hires')}`"
                         />
                     </div>
-                    <span class="max-w-20 truncate text-[10px] text-slate-500">
+                    <span
+                        class="max-w-20 truncate text-[10px] text-muted-foreground"
+                    >
                         {{ item.label }}
                     </span>
                 </div>
             </div>
             <div
-                class="mt-3 flex flex-wrap justify-center gap-4 text-xs text-slate-500"
+                class="mt-3 flex flex-wrap justify-center gap-4 text-xs text-muted-foreground"
             >
                 <span class="inline-flex items-center gap-1.5">
                     <i class="size-2 rounded-full bg-blue-500" />
@@ -304,7 +337,7 @@ const applyFilters = () => {
                     :empty-label="t('operations.analytics.noJobs')"
                 >
                     <template #cell-title="{ value }">
-                        <span class="font-bold text-slate-900">
+                        <span class="font-bold text-foreground">
                             {{ value }}
                         </span>
                     </template>
@@ -323,7 +356,10 @@ const applyFilters = () => {
                     :items="countryBars"
                     tone="teal"
                 />
-                <p v-else class="py-8 text-center text-sm text-slate-500">
+                <p
+                    v-else
+                    class="py-8 text-center text-sm text-muted-foreground"
+                >
                     {{ t('operations.analytics.noCountries') }}
                 </p>
             </SectionCard>

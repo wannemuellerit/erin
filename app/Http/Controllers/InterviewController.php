@@ -10,9 +10,13 @@ use App\Enums\UserRole;
 use App\Models\Interview;
 use App\Models\InterviewProposal;
 use App\Models\JobApplication;
-use App\Notifications\ActivityNotification;
+use App\Models\User;
+use App\Models\UserAvailabilitySlot;
 use App\Services\Activity\ActivityRecorder;
 use App\Services\Applications\ApplicationWorkflow;
+use App\Services\Platform\ProductNotificationDispatcher;
+use App\Services\Video\LiveKitConfiguration;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -36,6 +40,7 @@ class InterviewController extends Controller
             'application.candidateProfile.user:id,name',
             'proposals.proposer:id,name',
             'organizer:id,name',
+            'attendances:id,interview_id,user_id,first_joined_at,last_left_at,total_seconds,join_count',
         ]);
 
         if ($user->role === UserRole::Company) {
@@ -50,6 +55,13 @@ class InterviewController extends Controller
             ->get()
             ->map(fn (Interview $interview): array => [
                 ...$interview->toArray(),
+                'can_join' => $interview->status === InterviewStatus::Confirmed
+                    && $interview->starts_at !== null
+                    && $interview->ends_at !== null
+                    && now()->between(
+                        $interview->starts_at->copy()->subMinutes(15),
+                        $interview->ends_at->copy()->addMinutes(15),
+                    ),
                 'ics_url' => $interview->starts_at ? URL::temporarySignedRoute(
                     'interviews.ics',
                     now()->addMinutes(30),
@@ -63,6 +75,25 @@ class InterviewController extends Controller
                 'interviews' => $interviews,
                 'availability' => $user->availabilitySlots()->orderBy('weekday')->orderBy('starts_at')->get(),
                 'timezone' => $user->timezone,
+                'applications' => $user->role === UserRole::Company
+                    ? JobApplication::query()
+                        ->whereHas('jobPosting', fn ($jobs) => $jobs->whereIn('company_id', $companyIds))
+                        ->with([
+                            'jobPosting:id,title',
+                            'candidateProfile:id,first_name,last_name,user_id',
+                        ])
+                        ->whereNotIn('status', [ApplicationStatus::Rejected, ApplicationStatus::Withdrawn, ApplicationStatus::Hired])
+                        ->latest('applied_at')
+                        ->limit(100)
+                        ->get()
+                        ->map(fn (JobApplication $application): array => [
+                            'id' => $application->getKey(),
+                            'job_title' => $application->jobPosting->title,
+                            'candidate_name' => $application->identityIsRevealed()
+                                ? trim($application->candidateProfile->first_name.' '.$application->candidateProfile->last_name)
+                                : $application->candidateProfile->anonymizedLabel(),
+                        ])->values()
+                    : [],
             ],
         );
     }
@@ -83,6 +114,7 @@ class InterviewController extends Controller
         foreach ($validated['slots'] as $slot) {
             abort_unless(strtotime($slot['ends_at']) > strtotime($slot['starts_at']), 422);
         }
+        $this->assertParticipantAvailability($application, $validated['slots'], $request->user());
 
         $interview = DB::transaction(function () use ($application, $request, $validated): Interview {
             $interview = Interview::query()->create([
@@ -132,7 +164,7 @@ class InterviewController extends Controller
                     ),
                 ],
             ],
-            'url' => route('interviews.index'),
+            'url' => route('interviews.index', absolute: false),
             'interview_id' => $interview->getKey(),
         ]);
         $activity->record(
@@ -182,11 +214,23 @@ class InterviewController extends Controller
                 $interview,
                 ['job_title' => $interview->application->jobPosting->title],
             );
+            $this->notifyOtherParticipant($request, $interview->application, [
+                'event' => 'interview.cancelled',
+                'title' => __('Interview abgesagt'),
+                'message' => __('Der Interviewtermin wurde abgesagt.'),
+                'translations' => [
+                    'de' => ['title' => 'Interview abgesagt', 'message' => 'Der Interviewtermin wurde abgesagt.'],
+                    'en' => ['title' => 'Interview cancelled', 'message' => 'The interview appointment was cancelled.'],
+                ],
+                'url' => route('interviews.index', absolute: false),
+                'interview_id' => $interview->getKey(),
+            ]);
 
             return back()->with('success', __('Das Interview wurde abgesagt.'));
         }
 
         if ($validated['response'] === 'counter') {
+            $this->assertParticipantAvailability($interview->application, $validated['slots'], $interview->organizer);
             DB::transaction(function () use ($interview, $request, $validated): void {
                 $interview->proposals()->where('status', 'pending')->update([
                     'status' => 'superseded',
@@ -212,6 +256,17 @@ class InterviewController extends Controller
                 $interview,
                 ['job_title' => $interview->application->jobPosting->title],
             );
+            $this->notifyOtherParticipant($request, $interview->application, [
+                'event' => 'interview.countered',
+                'title' => __('Neue Gegenvorschläge'),
+                'message' => __('Für das Interview wurden neue Termine vorgeschlagen.'),
+                'translations' => [
+                    'de' => ['title' => 'Neue Gegenvorschläge', 'message' => 'Für das Interview wurden neue Termine vorgeschlagen.'],
+                    'en' => ['title' => 'New counterproposals', 'message' => 'New times were proposed for the interview.'],
+                ],
+                'url' => route('interviews.index', absolute: false),
+                'interview_id' => $interview->getKey(),
+            ]);
 
             return back()->with('success', __('Deine Gegenvorschläge wurden gesendet.'));
         }
@@ -221,6 +276,11 @@ class InterviewController extends Controller
             ->where('status', 'pending')
             ->findOrFail($validated['proposal_id']);
         abort_if($proposal->proposed_by === $request->user()?->getKey(), 422, __('Eigene Vorschläge können nicht selbst bestätigt werden.'));
+        $this->assertParticipantAvailability($interview->application, [[
+            'starts_at' => $proposal->starts_at->toIso8601String(),
+            'ends_at' => $proposal->ends_at->toIso8601String(),
+            'timezone' => $proposal->timezone,
+        ]], $interview->organizer);
 
         DB::transaction(function () use ($interview, $proposal, $request, $workflow): void {
             $interview->proposals()->whereKeyNot($proposal->getKey())->where('status', 'pending')->update([
@@ -263,7 +323,7 @@ class InterviewController extends Controller
                     'message' => 'The interview appointment has been confirmed.',
                 ],
             ],
-            'url' => route('interviews.index'),
+            'url' => route('interviews.index', absolute: false),
             'interview_id' => $interview->getKey(),
         ]);
         $activity->record(
@@ -281,9 +341,15 @@ class InterviewController extends Controller
         Request $request,
         Interview $interview,
         VideoProvider $video,
+        LiveKitConfiguration $liveKit,
     ): JsonResponse {
         $interview->load('application.jobPosting');
-        $this->authorizeApplication($request, $interview->application);
+        $this->authorizeApplication($request, $interview->application, true);
+        abort_unless(
+            $liveKit->isJoinReady(),
+            503,
+            __('Der sichere EU-Videoraum ist nicht korrekt konfiguriert.'),
+        );
         abort_unless($interview->status === InterviewStatus::Confirmed, 422, __('Das Interview ist nicht bestätigt.'));
         abort_if($interview->starts_at === null || $interview->ends_at === null, 422);
         abort_unless(
@@ -408,6 +474,61 @@ class InterviewController extends Controller
     }
 
     /**
+     * A configured weekly availability is authoritative. Users without slots remain
+     * unrestricted so that existing accounts are not locked out of scheduling.
+     *
+     * @param  list<array{starts_at: string, ends_at: string, timezone: string, note?: string|null}>  $slots
+     */
+    private function assertParticipantAvailability(
+        JobApplication $application,
+        array $slots,
+        ?User $organizer,
+    ): void {
+        $application->loadMissing('candidateProfile.user', 'jobPosting.creator');
+        $participants = collect([$application->candidateProfile->user, $organizer ?? $application->jobPosting->creator])
+            ->filter()
+            ->unique(fn (User $user): int => (int) $user->getKey());
+
+        foreach ($participants as $participant) {
+            $availability = $participant->availabilitySlots()->get();
+            if ($availability->isEmpty()) {
+                continue;
+            }
+
+            foreach ($slots as $slot) {
+                $startsAt = CarbonImmutable::parse($slot['starts_at']);
+                $endsAt = CarbonImmutable::parse($slot['ends_at']);
+                $fits = $availability->contains(function (UserAvailabilitySlot $available) use ($startsAt, $endsAt): bool {
+                    $localStart = $startsAt->setTimezone($available->timezone);
+                    $localEnd = $endsAt->setTimezone($available->timezone);
+                    if ($localStart->dayOfWeekIso !== (int) $available->weekday
+                        || $localEnd->dayOfWeekIso !== (int) $available->weekday) {
+                        return false;
+                    }
+
+                    $windowStart = CarbonImmutable::parse(
+                        $localStart->toDateString().' '.$available->starts_at,
+                        $available->timezone,
+                    );
+                    $windowEnd = CarbonImmutable::parse(
+                        $localStart->toDateString().' '.$available->ends_at,
+                        $available->timezone,
+                    );
+
+                    return $localStart->greaterThanOrEqualTo($windowStart)
+                        && $localEnd->lessThanOrEqualTo($windowEnd);
+                });
+
+                abort_unless(
+                    $fits,
+                    422,
+                    __('Mindestens ein Terminvorschlag liegt außerhalb der hinterlegten Wochenverfügbarkeit.'),
+                );
+            }
+        }
+    }
+
+    /**
      * @param  array<string, mixed>  $data
      */
     private function notifyOtherParticipant(Request $request, JobApplication $application, array $data): void
@@ -417,7 +538,14 @@ class InterviewController extends Controller
         $other = $user->role === UserRole::Candidate
             ? $application->jobPosting->creator
             : $application->candidateProfile->user;
-        $other->notify(new ActivityNotification($data));
+        $event = (string) ($data['event'] ?? '');
+        $interviewId = (string) ($data['interview_id'] ?? 'unknown');
+        app(ProductNotificationDispatcher::class)->dispatch(
+            $other,
+            $event,
+            "interview:{$interviewId}:{$event}",
+            $data,
+        );
     }
 
     private function icsEscape(string $value): string

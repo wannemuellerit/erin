@@ -168,7 +168,7 @@ const submit = () =>
     <div class="erin-page">
         <Link
             :href="jobsIndex.url()"
-            class="inline-flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-[var(--erin-primary)]"
+            class="inline-flex items-center gap-2 text-sm font-bold text-muted-foreground hover:text-[var(--erin-primary-text)]"
         >
             <ArrowLeft class="size-4" />
             {{ t('candidate.jobDetail.back') }}
@@ -194,16 +194,18 @@ const submit = () =>
                         {{ job.summary }}
                     </p>
                     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        <div class="rounded-xl bg-slate-50 p-4">
+                        <div class="rounded-xl bg-muted p-4">
                             <MapPin class="size-4 text-teal-600" />
-                            <p class="mt-2 text-xs text-slate-500">
+                            <p class="mt-2 text-xs text-muted-foreground">
                                 {{ t('candidate.jobDetail.location') }}
                             </p>
                             <p class="font-bold">{{ location }}</p>
                         </div>
-                        <div class="rounded-xl bg-slate-50 p-4">
-                            <Clock3 class="size-4 text-blue-600" />
-                            <p class="mt-2 text-xs text-slate-500">
+                        <div class="rounded-xl bg-muted p-4">
+                            <Clock3
+                                class="size-4 text-[var(--erin-primary-text)]"
+                            />
+                            <p class="mt-2 text-xs text-muted-foreground">
                                 {{ t('candidate.jobDetail.hours') }}
                             </p>
                             <p class="font-bold">
@@ -212,9 +214,9 @@ const submit = () =>
                                 }}
                             </p>
                         </div>
-                        <div class="rounded-xl bg-slate-50 p-4">
+                        <div class="rounded-xl bg-muted p-4">
                             <Languages class="size-4 text-orange-500" />
-                            <p class="mt-2 text-xs text-slate-500">
+                            <p class="mt-2 text-xs text-muted-foreground">
                                 {{ t('candidate.jobDetail.experience') }}
                             </p>
                             <p class="font-bold">
@@ -268,7 +270,7 @@ const submit = () =>
                         </div>
                     </div>
                     <p
-                        class="mt-5 text-sm leading-7 whitespace-pre-line text-slate-700"
+                        class="mt-5 text-sm leading-7 whitespace-pre-line text-muted-foreground"
                     >
                         {{
                             job.description ||
@@ -285,7 +287,7 @@ const submit = () =>
                         <span
                             v-for="skill in job.skills ?? []"
                             :key="Number(skill.id)"
-                            class="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600"
+                            class="rounded-lg bg-muted px-3 py-1.5 text-xs font-bold text-muted-foreground"
                         >
                             {{
                                 localizedField(
@@ -296,8 +298,8 @@ const submit = () =>
                             }}
                         </span>
                     </div>
-                    <div class="mt-5 border-t border-slate-100 pt-5">
-                        <p class="text-xs font-bold text-slate-500">
+                    <div class="mt-5 border-t border-border pt-5">
+                        <p class="text-xs font-bold text-muted-foreground">
                             {{ t('candidate.jobDetail.languages') }}
                         </p>
                         <div
@@ -311,7 +313,7 @@ const submit = () =>
                                 tone="teal"
                             />
                         </div>
-                        <p v-else class="mt-2 text-sm text-slate-600">
+                        <p v-else class="mt-2 text-sm text-muted-foreground">
                             {{ t('candidate.jobDetail.languageOpen') }}
                         </p>
                     </div>
@@ -325,11 +327,11 @@ const submit = () =>
                         v-for="medium in job.media"
                         :key="medium.id"
                         :href="medium.download_url"
-                        class="flex items-center justify-between gap-3 border-b border-slate-100 py-3 text-sm font-bold text-slate-700 last:border-0"
+                        class="flex items-center justify-between gap-3 border-b border-border py-3 text-sm font-bold text-muted-foreground last:border-0"
                     >
                         <span class="min-w-0 truncate">{{ medium.name }}</span>
                         <span
-                            class="flex shrink-0 items-center gap-2 text-xs text-blue-600"
+                            class="flex shrink-0 items-center gap-2 text-xs text-[var(--erin-primary-text)]"
                         >
                             <template v-if="medium.size_bytes">
                                 {{
@@ -356,21 +358,21 @@ const submit = () =>
                         />
                         <div>
                             <p class="font-extrabold">{{ job.company.name }}</p>
-                            <p class="text-xs text-slate-500">
+                            <p class="text-xs text-muted-foreground">
                                 {{ job.company.industry }}
                             </p>
                         </div>
                     </div>
                     <Link
                         :href="showCompany.url(job.company.id)"
-                        class="mt-4 block text-sm font-bold text-blue-600"
+                        class="mt-4 block text-sm font-bold text-[var(--erin-primary-text)]"
                     >
                         {{ t('candidate.jobDetail.companyProfile') }}
                     </Link>
                 </SectionCard>
 
                 <SectionCard :title="t('candidate.jobDetail.application')">
-                    <p class="mb-4 text-lg font-extrabold text-slate-950">
+                    <p class="mb-4 text-lg font-extrabold text-foreground">
                         {{ compensation }}
                     </p>
                     <StatusBadge
@@ -404,7 +406,7 @@ const submit = () =>
                             class="mt-4"
                         >
                             <label
-                                class="mb-2 block text-xs font-bold text-slate-700"
+                                class="mb-2 block text-xs font-bold text-muted-foreground"
                             >
                                 {{ question.question }}
                                 <span v-if="question.is_required">*</span>

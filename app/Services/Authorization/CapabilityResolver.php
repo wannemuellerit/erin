@@ -7,6 +7,7 @@ use App\Enums\CompanyMemberRole;
 use App\Enums\UserRole;
 use App\Models\Company;
 use App\Models\CompanyMembership;
+use App\Models\PartnerMember;
 use App\Models\User;
 use Illuminate\Http\Request;
 
@@ -100,6 +101,33 @@ final class CapabilityResolver
                 Capability::CandidateAiUse->value,
                 Capability::SupportUse->value,
             ];
+        }
+
+        if ($user->role === UserRole::Partner) {
+            /** @var PartnerMember|null $partnerMembership */
+            $partnerMembership = PartnerMember::query()
+                ->with('organization')
+                ->where('user_id', $user->getKey())
+                ->whereNotNull('accepted_at')
+                ->whereNull('revoked_at')
+                ->first();
+
+            if ($partnerMembership === null || ! $partnerMembership->organization->isOperational()) {
+                return [];
+            }
+
+            $capabilities = [Capability::DashboardView->value, Capability::PartnerCasesView->value];
+            if ($partnerMembership->role !== 'viewer') {
+                $capabilities[] = Capability::PartnerCasesManage->value;
+            }
+            if ($partnerMembership->role === 'admin') {
+                $capabilities[] = Capability::PartnerCatalogManage->value;
+            }
+
+            return array_values(array_unique(array_intersect(
+                $capabilities,
+                [Capability::DashboardView->value, ...(array) $partnerMembership->capabilities],
+            )));
         }
 
         if ($membership === null) {

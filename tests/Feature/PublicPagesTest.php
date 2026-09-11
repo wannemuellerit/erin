@@ -37,17 +37,17 @@ it('lets guests persist a supported locale and rejects unsupported locales', fun
         ->assertSessionHasErrors('locale');
 });
 
-it('also persists the selected locale for authenticated users', function () {
+it('also persists every supported locale for authenticated users', function (string $locale) {
     $user = User::factory()->create(['locale' => 'de']);
 
     $this->actingAs($user)
         ->from(route('home'))
-        ->post(route('locale.update'), ['locale' => 'en'])
+        ->post(route('locale.update'), ['locale' => $locale])
         ->assertRedirect(route('home'))
-        ->assertSessionHas('locale', 'en');
+        ->assertSessionHas('locale', $locale);
 
-    expect($user->refresh()->locale)->toBe('en');
-});
+    expect($user->refresh()->locale)->toBe($locale);
+})->with(['de', 'en', 'pl', 'ro', 'hr', 'es', 'pt']);
 
 it('serves every legal route with an explicit unpublished launch gate', function (
     string $routeName,
@@ -103,6 +103,13 @@ it('publishes only explicitly public and approved localized legal content', func
         ->assertInertia(fn (Assert $page) => $page
             ->where('published', true)
             ->where('content', 'Approved English privacy text.'));
+
+    $this->withSession(['locale' => 'pl'])
+        ->get(route('legal.privacy'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('published', false)
+            ->where('content', null));
 });
 
 it('replaces the dead contact redirect with a configurable public contact page', function () {

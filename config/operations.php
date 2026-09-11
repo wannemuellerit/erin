@@ -6,6 +6,15 @@ $embeddedBuildShaPath = base_path('.erin-build-sha');
 $embeddedBuildSha = is_readable($embeddedBuildShaPath)
     ? trim((string) file_get_contents($embeddedBuildShaPath))
     : null;
+$governedQueueNames = [
+    'payments',
+    'webhooks',
+    'notifications',
+    'scans',
+    'imports',
+    'ai',
+    'default',
+];
 
 return [
     'build' => [
@@ -24,13 +33,39 @@ return [
     ],
 
     'storage' => [
-        'minio_app_user' => env('MINIO_APP_USER'),
+        'access_key_id' => env('AWS_ACCESS_KEY_ID'),
+        'bucket' => env('AWS_BUCKET'),
+        'endpoint' => env('AWS_ENDPOINT'),
+        'bucket_scope_verified' => filter_var(
+            env('ERIN_STORAGE_BUCKET_SCOPE_VERIFIED', false),
+            FILTER_VALIDATE_BOOL,
+        ),
+        'versioning_verified' => filter_var(
+            env('ERIN_STORAGE_VERSIONING_VERIFIED', false),
+            FILTER_VALIDATE_BOOL,
+        ),
+        'encryption_verified' => filter_var(
+            env('ERIN_STORAGE_ENCRYPTION_VERIFIED', false),
+            FILTER_VALIDATE_BOOL,
+        ),
+        'access_logging_verified' => filter_var(
+            env('ERIN_STORAGE_ACCESS_LOGGING_VERIFIED', false),
+            FILTER_VALIDATE_BOOL,
+        ),
+        'offsite_copy_verified' => filter_var(
+            env('ERIN_STORAGE_OFFSITE_COPY_VERIFIED', false),
+            FILTER_VALIDATE_BOOL,
+        ),
+        'evidence_reference' => env('ERIN_STORAGE_EVIDENCE_REFERENCE'),
     ],
 
     'queue' => [
-        'queues' => array_values(array_filter(array_map(
-            'trim',
-            explode(',', (string) env('ERIN_QUEUE_HEALTH_QUEUES', 'high,default,low')),
+        'queues' => array_values(array_unique(array_merge(
+            $governedQueueNames,
+            array_filter(array_map(
+                'trim',
+                explode(',', (string) env('ERIN_QUEUE_HEALTH_QUEUES', '')),
+            )),
         ))),
         'max_pending' => (int) env('ERIN_QUEUE_MAX_PENDING', 500),
         'max_failed' => (int) env('ERIN_QUEUE_MAX_FAILED', 0),

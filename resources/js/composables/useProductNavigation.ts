@@ -7,6 +7,7 @@ import {
     CreditCard,
     FileCheck2,
     Gift,
+    Handshake,
     LayoutDashboard,
     LifeBuoy,
     ListChecks,
@@ -39,6 +40,7 @@ const roleAliases: Record<string, ProductRole> = {
     recruiter: 'employer',
     viewer: 'employer',
     employer: 'employer',
+    partner: 'partner',
     support: 'support',
     support_agent: 'support',
     admin: 'super_admin',
@@ -50,6 +52,9 @@ export function useProductNavigation() {
     const page = usePage();
     const { t } = useI18n();
     const { can } = useCapabilities();
+    const features = computed(
+        () => (page.props.features ?? {}) as Record<string, boolean>,
+    );
 
     const role = computed<ProductRole>(() => {
         const user = page.props.auth?.user as ProductUser | undefined;
@@ -106,11 +111,6 @@ export function useProductNavigation() {
                     icon: CalendarDays,
                 },
                 {
-                    label: t('operations.nav.productivity'),
-                    href: '/employer/productivity',
-                    icon: ListChecks,
-                },
-                {
                     label: t('operations.nav.support'),
                     href: '/support',
                     icon: LifeBuoy,
@@ -144,6 +144,11 @@ export function useProductNavigation() {
                     label: t('nav.billing'),
                     href: '/employer/billing',
                     icon: CreditCard,
+                },
+                {
+                    label: t('nav.services'),
+                    href: '/employer/services',
+                    icon: Handshake,
                 },
             ],
         },
@@ -208,9 +213,26 @@ export function useProductNavigation() {
                     icon: Gift,
                 },
                 {
+                    label: t('nav.services'),
+                    href: '/candidate/services',
+                    icon: Handshake,
+                },
+                {
                     label: t('operations.nav.support'),
                     href: '/support',
                     icon: LifeBuoy,
+                },
+            ],
+        },
+    ]);
+
+    const partnerNavigation = computed<ProductNavGroup[]>(() => [
+        {
+            items: [
+                {
+                    label: t('nav.partnerCases'),
+                    href: '/partner/cases',
+                    icon: Handshake,
                 },
             ],
         },
@@ -279,6 +301,11 @@ export function useProductNavigation() {
                     href: '/admin/settings',
                     icon: Settings2,
                 },
+                {
+                    label: t('nav.partners'),
+                    href: '/admin/partners',
+                    icon: Handshake,
+                },
             ],
         },
     ]);
@@ -327,7 +354,6 @@ export function useProductNavigation() {
         '/employer/analytics': 'analytics.view',
         '/employer/messages': 'messages.view',
         '/employer/interviews': 'interviews.view',
-        '/employer/productivity': 'applications.view',
         '/employer/visa': 'visa.view',
         '/employer/referrals': 'referrals.view',
         '/employer/company': 'company.view',
@@ -341,7 +367,19 @@ export function useProductNavigation() {
         '/candidate/interviews': 'interviews.view',
         '/candidate/ai-studio': 'candidate.ai.use',
         '/candidate/referrals': 'referrals.view',
+        '/partner/cases': 'partner.cases.view',
         '/admin': 'platform.view',
+    };
+
+    const featureForPath: Record<string, string> = {
+        '/employer/analytics': 'analytics',
+        '/employer/messages': 'messaging',
+        '/candidate/messages': 'messaging',
+        '/employer/interviews': 'interviews',
+        '/candidate/interviews': 'interviews',
+        '/candidate/ai-studio': 'ai',
+        '/employer/billing': 'billing',
+        '/support': 'support',
     };
 
     const filterByCapabilities = (groups: ProductNavGroup[]) =>
@@ -349,6 +387,21 @@ export function useProductNavigation() {
             .map((group) => ({
                 ...group,
                 items: group.items.filter((item) => {
+                    const feature =
+                        featureForPath[
+                            Object.keys(featureForPath)
+                                .sort((a, b) => b.length - a.length)
+                                .find(
+                                    (path) =>
+                                        item.href === path ||
+                                        item.href.startsWith(`${path}/`),
+                                ) ?? ''
+                        ];
+
+                    if (feature && features.value[feature] === false) {
+                        return false;
+                    }
+
                     const required =
                         capabilityForPath[
                             Object.keys(capabilityForPath)
@@ -370,6 +423,8 @@ export function useProductNavigation() {
 
         if (role.value === 'candidate') {
             groups = candidateNavigation.value;
+        } else if (role.value === 'partner') {
+            groups = partnerNavigation.value;
         } else if (role.value === 'support') {
             groups = supportNavigation.value;
         } else if (role.value === 'super_admin') {

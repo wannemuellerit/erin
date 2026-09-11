@@ -244,7 +244,7 @@ const saveCandidate = () => {
     <div class="erin-page">
         <Link
             :href="candidatesIndex()"
-            class="inline-flex w-fit items-center gap-2 text-xs font-bold text-slate-500 hover:text-[var(--erin-primary)]"
+            class="inline-flex w-fit items-center gap-2 text-xs font-bold text-muted-foreground hover:text-[var(--erin-primary-text)]"
         >
             <ArrowLeft class="size-4" />
             {{ t('employer.candidateShow.backToCandidates') }}
@@ -255,11 +255,11 @@ const saveCandidate = () => {
             class="erin-panel grid min-h-80 place-items-center p-8 text-center"
         >
             <div>
-                <LockKeyhole class="mx-auto size-8 text-slate-300" />
-                <h1 class="mt-4 font-bold text-slate-900">
+                <LockKeyhole class="mx-auto size-8 text-muted-foreground" />
+                <h1 class="mt-4 font-bold text-foreground">
                     {{ t('employer.candidateShow.unavailableTitle') }}
                 </h1>
-                <p class="mt-2 text-sm text-slate-500">
+                <p class="mt-2 text-sm text-muted-foreground">
                     {{ t('employer.candidateShow.unavailableDescription') }}
                 </p>
             </div>
@@ -272,7 +272,7 @@ const saveCandidate = () => {
                 />
                 <div class="flex flex-col gap-6 lg:flex-row lg:items-center">
                     <div
-                        class="grid size-20 shrink-0 place-items-center rounded-2xl bg-blue-50 text-xl font-extrabold text-[var(--erin-primary)]"
+                        class="grid size-20 shrink-0 place-items-center rounded-2xl bg-blue-50 text-xl font-extrabold text-[var(--erin-primary-text)]"
                     >
                         {{
                             (candidate.label ?? String(candidate.id)).slice(-2)
@@ -306,7 +306,7 @@ const saveCandidate = () => {
                                 "
                             />
                         </div>
-                        <p class="mt-1 text-sm text-slate-500">
+                        <p class="mt-1 text-sm text-muted-foreground">
                             {{ identityName }}
                             <span
                                 v-if="candidate.current_country_code"
@@ -316,7 +316,7 @@ const saveCandidate = () => {
                             >
                         </p>
                         <p
-                            class="mt-3 max-w-3xl text-sm leading-6 text-slate-600"
+                            class="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground"
                         >
                             {{
                                 candidate.summary ||
@@ -340,17 +340,17 @@ const saveCandidate = () => {
                                 class="flex gap-3"
                             >
                                 <span
-                                    class="grid size-9 shrink-0 place-items-center rounded-xl bg-slate-100 text-[var(--erin-primary)]"
+                                    class="grid size-9 shrink-0 place-items-center rounded-xl bg-muted text-[var(--erin-primary-text)]"
                                     ><component :is="item.icon" class="size-4"
                                 /></span>
                                 <div>
                                     <p
-                                        class="text-[10px] font-bold tracking-wider text-slate-400 uppercase"
+                                        class="text-[10px] font-bold tracking-wider text-muted-foreground uppercase"
                                     >
                                         {{ item.label }}
                                     </p>
                                     <p
-                                        class="mt-1 text-sm font-semibold text-slate-800"
+                                        class="mt-1 text-sm font-semibold text-foreground"
                                     >
                                         {{ item.value }}
                                     </p>
@@ -381,7 +381,7 @@ const saveCandidate = () => {
                                 }}
                             </span>
                         </div>
-                        <p v-else class="text-sm text-slate-400">
+                        <p v-else class="text-sm text-muted-foreground">
                             {{ t('employer.candidateShow.noSkills') }}
                         </p>
                     </SectionCard>
@@ -391,7 +391,7 @@ const saveCandidate = () => {
                     >
                         <div
                             v-if="candidate.experiences?.length"
-                            class="relative space-y-6 pl-7 before:absolute before:top-2 before:bottom-2 before:left-2 before:w-px before:bg-slate-200"
+                            class="relative space-y-6 pl-7 before:absolute before:top-2 before:bottom-2 before:left-2 before:w-px before:bg-border"
                         >
                             <div
                                 v-for="(
@@ -404,7 +404,7 @@ const saveCandidate = () => {
                                     class="absolute top-1 -left-[1.62rem] size-3 rounded-full border-2 border-white bg-[var(--erin-primary)] ring-1 ring-blue-200"
                                 />
                                 <p
-                                    class="text-[10px] font-bold text-[var(--erin-primary)]"
+                                    class="text-[10px] font-bold text-[var(--erin-primary-text)]"
                                 >
                                     {{ formatDate(experience.started_at) }} –
                                     {{
@@ -422,7 +422,7 @@ const saveCandidate = () => {
                                 <h3 class="mt-1 text-sm font-bold">
                                     {{ experience.position }}
                                 </h3>
-                                <p class="text-xs text-slate-500">
+                                <p class="text-xs text-muted-foreground">
                                     {{ experience.employer
                                     }}<span v-if="experience.country_code">
                                         · {{ experience.country_code }}</span
@@ -430,13 +430,13 @@ const saveCandidate = () => {
                                 </p>
                                 <p
                                     v-if="experience.description"
-                                    class="mt-2 text-sm leading-6 text-slate-600"
+                                    class="mt-2 text-sm leading-6 text-muted-foreground"
                                 >
                                     {{ experience.description }}
                                 </p>
                             </div>
                         </div>
-                        <p v-else class="text-sm text-slate-400">
+                        <p v-else class="text-sm text-muted-foreground">
                             {{ t('employer.candidateShow.noExperience') }}
                         </p>
                     </SectionCard>
@@ -453,12 +453,12 @@ const saveCandidate = () => {
                                     education, index
                                 ) in candidate.educations"
                                 :key="`${education.qualification}-${index}`"
-                                class="rounded-xl border border-slate-200 p-4"
+                                class="rounded-xl border border-border p-4"
                             >
                                 <p class="text-sm font-bold">
                                     {{ education.qualification }}
                                 </p>
-                                <p class="mt-1 text-xs text-slate-500">
+                                <p class="mt-1 text-xs text-muted-foreground">
                                     {{
                                         education.field ||
                                         t(
@@ -470,7 +470,7 @@ const saveCandidate = () => {
                                 </p>
                             </div>
                         </div>
-                        <p v-else class="text-sm text-slate-400">
+                        <p v-else class="text-sm text-muted-foreground">
                             {{ t('employer.candidateShow.noEducation') }}
                         </p>
                     </SectionCard>
@@ -485,7 +485,7 @@ const saveCandidate = () => {
                                 class="mb-5 flex items-center justify-between rounded-xl bg-gradient-to-r from-teal-50 to-blue-50 p-4"
                             >
                                 <div>
-                                    <p class="text-xs text-slate-500">
+                                    <p class="text-xs text-muted-foreground">
                                         {{
                                             t(
                                                 'employer.candidateShow.overallScore',
@@ -510,7 +510,7 @@ const saveCandidate = () => {
                                 />
                             </div>
                         </template>
-                        <p v-else class="text-sm text-slate-400">
+                        <p v-else class="text-sm text-muted-foreground">
                             {{ t('employer.candidateShow.noMatch') }}
                         </p>
                     </SectionCard>
@@ -522,7 +522,7 @@ const saveCandidate = () => {
                         <form class="space-y-3" @submit.prevent="sendInvite">
                             <select
                                 v-model="selectedJob"
-                                class="h-10 w-full rounded-xl border border-slate-200 px-3 text-xs"
+                                class="h-10 w-full rounded-xl border border-border px-3 text-xs"
                                 required
                             >
                                 <option :value="null" disabled>
@@ -539,7 +539,7 @@ const saveCandidate = () => {
                             <textarea
                                 v-model="inviteForm.message"
                                 rows="3"
-                                class="w-full rounded-xl border border-slate-200 p-3 text-xs"
+                                class="w-full rounded-xl border border-border p-3 text-xs"
                                 :placeholder="
                                     t(
                                         'employer.candidateShow.messagePlaceholder',
@@ -551,7 +551,7 @@ const saveCandidate = () => {
                                     inviteForm.processing || !selectedJob
                                 "
                                 type="submit"
-                                class="h-10 w-full rounded-xl bg-[var(--erin-primary)] text-sm font-bold text-white disabled:opacity-50"
+                                class="h-10 w-full rounded-xl bg-[var(--erin-primary)] text-sm font-bold text-[var(--erin-primary-foreground)] disabled:opacity-50"
                             >
                                 {{ t('employer.candidateShow.sendInvitation') }}
                             </button>
@@ -572,7 +572,7 @@ const saveCandidate = () => {
                             <select
                                 v-if="talent_lists.length"
                                 v-model="selectedList"
-                                class="h-10 w-full rounded-xl border border-slate-200 px-3 text-xs"
+                                class="h-10 w-full rounded-xl border border-border px-3 text-xs"
                             >
                                 <option
                                     v-for="list in talent_lists"
@@ -588,7 +588,7 @@ const saveCandidate = () => {
                                 v-else
                                 v-model="listForm.list_name"
                                 required
-                                class="h-10 w-full rounded-xl border border-slate-200 px-3 text-xs"
+                                class="h-10 w-full rounded-xl border border-border px-3 text-xs"
                                 :placeholder="
                                     t(
                                         'employer.candidateShow.newListPlaceholder',
@@ -598,7 +598,7 @@ const saveCandidate = () => {
                             <button
                                 :disabled="listForm.processing"
                                 type="submit"
-                                class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700"
+                                class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-border text-xs font-bold text-muted-foreground"
                             >
                                 <Heart
                                     class="size-4 text-[var(--erin-accent)]"
@@ -617,7 +617,7 @@ const saveCandidate = () => {
                                 v-if="candidate.identity?.email"
                                 class="flex justify-between gap-3"
                             >
-                                <dt class="text-slate-400">
+                                <dt class="text-muted-foreground">
                                     {{ t('employer.candidateShow.email') }}
                                 </dt>
                                 <dd class="font-bold">
@@ -628,7 +628,7 @@ const saveCandidate = () => {
                                 v-if="candidate.identity?.phone"
                                 class="flex justify-between gap-3"
                             >
-                                <dt class="text-slate-400">
+                                <dt class="text-muted-foreground">
                                     {{ t('employer.candidateShow.phone') }}
                                 </dt>
                                 <dd class="font-bold">
@@ -639,7 +639,7 @@ const saveCandidate = () => {
                                 v-if="candidate.identity?.whatsapp"
                                 class="flex justify-between gap-3"
                             >
-                                <dt class="text-slate-400">
+                                <dt class="text-muted-foreground">
                                     {{ t('employer.candidateShow.whatsapp') }}
                                 </dt>
                                 <dd class="font-bold">

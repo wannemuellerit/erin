@@ -3,8 +3,7 @@ import type { Component } from 'vue';
 import { Inbox } from '@lucide/vue';
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import de from '@/i18n/messages/product-components-de';
-import en from '@/i18n/messages/product-components-en';
+import { productMessages } from '@/i18n/product-locales';
 
 const props = withDefaults(
     defineProps<{
@@ -22,7 +21,7 @@ const props = withDefaults(
 
 const { t } = useI18n({
     useScope: 'local',
-    messages: { de, en },
+    messages: productMessages,
 });
 
 const resolvedTitle = computed(() => props.title ?? t('emptyState.title'));
@@ -42,7 +41,7 @@ const resolvedIcon = computed(() => props.icon ?? Inbox);
     >
         <div>
             <span
-                class="mx-auto grid place-items-center rounded-2xl bg-slate-100 text-slate-400"
+                class="mx-auto grid place-items-center rounded-2xl bg-muted text-muted-foreground"
                 :class="compact ? 'size-11' : 'size-14'"
             >
                 <component
@@ -51,14 +50,14 @@ const resolvedIcon = computed(() => props.icon ?? Inbox);
                 />
             </span>
             <h2
-                class="mt-4 font-bold text-slate-900"
+                class="mt-4 font-bold text-foreground"
                 :class="compact ? 'text-sm' : 'text-base'"
             >
                 {{ resolvedTitle }}
             </h2>
             <p
                 v-if="resolvedDescription"
-                class="mx-auto mt-2 max-w-md leading-6 text-slate-500"
+                class="mx-auto mt-2 max-w-md leading-6 text-muted-foreground"
                 :class="compact ? 'text-xs' : 'text-sm'"
             >
                 {{ resolvedDescription }}

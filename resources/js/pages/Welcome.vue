@@ -36,7 +36,7 @@ const features = [
         icon: Sparkles,
         title: 'public.welcome.platform.features.matching.title',
         text: 'public.welcome.platform.features.matching.text',
-        tone: 'bg-blue-50 text-blue-600',
+        tone: 'bg-blue-50 text-[var(--erin-primary-text)]',
     },
     {
         icon: Plane,
@@ -79,12 +79,12 @@ const steps = [
         />
     </Head>
 
-    <div class="min-h-screen bg-white text-slate-950">
+    <div class="min-h-screen bg-card text-foreground">
         <PublicHeader />
 
         <main>
             <section
-                class="relative overflow-hidden border-b border-slate-100 bg-gradient-to-b from-blue-50/70 via-white to-white"
+                class="relative overflow-hidden border-b border-border bg-gradient-to-b from-blue-50/70 via-background to-background"
             >
                 <div class="erin-grid absolute inset-0 opacity-45" />
                 <div
@@ -95,7 +95,7 @@ const steps = [
                 >
                     <div>
                         <div
-                            class="mb-5 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-bold text-blue-700 shadow-sm"
+                            class="mb-5 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-card px-3 py-1.5 text-xs font-bold text-[var(--erin-primary-text-hover)] shadow-sm"
                         >
                             <Globe2 class="size-3.5 text-teal-500" />
                             {{ t('public.welcome.hero.badge') }}
@@ -104,7 +104,9 @@ const steps = [
                             class="max-w-3xl text-4xl leading-[1.08] font-extrabold tracking-[-0.035em] sm:text-5xl lg:text-6xl"
                         >
                             {{ t('public.welcome.hero.titleLead') }}
-                            <span class="relative text-blue-600">
+                            <span
+                                class="relative text-[var(--erin-primary-text)]"
+                            >
                                 {{ t('public.welcome.hero.titleAccent') }}
                                 <svg
                                     class="absolute right-0 -bottom-2 h-2 w-4/5 text-orange-400"
@@ -122,7 +124,7 @@ const steps = [
                             </span>
                         </h1>
                         <p
-                            class="mt-7 max-w-2xl text-lg leading-8 text-slate-600"
+                            class="mt-7 max-w-2xl text-lg leading-8 text-muted-foreground"
                         >
                             {{ t('public.welcome.hero.description') }}
                         </p>
@@ -136,13 +138,13 @@ const steps = [
                             </Link>
                             <Link
                                 :href="`${register().url}?role=candidate`"
-                                class="erin-focus inline-flex h-12 items-center justify-center rounded-xl border border-slate-300 bg-white px-6 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                                class="erin-focus inline-flex h-12 items-center justify-center rounded-xl border border-border bg-card px-6 text-sm font-bold text-muted-foreground hover:bg-muted"
                             >
                                 {{ t('public.welcome.hero.candidateCta') }}
                             </Link>
                         </div>
                         <div
-                            class="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3 text-xs font-semibold text-slate-500"
+                            class="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3 text-xs font-semibold text-muted-foreground"
                         >
                             <span class="inline-flex items-center gap-1.5">
                                 <Check class="size-4 text-teal-500" />
@@ -163,7 +165,7 @@ const steps = [
 
                     <div class="relative mx-auto w-full max-w-xl">
                         <div
-                            class="absolute -top-5 -right-5 z-20 rounded-2xl bg-white p-3 shadow-xl ring-1 ring-slate-200"
+                            class="absolute -top-5 -right-5 z-20 rounded-2xl bg-card p-3 shadow-xl ring-1 ring-border"
                         >
                             <div class="flex items-center gap-2">
                                 <span
@@ -172,14 +174,18 @@ const steps = [
                                     <BadgeCheck class="size-4" />
                                 </span>
                                 <div>
-                                    <p class="text-[10px] text-slate-400">
+                                    <p
+                                        class="text-[10px] text-muted-foreground"
+                                    >
                                         {{
                                             t(
                                                 'public.welcome.preview.documentStatus',
                                             )
                                         }}
                                     </p>
-                                    <p class="text-xs font-bold text-slate-800">
+                                    <p
+                                        class="text-xs font-bold text-foreground"
+                                    >
                                         {{
                                             t(
                                                 'public.welcome.preview.fullyReviewed',
@@ -190,14 +196,14 @@ const steps = [
                             </div>
                         </div>
                         <div
-                            class="erin-panel relative overflow-hidden border-0 p-5 shadow-2xl ring-1 shadow-blue-950/10 ring-slate-200 sm:p-6"
+                            class="erin-panel relative overflow-hidden border-0 p-5 shadow-2xl ring-1 shadow-blue-950/10 ring-border sm:p-6"
                         >
                             <div
-                                class="flex items-center justify-between border-b border-slate-100 pb-5"
+                                class="flex items-center justify-between border-b border-border pb-5"
                             >
                                 <div>
                                     <p
-                                        class="text-[10px] font-bold tracking-wider text-slate-400 uppercase"
+                                        class="text-[10px] font-bold tracking-wider text-muted-foreground uppercase"
                                     >
                                         {{
                                             t('public.welcome.preview.example')
@@ -220,7 +226,7 @@ const steps = [
                             </div>
                             <div class="mt-5 flex items-start gap-4">
                                 <div
-                                    class="grid size-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-blue-100 to-teal-50 font-extrabold text-blue-700"
+                                    class="grid size-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-blue-100 to-teal-50 font-extrabold text-[var(--erin-primary-text-hover)]"
                                     aria-hidden="true"
                                 >
                                     ER
@@ -238,7 +244,9 @@ const steps = [
                                             class="size-4 text-teal-500"
                                         />
                                     </div>
-                                    <p class="mt-1 text-xs text-slate-500">
+                                    <p
+                                        class="mt-1 text-xs text-muted-foreground"
+                                    >
                                         {{
                                             t(
                                                 'public.welcome.preview.locationExperience',
@@ -258,7 +266,7 @@ const steps = [
                                                 ),
                                             ]"
                                             :key="skill"
-                                            class="rounded-md bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600"
+                                            class="rounded-md bg-muted px-2 py-1 text-[10px] font-semibold text-muted-foreground"
                                         >
                                             {{ skill }}
                                         </span>
@@ -267,7 +275,7 @@ const steps = [
                                 <MatchScore :score="94" size="lg" />
                             </div>
                             <div
-                                class="mt-5 grid gap-2 rounded-xl bg-slate-50 p-4 text-xs text-slate-600 sm:grid-cols-2"
+                                class="mt-5 grid gap-2 rounded-xl bg-muted p-4 text-xs text-muted-foreground sm:grid-cols-2"
                             >
                                 <span
                                     v-for="reason in [
@@ -298,10 +306,10 @@ const steps = [
                 </div>
             </section>
 
-            <section class="border-b border-slate-100 bg-white py-8">
+            <section class="border-b border-border bg-card py-8">
                 <div class="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8">
                     <p
-                        class="text-center text-[11px] font-bold tracking-[0.15em] text-slate-400 uppercase"
+                        class="text-center text-[11px] font-bold tracking-[0.15em] text-muted-foreground uppercase"
                     >
                         {{ t('public.welcome.professions.eyebrow') }}
                     </p>
@@ -309,7 +317,7 @@ const steps = [
                         <span
                             v-for="profession in professions"
                             :key="profession"
-                            class="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold text-slate-600"
+                            class="rounded-full border border-border bg-muted px-4 py-2 text-xs font-bold text-muted-foreground"
                         >
                             {{ t(profession) }}
                         </span>
@@ -332,7 +340,7 @@ const steps = [
                     >
                         {{ t('public.welcome.platform.title') }}
                     </h2>
-                    <p class="mt-4 text-base leading-7 text-slate-500">
+                    <p class="mt-4 text-base leading-7 text-muted-foreground">
                         {{ t('public.welcome.platform.description') }}
                     </p>
                 </div>
@@ -351,12 +359,12 @@ const steps = [
                         <h3 class="mt-5 text-lg font-bold">
                             {{ t(feature.title) }}
                         </h3>
-                        <p class="mt-2 text-sm leading-6 text-slate-500">
+                        <p class="mt-2 text-sm leading-6 text-muted-foreground">
                             {{ t(feature.text) }}
                         </p>
                         <Link
                             :href="pricing()"
-                            class="erin-focus mt-5 inline-flex items-center gap-1 rounded-md text-sm font-bold text-blue-600 hover:text-blue-700"
+                            class="erin-focus mt-5 inline-flex items-center gap-1 rounded-md text-sm font-bold text-[var(--erin-primary-text)] hover:text-[var(--erin-primary-text-hover)]"
                         >
                             {{ t('public.welcome.platform.learnMore') }}
                             <ChevronRight class="size-4" />
@@ -426,7 +434,7 @@ const steps = [
                         </div>
                         <Link
                             :href="`${register().url}?role=candidate`"
-                            class="erin-focus mt-8 inline-flex h-12 items-center gap-2 rounded-xl bg-orange-500 px-6 text-sm font-bold text-white hover:bg-orange-600"
+                            class="erin-focus mt-8 inline-flex h-12 items-center gap-2 rounded-xl bg-orange-500 px-6 text-sm font-bold text-[#0f172a] hover:bg-orange-600"
                         >
                             {{ t('public.welcome.candidates.cta') }}
                             <ArrowRight class="size-4" />
@@ -453,7 +461,7 @@ const steps = [
                             </p>
                         </div>
                         <div
-                            class="rounded-2xl bg-white p-5 text-slate-950 shadow-2xl"
+                            class="rounded-2xl bg-card p-5 text-foreground shadow-2xl"
                         >
                             <BadgeCheck class="size-6 text-orange-400" />
                             <p class="mt-7 text-2xl font-extrabold">
@@ -463,7 +471,7 @@ const steps = [
                                     )
                                 }}
                             </p>
-                            <p class="mt-1 text-xs text-slate-500">
+                            <p class="mt-1 text-xs text-muted-foreground">
                                 {{
                                     t(
                                         'public.welcome.candidates.cards.measurableText',
@@ -472,7 +480,7 @@ const steps = [
                             </p>
                         </div>
                         <div
-                            class="rounded-2xl bg-teal-500 p-5 text-white shadow-2xl"
+                            class="rounded-2xl bg-teal-500 p-5 text-[#0f172a] shadow-2xl"
                         >
                             <Plane class="size-6" />
                             <p class="mt-7 text-2xl font-extrabold">
@@ -482,7 +490,7 @@ const steps = [
                                     )
                                 }}
                             </p>
-                            <p class="mt-1 text-xs text-teal-50">
+                            <p class="mt-1 text-xs text-[#0f172a]">
                                 {{
                                     t(
                                         'public.welcome.candidates.cards.relocationText',
@@ -519,7 +527,7 @@ const steps = [
             >
                 <div class="text-center">
                     <p
-                        class="text-xs font-bold tracking-[0.15em] text-blue-600 uppercase"
+                        class="text-xs font-bold tracking-[0.15em] text-[var(--erin-primary-text)] uppercase"
                     >
                         {{ t('public.welcome.process.eyebrow') }}
                     </p>
@@ -534,7 +542,7 @@ const steps = [
                     <article
                         v-for="step in steps"
                         :key="step.number"
-                        class="relative rounded-2xl border border-slate-200 bg-white p-6 text-center"
+                        class="relative rounded-2xl border border-border bg-card p-6 text-center"
                     >
                         <span
                             class="relative mx-auto grid size-[4.5rem] place-items-center rounded-2xl bg-slate-950 text-lg font-extrabold text-white ring-8 ring-white"
@@ -542,7 +550,7 @@ const steps = [
                             {{ step.number }}
                         </span>
                         <h3 class="mt-6 font-bold">{{ t(step.title) }}</h3>
-                        <p class="mt-2 text-sm leading-6 text-slate-500">
+                        <p class="mt-2 text-sm leading-6 text-muted-foreground">
                             {{ t(step.text) }}
                         </p>
                     </article>
@@ -566,7 +574,7 @@ const steps = [
                     >
                         <Link
                             :href="`${register().url}?role=candidate`"
-                            class="erin-focus inline-flex h-12 items-center justify-center rounded-xl bg-white px-6 text-sm font-bold text-blue-700 hover:bg-blue-50"
+                            class="erin-focus inline-flex h-12 items-center justify-center rounded-xl bg-card px-6 text-sm font-bold text-[var(--erin-primary-text-hover)] hover:bg-blue-50"
                         >
                             {{ t('public.welcome.finalCta.candidate') }}
                         </Link>
@@ -587,9 +595,9 @@ const steps = [
             </section>
         </main>
 
-        <footer class="border-t border-slate-200 bg-slate-50">
+        <footer class="border-t border-border bg-muted">
             <div
-                class="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-8 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8"
+                class="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-8 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8"
             >
                 <p>
                     {{
@@ -604,25 +612,25 @@ const steps = [
                 >
                     <Link
                         :href="legal.privacy()"
-                        class="erin-focus rounded hover:text-blue-600"
+                        class="erin-focus rounded hover:text-[var(--erin-primary-text)]"
                     >
                         {{ t('public.common.privacy') }}
                     </Link>
                     <Link
                         :href="legal.imprint()"
-                        class="erin-focus rounded hover:text-blue-600"
+                        class="erin-focus rounded hover:text-[var(--erin-primary-text)]"
                     >
                         {{ t('public.common.imprint') }}
                     </Link>
                     <Link
                         :href="legal.terms()"
-                        class="erin-focus rounded hover:text-blue-600"
+                        class="erin-focus rounded hover:text-[var(--erin-primary-text)]"
                     >
                         {{ t('public.common.terms') }}
                     </Link>
                     <Link
                         :href="contact()"
-                        class="erin-focus rounded hover:text-blue-600"
+                        class="erin-focus rounded hover:text-[var(--erin-primary-text)]"
                     >
                         {{ t('public.common.contact') }}
                     </Link>

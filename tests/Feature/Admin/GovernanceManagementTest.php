@@ -263,7 +263,7 @@ it('validates normalizes updates and deletes access list entries with audit hist
             ->count())->toBe(3);
 });
 
-it('upserts and deletes bilingual email templates atomically with validation and audit', function () {
+it('upserts and deletes localized email templates atomically with validation and audit', function () {
     $admin = User::factory()->create(['role' => UserRole::SuperAdmin]);
     $invalid = erinEmailTemplatePayload();
     unset($invalid['translations']['en']);
@@ -280,11 +280,11 @@ it('upserts and deletes bilingual email templates atomically with validation and
 
     expect(EmailTemplate::query()
         ->where('key', 'application.accepted')
-        ->count())->toBe(2)
+        ->count())->toBe(count(config('app.supported_locales')))
         ->and(EmailTemplate::query()
             ->where('key', 'application.accepted')
             ->pluck('locale')
-            ->all())->toEqualCanonicalizing(['de', 'en']);
+            ->all())->toEqualCanonicalizing(config('app.supported_locales'));
 
     $payload['is_active'] = false;
     $payload['translations']['de']['subject'] = 'Bewerbung aktualisiert';
@@ -320,20 +320,29 @@ it('upserts and deletes bilingual email templates atomically with validation and
  */
 function erinEmailTemplatePayload(): array
 {
+    $translations = [
+        'de' => [
+            'subject' => 'Bewerbung angenommen',
+            'body_html' => '<p>Deine Bewerbung wurde angenommen.</p>',
+            'body_text' => 'Deine Bewerbung wurde angenommen.',
+        ],
+        'en' => [
+            'subject' => 'Application accepted',
+            'body_html' => '<p>Your application was accepted.</p>',
+            'body_text' => 'Your application was accepted.',
+        ],
+    ];
+    foreach (array_diff(config('app.supported_locales'), ['de', 'en']) as $locale) {
+        $translations[$locale] = [
+            'subject' => "Application accepted ({$locale})",
+            'body_html' => "<p>Application accepted ({$locale}).</p>",
+            'body_text' => "Application accepted ({$locale}).",
+        ];
+    }
+
     return [
         'key' => 'application.accepted',
         'is_active' => true,
-        'translations' => [
-            'de' => [
-                'subject' => 'Bewerbung angenommen',
-                'body_html' => '<p>Deine Bewerbung wurde angenommen.</p>',
-                'body_text' => 'Deine Bewerbung wurde angenommen.',
-            ],
-            'en' => [
-                'subject' => 'Application accepted',
-                'body_html' => '<p>Your application was accepted.</p>',
-                'body_text' => 'Your application was accepted.',
-            ],
-        ],
+        'translations' => $translations,
     ];
 }

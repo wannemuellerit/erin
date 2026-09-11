@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Employer;
 
+use App\Enums\CountryOperation;
 use App\Enums\JobStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Employer\UpsertJobPostingRequest;
@@ -9,6 +10,7 @@ use App\Jobs\ScanJobMedia;
 use App\Models\Company;
 use App\Models\JobMedia;
 use App\Models\JobPosting;
+use App\Models\JobTemplate;
 use App\Models\Language;
 use App\Models\Occupation;
 use App\Models\Skill;
@@ -16,6 +18,7 @@ use App\Services\Activity\ActivityRecorder;
 use App\Services\Audit\AuditLogger;
 use App\Services\Billing\EntitlementService;
 use App\Services\Companies\CurrentCompany;
+use App\Services\Countries\CountryLaunchGate;
 use App\Services\Documents\UploadPolicy;
 use App\Services\Jobs\JobPublishingReadiness;
 use DomainException;
@@ -71,7 +74,7 @@ class JobController extends Controller
 
         $job = DB::transaction(function () use ($request, $company, $validated): JobPosting {
             $job = $company->jobPostings()->create([
-                ...Arr::except($validated, ['skills', 'languages', 'screening_questions', 'media']),
+                ...Arr::except($validated, ['skills', 'languages', 'screening_questions', 'media', 'template_id', 'translations']),
                 'created_by' => $request->user()?->getKey(),
                 'slug' => $this->uniqueSlug($company->getKey(), $validated['title']),
                 'status' => JobStatus::Draft,
@@ -102,11 +105,14 @@ class JobController extends Controller
         $company = $currentCompany->forRequest($request);
         $this->assertOwned($job, $company->getKey());
         $this->assertCanRecruit($request, $currentCompany);
-        $job->load(['skills', 'languages', 'screeningQuestions', 'media']);
+        $job->load(['skills', 'languages', 'screeningQuestions', 'media', 'translations']);
 
         return Inertia::render('employer/JobForm', [
             'job' => [
                 ...Arr::except($job->toArray(), ['media']),
+                'translations' => $job->translations()
+                    ->get(['locale', 'title', 'position', 'description'])
+                    ->keyBy('locale'),
                 'media' => $job->media->map(
                     fn (JobMedia $media): array => [
                         'id' => $media->getKey(),
@@ -134,6 +140,7 @@ class JobController extends Controller
         JobPosting $job,
         CurrentCompany $currentCompany,
         AuditLogger $audit,
+        ActivityRecorder $activity,
     ): RedirectResponse {
         $company = $currentCompany->forRequest($request);
         $this->assertOwned($job, $company->getKey());
@@ -148,11 +155,18 @@ class JobController extends Controller
         $before = $job->toArray();
 
         DB::transaction(function () use ($job, $validated, $request): void {
-            $job->update(Arr::except($validated, ['skills', 'languages', 'screening_questions', 'media']));
+            $job->update(Arr::except($validated, ['skills', 'languages', 'screening_questions', 'media', 'template_id', 'translations']));
             $this->syncRelations($job, $validated, $request);
         });
 
         $audit->record('job.updated', $job, $before, $job->fresh()->toArray(), companyId: $company->getKey());
+        $activity->record(
+            'job.updated',
+            $request->user(),
+            $company,
+            $job,
+            ['job_title' => $job->title],
+        );
 
         return back()->with('success', __('Stellenanzeige wurde aktualisiert.'));
     }
@@ -164,6 +178,8 @@ class JobController extends Controller
         EntitlementService $entitlements,
         JobPublishingReadiness $readiness,
         AuditLogger $audit,
+        CountryLaunchGate $countries,
+        ActivityRecorder $activity,
     ): RedirectResponse {
         $company = $currentCompany->forRequest($request);
         $this->assertOwned($job, $company->getKey());
@@ -185,7 +201,7 @@ class JobController extends Controller
         $before = $job->status;
 
         try {
-            DB::transaction(function () use ($company, $job, $target, $allowed, $entitlements): void {
+            DB::transaction(function () use ($company, $job, $target, $allowed, $entitlements, $countries): void {
                 Company::query()->whereKey($company->getKey())->lockForUpdate()->firstOrFail();
                 $job->refresh();
                 abort_unless(
@@ -195,6 +211,13 @@ class JobController extends Controller
                 );
 
                 if ($target === JobStatus::Published) {
+                    if (filled($job->target_country_code)) {
+                        $countries->assertEnabled(CountryOperation::Recruiting, $job->target_country_code);
+                        if ($job->visa_package_available) {
+                            $countries->assertEnabled(CountryOperation::Visa, $job->target_country_code);
+                            $countries->assertEnabled(CountryOperation::Relocation, $job->target_country_code);
+                        }
+                    }
                     $entitlements->assertCanPublishJob($company, $job);
                 }
 
@@ -215,6 +238,13 @@ class JobController extends Controller
             ['status' => $target->value],
             companyId: $company->getKey(),
         );
+        $activity->record(
+            'job.status_changed',
+            $request->user(),
+            $company,
+            $job,
+            ['job_title' => $job->title, 'status' => $target->value],
+        );
 
         return back()->with('success', __('Der Stellenstatus wurde geändert.'));
     }
@@ -225,6 +255,7 @@ class JobController extends Controller
         CurrentCompany $currentCompany,
         EntitlementService $entitlements,
         AuditLogger $audit,
+        ActivityRecorder $activity,
     ): RedirectResponse {
         $company = $currentCompany->forRequest($request);
         $this->assertOwned($job, $company->getKey());
@@ -233,16 +264,32 @@ class JobController extends Controller
 
         try {
             DB::transaction(function () use ($company, $job, $entitlements): void {
+                $lockedJob = JobPosting::query()
+                    ->whereKey($job->getKey())
+                    ->where('company_id', $company->getKey())
+                    ->lockForUpdate()
+                    ->firstOrFail();
+                if ($lockedJob->boosted_until?->isFuture()) {
+                    throw new DomainException(__('Diese Stellenanzeige besitzt bereits einen aktiven Boost.'));
+                }
                 $entitlements->consumeBoost($company);
-                $job->update(['boosted_until' => now()->addDay()]);
+                $lockedJob->update(['boosted_until' => now()->addDay()]);
             }, 3);
         } catch (DomainException $exception) {
             return back()->withErrors(['boost' => $exception->getMessage()]);
         }
 
+        $job->refresh();
         $audit->record('job.boosted', $job, after: [
             'boosted_until' => $job->boosted_until?->toIso8601String(),
         ], companyId: $company->getKey());
+        $activity->record(
+            'job.boosted',
+            $request->user(),
+            $company,
+            $job,
+            ['job_title' => $job->title],
+        );
 
         return back()->with('success', __('Die Stellenanzeige wird 24 Stunden hervorgehoben.'));
     }
@@ -256,7 +303,7 @@ class JobController extends Controller
         $company = $currentCompany->forRequest($request);
         $this->assertOwned($job, $company->getKey());
         $this->assertCanRecruit($request, $currentCompany);
-        $job->load(['skills', 'languages', 'screeningQuestions']);
+        $job->load(['skills', 'languages', 'screeningQuestions', 'translations']);
         $copy = DB::transaction(function () use ($job, $request, $company): JobPosting {
             $copy = $job->replicate([
                 'slug', 'status', 'published_at', 'closed_at', 'boosted_until',
@@ -283,6 +330,12 @@ class JobController extends Controller
                 $copy->screeningQuestions()->create($question->only([
                     'question', 'type', 'is_required', 'sort_order', 'options',
                 ]));
+            }
+            foreach ($job->translations as $translation) {
+                $copy->translations()->create([
+                    ...$translation->only(['locale', 'title', 'position', 'description']),
+                    'title' => $translation->locale === 'de' ? $copy->title : $translation->title,
+                ]);
             }
 
             return $copy;
@@ -329,8 +382,10 @@ class JobController extends Controller
         $this->assertCanRecruit($request, $currentCompany);
         abort_unless($media->job_posting_id === $job->getKey(), 404);
         $before = $media->toArray();
-        $media->delete();
-        Storage::disk($media->disk)->delete($media->path);
+        DB::transaction(function () use ($media): void {
+            abort_unless(Storage::disk($media->disk)->delete($media->path), 503, __('Die Datei konnte nicht entfernt werden.'));
+            $media->delete();
+        });
         $audit->record('job.media_deleted', $media, before: $before, companyId: $company->getKey());
 
         return back()->with('success', __('Die Datei wurde aus der Stellenanzeige entfernt.'));
@@ -341,6 +396,7 @@ class JobController extends Controller
      */
     private function syncRelations(JobPosting $job, array $validated, Request $request): void
     {
+        $this->assertTemplateAllowed($job->company, $validated['template_id'] ?? null);
         /** @var list<array{id: int, importance?: int, minimum_experience_years?: float|int|null}> $skills */
         $skills = is_array($validated['skills'] ?? null) ? array_values($validated['skills']) : [];
         $skillSync = [];
@@ -367,6 +423,23 @@ class JobController extends Controller
                 $job->screeningQuestions()->create([...$question, 'sort_order' => $index]);
             }
         }
+
+        $translations = is_array($validated['translations'] ?? null) ? $validated['translations'] : [];
+        $translations['de'] = [
+            'title' => $validated['title'],
+            'position' => $validated['position'],
+            'description' => $validated['description'],
+        ];
+        foreach ($translations as $locale => $translation) {
+            if (! is_array($translation) || ! filled($translation['title'] ?? null)) {
+                continue;
+            }
+            $job->translations()->updateOrCreate(
+                ['locale' => $locale],
+                Arr::only($translation, ['title', 'position', 'description']),
+            );
+        }
+        $job->translations()->whereNotIn('locale', array_keys($translations))->delete();
 
         $storedPaths = [];
         try {
@@ -402,7 +475,44 @@ class JobController extends Controller
             'skills' => Skill::query()->where('is_active', true)->orderBy('name_de')->get(),
             'languages' => Language::query()->orderBy('name_de')->get(),
             'locations' => $company->locations()->orderBy('name')->get(),
+            'templates' => JobTemplate::query()
+                ->where(function ($query) use ($company): void {
+                    $query->where('company_id', $company->getKey())
+                        ->orWhere(function ($global) use ($company): void {
+                            $global->whereNull('company_id')
+                                ->where(function ($allowed) use ($company): void {
+                                    $allowed->where('is_premium', false)
+                                        ->orWhere('plan_id', $company->current_plan_id);
+                                });
+                        });
+                })
+                ->orderBy('is_premium')
+                ->orderBy('name')
+                ->get(['id', 'name', 'content', 'is_premium', 'company_id', 'plan_id']),
         ];
+    }
+
+    private function assertTemplateAllowed(Company $company, mixed $templateId): void
+    {
+        if ($templateId === null) {
+            return;
+        }
+
+        $allowed = JobTemplate::query()
+            ->whereKey((int) $templateId)
+            ->where(function ($query) use ($company): void {
+                $query->where('company_id', $company->getKey())
+                    ->orWhere(function ($global) use ($company): void {
+                        $global->whereNull('company_id')
+                            ->where(function ($plans) use ($company): void {
+                                $plans->where('is_premium', false)
+                                    ->orWhere('plan_id', $company->current_plan_id);
+                            });
+                    });
+            })
+            ->exists();
+
+        abort_unless($allowed, 403, __('Diese Stellenvorlage ist für den aktuellen Tarif nicht verfügbar.'));
     }
 
     private function assertCanRecruit(Request $request, CurrentCompany $currentCompany): void

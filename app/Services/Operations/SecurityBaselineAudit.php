@@ -28,7 +28,22 @@ final class SecurityBaselineAudit
         $internalSubnet = config('operations.network.internal_subnet');
         $trustedProxies = config('operations.network.trusted_proxies', []);
         $trustedProxies = is_array($trustedProxies) ? $trustedProxies : [];
-        $minioAppUser = config('operations.storage.minio_app_user');
+        $storageAccessKey = config('operations.storage.access_key_id');
+        $storageBucket = config('operations.storage.bucket');
+        $storageEndpoint = config('operations.storage.endpoint');
+        $webhookSecrets = [
+            config('services.mail_delivery.webhook_secret'),
+            config('services.partners.webhook_secret'),
+            config('services.payouts.webhook_secret'),
+            config('services.twilio.webhook_secret'),
+        ];
+        $webhookBodyLimits = [
+            config('services.mail_delivery.webhook_max_bytes'),
+            config('services.partners.webhook_max_bytes'),
+            config('services.payouts.webhook_max_bytes'),
+            config('services.twilio.webhook_max_bytes'),
+            config('services.livekit.webhook_max_bytes'),
+        ];
 
         return [
             $this->check(
@@ -94,12 +109,24 @@ final class SecurityBaselineAudit
                 ($privateDisk['driver'] ?? null) === 's3'
                     && ($privateDisk['visibility'] ?? null) === 'private'
                     && ($privateDisk['throw'] ?? null) === true
-                    && is_string($minioAppUser)
-                    && $minioAppUser !== ''
-                    && ($privateDisk['key'] ?? null) === $minioAppUser
-                    && $this->minioPolicyIsBucketScoped(),
-                'Sensible Dateien nutzen fail-closed Storage mit bucket-begrenztem MinIO-App-Nutzer.',
-                'Privater Storage oder bucket-begrenzte MinIO-App-Zugangsdaten fehlen.',
+                    && filled($privateDisk['secret'] ?? null)
+                    && is_string($storageAccessKey)
+                    && $storageAccessKey !== ''
+                    && ($privateDisk['key'] ?? null) === $storageAccessKey
+                    && is_string($storageBucket)
+                    && $storageBucket !== ''
+                    && ($privateDisk['bucket'] ?? null) === $storageBucket
+                    && is_string($storageEndpoint)
+                    && str_starts_with($storageEndpoint, 'https://')
+                    && config('operations.storage.bucket_scope_verified') === true
+                    && config('operations.storage.versioning_verified') === true
+                    && config('operations.storage.encryption_verified') === true
+                    && config('operations.storage.access_logging_verified') === true
+                    && config('operations.storage.offsite_copy_verified') === true
+                    && $this->validEvidenceReference(config('operations.storage.evidence_reference'))
+                    && $this->productionStorageIsExternal(),
+                'Sensible Dateien nutzen fail-closed, verschlüsselten und versionierten externen S3-Storage mit bucket-begrenztem Zugriff und Offsite-Kopie.',
+                'Externer privater S3-Storage oder belastbare Nachweise für Bucket-Scope, Versionierung, Verschlüsselung, Zugriffslogs und Offsite-Kopie fehlen.',
             ),
             $this->check(
                 'staff.two_factor',
@@ -159,6 +186,20 @@ final class SecurityBaselineAudit
                     && (int) config('services.livekit.token_ttl_minutes') <= 10,
                 'LiveKit ist EU-gebunden, E2EE-pflichtig und nutzt kurzlebige Tokens.',
                 'LiveKit benötigt WSS, EU-Pinning, E2EE, Zugangsdaten und höchstens zehn Minuten Tokenlaufzeit.',
+            ),
+            $this->check(
+                'integrations.webhook_hardening',
+                collect($webhookSecrets)->every(
+                    static fn (mixed $secret): bool => blank($secret)
+                        || (is_string($secret) && strlen($secret) >= 32),
+                )
+                    && collect($webhookBodyLimits)->every(
+                        static fn (mixed $bytes): bool => is_int($bytes)
+                            && $bytes >= 1024
+                            && $bytes <= 2 * 1024 * 1024,
+                    ),
+                'Optionale Webhooks verwenden ausreichend starke Secrets und begrenzte Request-Bodies.',
+                'Konfigurierte Webhook-Secrets benötigen mindestens 32 Zeichen; Body-Limits müssen zwischen 1 KiB und 2 MiB liegen.',
             ),
             $this->check(
                 'reverb.abuse_protection',
@@ -263,18 +304,30 @@ final class SecurityBaselineAudit
             && str_contains($config, 'fastcgi_param HTTP_FORWARDED "";');
     }
 
-    private function minioPolicyIsBucketScoped(): bool
+    private function productionStorageIsExternal(): bool
     {
         $path = base_path('compose.production.yaml');
         $compose = is_readable($path) ? file_get_contents($path) : false;
 
         return is_string($compose)
-            && str_contains($compose, 'AWS_ACCESS_KEY_ID: ${MINIO_APP_USER:')
-            && str_contains($compose, 'AWS_SECRET_ACCESS_KEY: ${MINIO_APP_PASSWORD:')
-            && str_contains($compose, 'mc admin user add local "$${MINIO_APP_USER}"')
-            && str_contains($compose, 'mc admin policy create local erin-app-bucket')
-            && str_contains($compose, 'mc admin policy attach local erin-app-bucket --user "$${MINIO_APP_USER}"')
-            && str_contains($compose, 'arn:aws:s3:::$${AWS_BUCKET}/*');
+            && str_contains($compose, 'AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?AWS_ACCESS_KEY_ID must be set}')
+            && str_contains($compose, 'AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?AWS_SECRET_ACCESS_KEY must be set}')
+            && str_contains($compose, 'AWS_ENDPOINT: ${AWS_ENDPOINT:?AWS_ENDPOINT must be set}')
+            && ! str_contains(strtolower($compose), 'minio/')
+            && ! preg_match('/^\s{2}(?:minio|object-storage):\s*$/m', $compose);
+    }
+
+    private function validEvidenceReference(mixed $value): bool
+    {
+        if (! is_string($value) || filter_var($value, FILTER_VALIDATE_URL) === false) {
+            return false;
+        }
+
+        $host = parse_url($value, PHP_URL_HOST);
+
+        return str_starts_with($value, 'https://')
+            && is_string($host)
+            && ! in_array($host, ['localhost', '127.0.0.1', 'example.com', 'example.invalid'], true);
     }
 
     /**

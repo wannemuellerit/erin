@@ -14,6 +14,8 @@ export default {
         searchPlaceholder: 'Bewerbungen durchsuchen …',
         appliedOn: 'Beworben am {date}',
         visaProcess: 'Visa-Prozess',
+        nextVisaAction: 'Nächste Aktion',
+        visaDocuments: '{count} freigegebene Dokumente',
         withdraw: 'Zurückziehen',
         emptyTitle: 'Noch keine Bewerbungen',
         emptyDescription:
@@ -164,6 +166,8 @@ export default {
         proposalReview:
             'Bitte vor jeder Verwendung fachlich und inhaltlich prüfen.',
         humanReview: 'Hinweise für die menschliche Prüfung',
+        markAccepted: 'Vorschlag nach Prüfung übernehmen',
+        markRejected: 'Vorschlag verwerfen',
         activityTitle: 'Letzte KI-Aktivitäten',
         activityDescription: 'Auditierbare Historie deiner Verarbeitungsläufe',
         noActivity: 'Noch keine KI-Aktivitäten vorhanden.',

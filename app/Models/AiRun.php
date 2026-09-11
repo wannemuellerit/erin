@@ -6,6 +6,7 @@ use App\Enums\AiRunStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/** @property AiRunStatus $status */
 class AiRun extends Model
 {
     protected $guarded = ['id'];
@@ -19,6 +20,7 @@ class AiRun extends Model
             'requires_consent' => 'boolean',
             'started_at' => 'datetime',
             'completed_at' => 'datetime',
+            'reviewed_at' => 'datetime',
         ];
     }
 

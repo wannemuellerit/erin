@@ -2,6 +2,12 @@
 
 Stand: 2. September 2026
 
+Abgleich vom 11. September 2026: Maßgeblich für den zusammengeführten lokalen
+Stand sind die Ergänzungen in [merge-2026-09-11.md](../operations/merge-2026-09-11.md).
+Die unten beschriebene Recruiter-Rolle/Produktivitätsansicht ist zurückgestellt;
+Kalender werden nur als ICS exportiert. Lokal wird SeaweedFS genutzt, Develop
+und Produktion benötigen einen separat eingerichteten privaten S3-Speicher.
+
 Repository: `wannemuellerit/erin`
 
 Produktname: **Faden**

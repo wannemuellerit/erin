@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Employer;
 
+use App\Services\Companies\CurrentCompany;
 use App\Services\Documents\UploadPolicy;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -9,6 +10,16 @@ use Illuminate\Validation\Validator;
 
 class UpsertJobPostingRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        $translations = $this->input('translations');
+        if (is_array($translations) && is_array($translations['en'] ?? null)
+            && ! collect($translations['en'])->contains(fn (mixed $value): bool => filled($value))) {
+            unset($translations['en']);
+            $this->merge(['translations' => $translations]);
+        }
+    }
+
     public function authorize(): bool
     {
         return $this->user() !== null;
@@ -18,6 +29,16 @@ class UpsertJobPostingRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'target_country_code' => ['nullable', 'string', 'size:2'],
+            'template_id' => ['nullable', 'integer', 'exists:job_templates,id'],
+            'translations' => ['nullable', 'array:de,en'],
+            'translations.*' => ['nullable', 'array:title,position,description'],
+            'translations.*.title' => ['nullable', 'string', 'max:180'],
+            'translations.*.position' => ['nullable', 'string', 'max:180'],
+            'translations.*.description' => ['nullable', 'string', 'max:50000'],
+            'translations.en.title' => ['nullable', 'required_with:translations.en.position,translations.en.description', 'string', 'max:180'],
+            'translations.en.position' => ['nullable', 'required_with:translations.en.title,translations.en.description', 'string', 'max:180'],
+            'translations.en.description' => ['nullable', 'required_with:translations.en.title,translations.en.position', 'string', 'max:50000'],
             'title' => ['required', 'string', 'min:5', 'max:180'],
             'position' => ['required', 'string', 'min:2', 'max:180'],
             'summary' => ['required', 'string', 'min:40', 'max:1000'],
@@ -26,7 +47,7 @@ class UpsertJobPostingRequest extends FormRequest
             'requirements' => ['required', 'string', 'min:40', 'max:20000'],
             'benefits' => ['nullable', 'string', 'max:10000'],
             'occupation_id' => ['required', 'exists:occupations,id'],
-            'location_id' => ['nullable', 'exists:company_locations,id'],
+            'location_id' => ['nullable', Rule::exists('company_locations', 'id')->where('company_id', app(CurrentCompany::class)->forRequest($this)->getKey())],
             'expected_experience_years' => ['required', 'numeric', 'min:0', 'max:60'],
             'language_notes' => ['nullable', 'string', 'max:3000'],
             'application_deadline' => ['nullable', 'date', 'after_or_equal:today'],

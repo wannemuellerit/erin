@@ -19,6 +19,7 @@ import ProgressBar from '@/components/product/ProgressBar.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
 import { useFormatters } from '@/composables/useFormatters';
+import { newUuid } from '@/lib/uuid';
 import { run } from '@/routes/ai';
 import {
     destroy as withdrawConsent,
@@ -93,7 +94,7 @@ const toolDefinitions = computed<ToolDefinition[]>(() => [
         text: t('candidate.ai.tools.cv_improve.description'),
         placeholder: t('candidate.ai.tools.cv_improve.placeholder'),
         icon: FileText,
-        tone: 'bg-blue-50 text-blue-600',
+        tone: 'bg-blue-50 text-[var(--erin-primary-text)]',
         requiresConsent: true,
     },
     {
@@ -161,6 +162,7 @@ const running = ref(false);
 const error = ref('');
 const result = ref<AiResult | null>(null);
 const resultModel = ref('');
+const resultRunId = ref<number | null>(null);
 const localCreditsUsed = ref(0);
 const selectedTool = computed(
     () =>
@@ -232,11 +234,13 @@ const runTask = async () => {
                 task: selectedTask.value,
                 input: { text: inputText.value },
                 consent_id: activeConsent.value?.id ?? null,
+                request_key: newUuid(),
             }),
         });
         const payload = (await response.json()) as {
             result?: AiResult;
             model?: string;
+            run_id?: number;
             message?: string;
             errors?: Record<string, string[]>;
         };
@@ -251,6 +255,7 @@ const runTask = async () => {
 
         result.value = payload.result;
         resultModel.value = payload.model ?? '';
+        resultRunId.value = payload.run_id ?? null;
         localCreditsUsed.value += 1;
     } catch (exception) {
         error.value =
@@ -265,6 +270,17 @@ const runStatusLabel = (status: string) => {
     const key = `candidate.ai.runStatus.${status}`;
 
     return te(key) ? t(key) : status.replaceAll('_', ' ');
+};
+const reviewResult = (decision: 'accepted' | 'rejected') => {
+    if (!resultRunId.value) {
+        return;
+    }
+
+    router.post(
+        `/ai/runs/${resultRunId.value}/review`,
+        { decision },
+        { preserveScroll: true },
+    );
 };
 </script>
 
@@ -327,11 +343,11 @@ const runStatusLabel = (status: string) => {
                     <component :is="tool.icon" class="size-5" />
                 </span>
                 <h2 class="mt-4 font-extrabold">{{ tool.title }}</h2>
-                <p class="mt-2 flex-1 text-sm leading-6 text-slate-500">
+                <p class="mt-2 flex-1 text-sm leading-6 text-muted-foreground">
                     {{ tool.text }}
                 </p>
                 <span
-                    class="mt-5 flex h-10 items-center justify-between rounded-xl border border-slate-200 px-3 text-xs font-bold text-slate-700"
+                    class="mt-5 flex h-10 items-center justify-between rounded-xl border border-border px-3 text-xs font-bold text-muted-foreground"
                 >
                     <span>{{ t('candidate.ai.oneCredit') }}</span>
                     <ArrowRight class="size-4 text-violet-500" />
@@ -343,11 +359,11 @@ const runStatusLabel = (status: string) => {
             class="erin-panel grid min-h-64 place-items-center p-8 text-center"
         >
             <div>
-                <Bot class="mx-auto size-9 text-slate-300" />
+                <Bot class="mx-auto size-9 text-muted-foreground" />
                 <h2 class="mt-4 font-bold">
                     {{ t('candidate.ai.noToolsTitle') }}
                 </h2>
-                <p class="mt-2 text-sm text-slate-500">
+                <p class="mt-2 text-sm text-muted-foreground">
                     {{ t('candidate.ai.noToolsDescription') }}
                 </p>
             </div>
@@ -382,7 +398,7 @@ const runStatusLabel = (status: string) => {
                     v-model="inputText"
                     rows="10"
                     :placeholder="selectedTool.placeholder"
-                    class="erin-focus w-full rounded-xl border border-slate-200 p-4 text-sm leading-6"
+                    class="erin-focus w-full rounded-xl border border-border p-4 text-sm leading-6"
                 />
                 <p v-if="error" class="mt-3 text-xs font-bold text-red-600">
                     {{ error }}
@@ -413,7 +429,7 @@ const runStatusLabel = (status: string) => {
                         <p class="text-2xl font-extrabold">
                             {{ usedCredits }} / {{ credits.limit }}
                         </p>
-                        <p class="text-xs text-slate-400">
+                        <p class="text-xs text-muted-foreground">
                             {{ t('candidate.ai.usageDescription') }}
                         </p>
                     </div>
@@ -424,11 +440,11 @@ const runStatusLabel = (status: string) => {
                     :show-value="false"
                     tone="orange"
                 />
-                <p class="mt-4 text-xs leading-5 text-slate-500">
+                <p class="mt-4 text-xs leading-5 text-muted-foreground">
                     {{ t('candidate.ai.expiryNotice') }}
                 </p>
                 <div v-if="activeConsent" class="mt-4 border-t pt-4">
-                    <p class="text-xs font-bold text-slate-700">
+                    <p class="text-xs font-bold text-muted-foreground">
                         {{ t('candidate.ai.activeConsent') }}
                     </p>
                     <button
@@ -457,7 +473,7 @@ const runStatusLabel = (status: string) => {
                 />
             </div>
             <div
-                class="mt-4 rounded-xl bg-slate-50 p-4 text-sm leading-7 whitespace-pre-wrap text-slate-700"
+                class="mt-4 rounded-xl bg-muted p-4 text-sm leading-7 whitespace-pre-wrap text-muted-foreground"
             >
                 {{ result.content }}
             </div>
@@ -491,6 +507,22 @@ const runStatusLabel = (status: string) => {
                     </li>
                 </ul>
             </div>
+            <div class="mt-4 flex flex-wrap gap-2">
+                <button
+                    type="button"
+                    class="erin-focus rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white"
+                    @click="reviewResult('accepted')"
+                >
+                    {{ t('candidate.ai.markAccepted') }}
+                </button>
+                <button
+                    type="button"
+                    class="erin-focus rounded-xl border border-border px-4 py-2 text-xs font-bold text-muted-foreground"
+                    @click="reviewResult('rejected')"
+                >
+                    {{ t('candidate.ai.markRejected') }}
+                </button>
+            </div>
         </SectionCard>
 
         <SectionCard
@@ -501,11 +533,13 @@ const runStatusLabel = (status: string) => {
                 <article
                     v-for="aiRun in normalizedRuns"
                     :key="aiRun.id"
-                    class="flex items-center gap-3 rounded-xl bg-slate-50 p-3"
+                    class="flex items-center gap-3 rounded-xl bg-muted p-3"
                 >
                     <Sparkles class="size-4 text-violet-500" />
                     <div class="min-w-0 flex-1">
-                        <p class="truncate text-xs font-bold text-slate-700">
+                        <p
+                            class="truncate text-xs font-bold text-muted-foreground"
+                        >
                             {{
                                 toolDefinitions.find(
                                     (tool) => tool.task === aiRun.purpose,
@@ -514,7 +548,7 @@ const runStatusLabel = (status: string) => {
                         </p>
                         <p
                             v-if="aiRun.created_at"
-                            class="mt-1 text-[10px] text-slate-400"
+                            class="mt-1 text-[10px] text-muted-foreground"
                         >
                             {{
                                 formatDate(aiRun.created_at, {
@@ -536,7 +570,7 @@ const runStatusLabel = (status: string) => {
                     />
                 </article>
             </div>
-            <p v-else class="py-8 text-center text-sm text-slate-400">
+            <p v-else class="py-8 text-center text-sm text-muted-foreground">
                 {{ t('candidate.ai.noActivity') }}
             </p>
         </SectionCard>

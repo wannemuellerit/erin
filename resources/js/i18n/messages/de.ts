@@ -9,9 +9,20 @@ export default {
         toggleSidebar: 'Seitenleiste umschalten',
         loading: 'Wird geladen',
     },
+    errors: {
+        logoAlt: 'Faden Logo',
+        notFound: {
+            title: 'Seite nicht gefunden',
+            message: 'Der aufgerufene Pfad konnte nicht gefunden werden.',
+            returnPrefix: 'Klicke',
+            returnLink: 'hier',
+            returnSuffix: ', um zur Startseite zurückzukehren.',
+        },
+    },
     roles: {
         candidate: 'Fachkraft',
         employer: 'Unternehmen',
+        partner: 'Partner',
         support: 'Support',
         super_admin: 'Superadmin',
     },
@@ -39,6 +50,9 @@ export default {
         auditLog: 'Audit Log',
         system: 'System',
         settings: 'Einstellungen',
+        services: 'Services',
+        partnerCases: 'Zugeordnete Fälle',
+        partners: 'Partnerplattform',
         groups: {
             communication: 'Kommunikation',
             organization: 'Organisation',
@@ -47,12 +61,110 @@ export default {
             control: 'Kontrolle',
         },
     },
+    services: {
+        metaTitle: 'Services',
+        eyebrow: 'Ankommen & Arbeiten',
+        title: 'Unterstützende Services',
+        description:
+            'Vergleiche Angebote und behalte jederzeit die Kontrolle über deine Daten.',
+        newCase: 'Neuen Servicefall anlegen',
+        newCaseDescription:
+            'Ein Angebot ist optional; ohne verfügbaren Partner übernimmt der Support die manuelle Koordination.',
+        service: 'Service',
+        select: 'Bitte auswählen',
+        targetCountry: 'Zielland',
+        candidateId: 'Benutzer-ID der Fachkraft',
+        offering: 'Angebot',
+        manualFallback: 'Manuelle Betreuung',
+        purpose: 'Konkreter Zweck',
+        translationDetails: 'Übersetzungsauftrag',
+        sourceLanguage: 'Ausgangssprache (ISO)',
+        targetLanguage: 'Zielsprache (ISO)',
+        documentType: 'Dokumenttyp',
+        pageCount: 'Seitenzahl',
+        deadline: 'Frist',
+        optionalOffer: 'Optionales Angebot in Cent',
+        openTasks: 'Rückmeldung erforderlich',
+        consent:
+            'Ich willige ausdrücklich in die zweckgebundene, zeitlich begrenzte Weitergabe der ausgewählten Daten ein.',
+        create: 'Fall anlegen',
+        assignedCases: 'Zugeordnete Fälle',
+        myCases: 'Meine Fälle',
+        empty: 'Noch keine Fälle',
+        emptyDescription:
+            'Hier erscheinen angelegte und dir zugeordnete Servicefälle.',
+        transfer: 'An Partner übermitteln',
+        withdraw: 'Einwilligung widerrufen',
+        export: 'Exportieren',
+        statusSummary: 'Sachliche Statusnotiz',
+        update: 'Status aktualisieren',
+        offeringLabel: '{title} · {partner} · v{version}',
+        statuses: {
+            in_progress: 'In Bearbeitung',
+            waiting_for_candidate: 'Rückmeldung erforderlich',
+            submitted_to_authority: 'Bei Behörde eingereicht',
+            booked: 'Gebucht',
+            completed: 'Abgeschlossen',
+            rejected: 'Abgelehnt',
+        },
+        types: {
+            language_course: 'Sprach- und Integrationskurs',
+            recognition: 'Anerkennung',
+            translation: 'Übersetzung',
+            health_insurance: 'Krankenversicherung',
+            housing: 'Wohnen',
+            travel: 'Reise',
+            tax: 'Steuer',
+            bank: 'Bankkonto',
+            connectivity: 'Mobilfunk & Internet',
+            payroll: 'Payroll-Onboarding',
+        },
+    },
+    partnersAdmin: {
+        eyebrow: 'Governance',
+        title: 'Partnerplattform',
+        description:
+            'Partner, Angebote und Länderfreigaben werden versioniert und bleiben bis zur vollständigen Freigabe deaktiviert.',
+        organizations: 'Partnerorganisationen',
+        organizationCounts:
+            '{category} · {members} Mitglieder · {offerings} Angebote',
+        name: 'Name',
+        createDraft: 'Partnerentwurf anlegen',
+        countryMatrix: 'Länder- und Rechtsmatrix',
+        country: 'Land',
+        service: 'Dienst',
+        status: 'Status',
+        version: 'Version',
+        approval: 'Freigabe',
+        versionValue: 'v{version}',
+        yes: 'ja',
+        no: 'nein',
+        legalBasis: 'Rechtsgrundlage',
+        legallyApproved: 'rechtlich freigegeben',
+        newRuleVersion: 'Neue Regelversion',
+        statuses: {
+            disabled: 'Deaktiviert',
+            pilot: 'Pilot',
+            enabled: 'Aktiviert',
+        },
+    },
     shell: {
         area: 'Bereich',
         mainNavigation: 'Hauptnavigation',
         menu: 'Navigation öffnen',
         searchLabel: 'Plattform durchsuchen',
         searchPlaceholder: 'Jobs, Fachkräfte, Nachrichten durchsuchen …',
+        searchMinimum: 'Bitte mindestens zwei Zeichen eingeben.',
+        searchLoading: 'Ergebnisse werden geladen …',
+        searchEmpty: 'Keine erlaubten Treffer gefunden.',
+        searchGroups: {
+            candidates: 'Fachkräfte',
+            jobs: 'Stellenanzeigen',
+            applications: 'Bewerbungen',
+            companies: 'Unternehmen',
+            conversations: 'Gespräche',
+            users: 'Konten',
+        },
         notifications: 'Benachrichtigungen',
         openNotifications: 'Benachrichtigungen öffnen',
         newNotifications: '{count} neu',
@@ -61,6 +173,7 @@ export default {
         profileSettings: 'Profil & Einstellungen',
         helpSupport: 'Hilfe & Support',
         userFallback: 'Faden Nutzer',
+        loggedInAs: 'Eingeloggt als',
         language: 'Sprache',
         german: 'Deutsch',
         english: 'Englisch',
@@ -505,6 +618,23 @@ export default {
             sms: 'SMS',
             whatsapp: 'WhatsApp',
             comingLater: 'Später',
+            phoneTitle: 'SMS und WhatsApp',
+            phoneDescription:
+                'Verifiziere eine Telefonnummer und erlaube ausgewählte, zeitkritische Hinweise je Kanal. Inhalte bleiben kurz und enthalten keine sensiblen Details.',
+            phoneUnavailable:
+                'SMS und WhatsApp sind global deaktiviert, bis Provider-, Länder- und Datenschutzfreigaben abgeschlossen sind.',
+            phonePlaceholder: '+491701234567',
+            quietStart: 'Ruhezeit beginnt',
+            quietEnd: 'Ruhezeit endet',
+            phoneConsent:
+                'Ich willige ausdrücklich ein, zeitkritische Faden-Hinweise per {channel} zu erhalten. Ich kann jederzeit widerrufen oder STOP senden.',
+            sendCode: 'Bestätigungscode senden',
+            code: '6-stelliger Code',
+            verify: 'Verifizieren',
+            verified: 'Verifiziert',
+            verificationPending: 'Bestätigung offen',
+            verificationRequired: 'Verifizierung nötig',
+            revoke: 'Einwilligung sofort widerrufen',
             pushMissing:
                 'Browser-Push ist noch nicht serverseitig eingerichtet. Hinterlege zuerst die VAPID-Schlüssel.',
             pushTitle: 'Browser-Push auf diesem Gerät',
@@ -546,6 +676,21 @@ export default {
                     title: 'Nachrichten',
                     description: 'Neue Nachrichten im Faden-Nachrichtencenter.',
                 },
+                document: {
+                    title: 'Dokumente',
+                    description:
+                        'Prüfentscheidungen zu eingereichten Dokumenten.',
+                },
+                visa: {
+                    title: 'Visa-Prozess',
+                    description:
+                        'Statusänderungen und Fristen im Visa-Prozess.',
+                },
+                referral: {
+                    title: 'Empfehlungen',
+                    description:
+                        'Status und Auszahlungsreife deiner Empfehlungen.',
+                },
                 reminder: {
                     title: 'Erinnerungen',
                     description:
@@ -555,6 +700,21 @@ export default {
                     title: 'Support',
                     description:
                         'Antworten und Statusänderungen bei Supporttickets.',
+                },
+                billing: {
+                    title: 'Abrechnung',
+                    description:
+                        'Zahlungswarnungen und wichtige Abonnementhinweise.',
+                },
+                boost: {
+                    title: 'Stellen-Boosts',
+                    description:
+                        'Hinweise zu wieder verfügbaren Stellen-Boosts.',
+                },
+                company: {
+                    title: 'Firmenteam',
+                    description:
+                        'Angenommene Einladungen und Änderungen im Team.',
                 },
                 system: {
                     title: 'System & Sonstiges',

@@ -14,8 +14,7 @@ import { useI18n } from 'vue-i18n';
 import MatchScore from '@/components/product/MatchScore.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
 import { useFormatters } from '@/composables/useFormatters';
-import de from '@/i18n/messages/product-components-de';
-import en from '@/i18n/messages/product-components-en';
+import { productMessages } from '@/i18n/product-locales';
 
 type Candidate = {
     id: number | string;
@@ -70,7 +69,7 @@ const emit = defineEmits<{
 
 const { locale, t } = useI18n({
     useScope: 'local',
-    messages: { de, en },
+    messages: productMessages,
 });
 const { formatDate } = useFormatters();
 
@@ -106,7 +105,7 @@ const skillLabels = computed(() =>
         .map((skill) =>
             typeof skill === 'string'
                 ? skill
-                : locale.value === 'en'
+                : locale.value !== 'de'
                   ? (skill.name_en ?? skill.name_de ?? skill.slug ?? '')
                   : (skill.name_de ?? skill.name_en ?? skill.slug ?? ''),
         )
@@ -121,7 +120,7 @@ const language = computed(() => {
 
     return first
         ? `${
-              locale.value === 'en'
+              locale.value !== 'de'
                   ? (first.name_en ??
                     first.name_de ??
                     first.code ??
@@ -171,7 +170,7 @@ const verified = computed(
                     </span>
                     <input
                         type="checkbox"
-                        class="erin-focus size-5 rounded border-slate-300 text-blue-600"
+                        class="erin-focus size-5 rounded border-border text-[var(--erin-primary-text)]"
                         :checked="selected"
                         @change="
                             emit(
@@ -182,12 +181,12 @@ const verified = computed(
                     />
                 </label>
                 <div
-                    class="relative grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-teal-50 to-blue-100 text-sm font-extrabold text-blue-700"
+                    class="relative grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-teal-50 to-blue-100 text-sm font-extrabold text-[var(--erin-primary-text-hover)]"
                 >
                     {{ reference.slice(-2) }}
                     <span
                         v-if="verified"
-                        class="absolute -right-1 -bottom-1 grid size-5 place-items-center rounded-full bg-white text-teal-500"
+                        class="absolute -right-1 -bottom-1 grid size-5 place-items-center rounded-full bg-card text-teal-500"
                         :title="t('candidateCard.verifiedTitle')"
                     >
                         <CheckCircle2 class="size-4" />
@@ -195,7 +194,7 @@ const verified = computed(
                 </div>
                 <div class="min-w-0">
                     <div class="flex items-center gap-2">
-                        <h3 class="truncate font-bold text-slate-950">
+                        <h3 class="truncate font-bold text-foreground">
                             {{ position }}
                         </h3>
                         <StatusBadge
@@ -206,11 +205,11 @@ const verified = computed(
                         />
                     </div>
                     <p
-                        class="mt-1 flex items-center gap-1 text-xs text-slate-500"
+                        class="mt-1 flex items-center gap-1 text-xs text-muted-foreground"
                     >
                         <MapPin class="size-3.5 text-teal-500" />
                         {{ country }}
-                        <span class="text-slate-300">•</span>
+                        <span class="text-muted-foreground">•</span>
                         {{ reference }}
                     </p>
                 </div>
@@ -222,7 +221,7 @@ const verified = computed(
                 :class="
                     candidate.favorite
                         ? 'bg-orange-50 text-orange-500'
-                        : 'text-slate-300 hover:bg-slate-50 hover:text-orange-500'
+                        : 'text-muted-foreground hover:bg-muted hover:text-orange-500'
                 "
                 :aria-label="
                     t(
@@ -239,7 +238,7 @@ const verified = computed(
             </button>
         </div>
 
-        <p class="mt-4 line-clamp-3 text-sm leading-6 text-slate-600">
+        <p class="mt-4 line-clamp-3 text-sm leading-6 text-muted-foreground">
             {{ candidate.summary || t('candidateCard.summaryMissing') }}
         </p>
 
@@ -247,18 +246,20 @@ const verified = computed(
             <span
                 v-for="skill in skillLabels.slice(0, 4)"
                 :key="skill"
-                class="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600"
+                class="rounded-lg bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground"
             >
                 {{ skill }}
             </span>
         </div>
 
         <div
-            class="mt-5 grid grid-cols-[1fr_auto] items-center gap-4 border-t border-slate-100 pt-4"
+            class="mt-5 grid grid-cols-[1fr_auto] items-center gap-4 border-t border-border pt-4"
         >
-            <div class="grid gap-2 text-xs text-slate-500">
+            <div class="grid gap-2 text-xs text-muted-foreground">
                 <span class="flex items-center gap-2">
-                    <Briefcase class="size-3.5 text-blue-500" />
+                    <Briefcase
+                        class="size-3.5 text-[var(--erin-primary-text)]"
+                    />
                     {{ experience }}
                 </span>
                 <span class="flex items-center gap-2">
@@ -281,7 +282,7 @@ const verified = computed(
             <button
                 v-if="canManage"
                 type="button"
-                class="erin-focus grid size-10 place-items-center rounded-xl border border-slate-200 text-slate-500 hover:border-teal-300 hover:bg-teal-50 hover:text-teal-600"
+                class="erin-focus grid size-10 place-items-center rounded-xl border border-border text-muted-foreground hover:border-teal-300 hover:bg-teal-50 hover:text-teal-600"
                 :aria-label="t('candidateCard.invite')"
             >
                 <MessageCircle class="size-4" />

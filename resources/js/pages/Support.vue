@@ -10,7 +10,9 @@ import PageHeader from '@/components/product/PageHeader.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
 import SupportConversation from '@/components/product/SupportConversation.vue';
+import SupportChatbot from '@/components/product/SupportChatbot.vue';
 import Textarea from '@/components/product/Textarea.vue';
+import type { SupportedLocale } from '@/i18n';
 import type { StatusTone, SupportTicket } from '@/types';
 
 const props = withDefaults(
@@ -26,6 +28,30 @@ const props = withDefaults(
             maxFileMegabytes: number;
             maxTotalMegabytes: number;
         };
+        chatbot?: {
+            enabled: boolean;
+            session: {
+                id: string;
+                locale: SupportedLocale;
+                status: 'active' | 'handed_off';
+                ticket_id: number | null;
+                retention_expires_at: string;
+            } | null;
+            messages: Array<{
+                id: number;
+                author: 'user' | 'assistant';
+                body: string;
+                sources: Array<{
+                    id: number;
+                    title: string;
+                    url: string | null;
+                    version: number;
+                }>;
+                escalation_required: boolean;
+                feedback: 'helpful' | 'unhelpful' | null;
+                created_at: string;
+            }>;
+        };
     }>(),
     {
         tickets: () => [],
@@ -36,6 +62,7 @@ const props = withDefaults(
             maxFileMegabytes: 10,
             maxTotalMegabytes: 15,
         }),
+        chatbot: () => ({ enabled: true, session: null, messages: [] }),
     },
 );
 
@@ -109,6 +136,12 @@ const toneFor = (status: string): StatusTone =>
             </template>
         </PageHeader>
 
+        <SupportChatbot
+            v-if="chatbot.enabled"
+            :initial-session="chatbot.session"
+            :initial-messages="chatbot.messages"
+        />
+
         <SectionCard
             v-if="showCreate"
             :title="t('operations.support.newTicket')"
@@ -128,7 +161,7 @@ const toneFor = (status: string): StatusTone =>
                         v-model="form.subject"
                         required
                         maxlength="180"
-                        class="erin-focus h-11 w-full rounded-xl border border-slate-200 px-3.5 text-sm"
+                        class="erin-focus h-11 w-full rounded-xl border border-border px-3.5 text-sm"
                         :placeholder="
                             t('operations.support.subjectPlaceholder')
                         "
@@ -143,7 +176,7 @@ const toneFor = (status: string): StatusTone =>
                         id="support-category"
                         v-model="form.category"
                         maxlength="80"
-                        class="erin-focus h-11 w-full rounded-xl border border-slate-200 px-3.5 text-sm"
+                        class="erin-focus h-11 w-full rounded-xl border border-border px-3.5 text-sm"
                         :placeholder="
                             t('operations.support.categoryPlaceholder')
                         "
@@ -157,7 +190,7 @@ const toneFor = (status: string): StatusTone =>
                     <select
                         id="support-priority"
                         v-model="form.priority"
-                        class="erin-focus h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm"
+                        class="erin-focus h-11 w-full rounded-xl border border-border bg-card px-3.5 text-sm"
                     >
                         <option
                             v-for="priority in [
@@ -204,7 +237,7 @@ const toneFor = (status: string): StatusTone =>
                     >
                         {{ form.errors.attachments }}
                     </p>
-                    <p class="mt-1 text-xs text-slate-500">
+                    <p class="mt-1 text-xs text-muted-foreground">
                         {{
                             t(
                                 'operations.support.attachmentHint',
@@ -217,7 +250,7 @@ const toneFor = (status: string): StatusTone =>
                     <button
                         type="submit"
                         :disabled="form.processing"
-                        class="erin-focus inline-flex h-11 items-center justify-center rounded-xl bg-orange-500 px-5 text-sm font-bold text-white hover:bg-orange-600 disabled:opacity-50"
+                        class="erin-focus inline-flex h-11 items-center justify-center rounded-xl bg-orange-700 px-5 text-sm font-bold text-white hover:bg-orange-800 disabled:opacity-50"
                     >
                         {{
                             form.processing
@@ -231,16 +264,16 @@ const toneFor = (status: string): StatusTone =>
 
         <div
             v-if="tickets.length"
-            class="grid overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:grid-cols-[22rem_minmax(0,1fr)]"
+            class="grid overflow-hidden rounded-2xl border border-border bg-card shadow-sm xl:grid-cols-[22rem_minmax(0,1fr)]"
         >
-            <aside class="border-b border-slate-200 xl:border-r xl:border-b-0">
-                <div class="border-b border-slate-100 px-4 py-3">
-                    <h2 class="text-sm font-bold text-slate-950">
+            <aside class="border-b border-border xl:border-r xl:border-b-0">
+                <div class="border-b border-border px-4 py-3">
+                    <h2 class="text-sm font-bold text-foreground">
                         {{ t('operations.support.ticketList') }}
                     </h2>
                 </div>
                 <div
-                    class="max-h-[44rem] divide-y divide-slate-100 overflow-y-auto"
+                    class="max-h-[44rem] divide-y divide-border overflow-y-auto"
                 >
                     <button
                         v-for="ticket in tickets"
@@ -250,7 +283,7 @@ const toneFor = (status: string): StatusTone =>
                         :class="
                             selectedId === ticket.id
                                 ? 'bg-blue-50'
-                                : 'hover:bg-slate-50'
+                                : 'hover:bg-muted'
                         "
                         @click="
                             selectedId = ticket.id;
@@ -258,7 +291,9 @@ const toneFor = (status: string): StatusTone =>
                         "
                     >
                         <div class="flex items-center justify-between gap-2">
-                            <span class="text-[11px] font-bold text-slate-400">
+                            <span
+                                class="text-[11px] font-bold text-muted-foreground"
+                            >
                                 {{ ticket.number }}
                             </span>
                             <StatusBadge
@@ -272,11 +307,13 @@ const toneFor = (status: string): StatusTone =>
                             />
                         </div>
                         <p
-                            class="mt-2 truncate text-sm font-bold text-slate-900"
+                            class="mt-2 truncate text-sm font-bold text-foreground"
                         >
                             {{ ticket.subject }}
                         </p>
-                        <p class="mt-1 line-clamp-2 text-xs text-slate-500">
+                        <p
+                            class="mt-1 line-clamp-2 text-xs text-muted-foreground"
+                        >
                             {{ ticket.messages.at(-1)?.body }}
                         </p>
                     </button>

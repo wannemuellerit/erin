@@ -108,7 +108,7 @@ it('lets only superadmins manage feature flags and audits changes', function () 
         'description' => 'Kontrollierter Rollout',
         'enabled' => true,
         'rollout_percentage' => 25,
-        'conditions' => ['locale' => ['de', 'en']],
+        'conditions' => ['roles' => ['candidate']],
     ];
 
     $this->actingAs($support)

@@ -39,7 +39,7 @@ höchstens einen aktiven Alarm je Ursache.
   Reparatur auf der einzigen Kopie. Bei Datenverlust Restore-Runbook starten.
 - **Redis:** Queue und Sessions betroffen; keine Worker vervielfachen, bevor
   Persistenz und Speicherlimit geklärt sind.
-- **MinIO/S3:** Uploads sperren, niemals auf öffentlichen Ersatzbucket
+- **S3-Objektspeicher:** Uploads sperren, niemals auf öffentlichen Ersatzbucket
   umstellen. Objekt- und DB-Konsistenz gemeinsam prüfen.
 - **Meilisearch:** Suche degradieren; Index aus MySQL neu aufbauen. Der Index
   ist nie Primärquelle.

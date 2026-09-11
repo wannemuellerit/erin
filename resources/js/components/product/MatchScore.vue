@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import de from '@/i18n/messages/product-components-de';
-import en from '@/i18n/messages/product-components-en';
+import { productMessages } from '@/i18n/product-locales';
 
 const props = withDefaults(
     defineProps<{
@@ -17,7 +16,7 @@ const props = withDefaults(
 );
 const { t } = useI18n({
     useScope: 'local',
-    messages: { de, en },
+    messages: productMessages,
 });
 const resolvedLabel = computed(() => props.label || t('matchScore.label'));
 
@@ -49,11 +48,11 @@ const dimensions = {
         }"
     >
         <div
-            class="absolute inset-[5px] grid place-items-center rounded-full bg-white"
+            class="absolute inset-[5px] grid place-items-center rounded-full bg-card"
         >
             <div class="text-center">
                 <div
-                    class="font-extrabold tracking-tight text-slate-950"
+                    class="font-extrabold tracking-tight text-foreground"
                     :class="
                         size === 'sm'
                             ? 'text-sm'
@@ -66,7 +65,7 @@ const dimensions = {
                 </div>
                 <div
                     v-if="size !== 'sm'"
-                    class="text-[9px] font-semibold text-slate-400 uppercase"
+                    class="text-[9px] font-semibold text-muted-foreground uppercase"
                 >
                     {{ resolvedLabel }}
                 </div>

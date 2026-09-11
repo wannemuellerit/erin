@@ -332,7 +332,7 @@ class ZammadTicketingProvider implements TicketingProvider
 
     private function ticketMarker(SupportTicket $ticket): string
     {
-        return 'Erin operation ticket:'.$ticket->number;
+        return 'Faden operation ticket:'.$ticket->number;
     }
 
     private function messageMarker(SupportTicketMessage $message): string

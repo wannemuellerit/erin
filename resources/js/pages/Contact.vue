@@ -29,13 +29,13 @@ const { t } = useI18n();
         />
     </Head>
 
-    <div class="min-h-screen bg-slate-50 text-slate-950">
+    <div class="min-h-screen bg-muted text-foreground">
         <PublicHeader />
 
         <main class="mx-auto max-w-5xl px-5 py-14 sm:px-6 lg:px-8 lg:py-20">
             <div class="max-w-3xl">
                 <p
-                    class="text-xs font-bold tracking-[0.15em] text-blue-600 uppercase"
+                    class="text-xs font-bold tracking-[0.15em] text-[var(--erin-primary-text)] uppercase"
                 >
                     {{ t('public.contact.eyebrow') }}
                 </p>
@@ -44,7 +44,7 @@ const { t } = useI18n();
                 >
                     {{ t('public.contact.title') }}
                 </h1>
-                <p class="mt-5 text-base leading-7 text-slate-500">
+                <p class="mt-5 text-base leading-7 text-muted-foreground">
                     {{ t('public.contact.description') }}
                 </p>
             </div>
@@ -56,51 +56,57 @@ const { t } = useI18n();
                 <a
                     v-if="contact.email"
                     :href="`mailto:${contact.email}`"
-                    class="erin-focus rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:border-blue-200 hover:shadow-md"
+                    class="erin-focus rounded-2xl border border-border bg-card p-6 shadow-sm hover:border-blue-200 hover:shadow-md"
                 >
                     <span
-                        class="grid size-11 place-items-center rounded-xl bg-blue-50 text-blue-600"
+                        class="grid size-11 place-items-center rounded-xl bg-blue-50 text-[var(--erin-primary-text)]"
                     >
                         <Mail class="size-5" />
                     </span>
-                    <p class="mt-5 text-xs font-bold text-slate-400 uppercase">
+                    <p
+                        class="mt-5 text-xs font-bold text-muted-foreground uppercase"
+                    >
                         {{ t('public.contact.email') }}
                     </p>
-                    <p class="mt-1 text-sm font-bold break-all text-slate-900">
+                    <p class="mt-1 text-sm font-bold break-all text-foreground">
                         {{ contact.email }}
                     </p>
                 </a>
                 <a
                     v-if="contact.phone"
                     :href="`tel:${contact.phone.replace(/[^+\d]/g, '')}`"
-                    class="erin-focus rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:border-blue-200 hover:shadow-md"
+                    class="erin-focus rounded-2xl border border-border bg-card p-6 shadow-sm hover:border-blue-200 hover:shadow-md"
                 >
                     <span
                         class="grid size-11 place-items-center rounded-xl bg-teal-50 text-teal-600"
                     >
                         <Phone class="size-5" />
                     </span>
-                    <p class="mt-5 text-xs font-bold text-slate-400 uppercase">
+                    <p
+                        class="mt-5 text-xs font-bold text-muted-foreground uppercase"
+                    >
                         {{ t('public.contact.phone') }}
                     </p>
-                    <p class="mt-1 text-sm font-bold text-slate-900">
+                    <p class="mt-1 text-sm font-bold text-foreground">
                         {{ contact.phone }}
                     </p>
                 </a>
                 <div
                     v-if="contact.address"
-                    class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+                    class="rounded-2xl border border-border bg-card p-6 shadow-sm"
                 >
                     <span
                         class="grid size-11 place-items-center rounded-xl bg-orange-50 text-orange-600"
                     >
                         <MapPin class="size-5" />
                     </span>
-                    <p class="mt-5 text-xs font-bold text-slate-400 uppercase">
+                    <p
+                        class="mt-5 text-xs font-bold text-muted-foreground uppercase"
+                    >
                         {{ t('public.contact.address') }}
                     </p>
                     <p
-                        class="mt-1 text-sm leading-6 font-bold whitespace-pre-wrap text-slate-900"
+                        class="mt-1 text-sm leading-6 font-bold whitespace-pre-wrap text-foreground"
                     >
                         {{ contact.address }}
                     </p>
@@ -112,7 +118,7 @@ const { t } = useI18n();
                 class="mt-10 rounded-2xl border border-blue-200 bg-blue-50 p-6 sm:p-10"
             >
                 <div
-                    class="grid size-12 place-items-center rounded-2xl bg-white text-blue-600 shadow-sm"
+                    class="grid size-12 place-items-center rounded-2xl bg-card text-[var(--erin-primary-text)] shadow-sm"
                 >
                     <Building2 class="size-6" />
                 </div>
@@ -126,16 +132,16 @@ const { t } = useI18n();
 
             <Link
                 :href="pricing()"
-                class="erin-focus mt-8 inline-flex items-center gap-2 rounded-lg text-sm font-bold text-blue-700 hover:text-blue-800"
+                class="erin-focus mt-8 inline-flex items-center gap-2 rounded-lg text-sm font-bold text-[var(--erin-primary-text-hover)] hover:text-blue-800"
             >
                 <ArrowLeft class="size-4" />
                 {{ t('public.contact.backPricing') }}
             </Link>
         </main>
 
-        <footer class="border-t border-slate-200 bg-white">
+        <footer class="border-t border-border bg-card">
             <div
-                class="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-8 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8"
+                class="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-8 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8"
             >
                 <p>
                     {{
@@ -150,25 +156,25 @@ const { t } = useI18n();
                 >
                     <Link
                         :href="legal.privacy()"
-                        class="erin-focus rounded hover:text-blue-600"
+                        class="erin-focus rounded hover:text-[var(--erin-primary-text)]"
                     >
                         {{ t('public.common.privacy') }}
                     </Link>
                     <Link
                         :href="legal.imprint()"
-                        class="erin-focus rounded hover:text-blue-600"
+                        class="erin-focus rounded hover:text-[var(--erin-primary-text)]"
                     >
                         {{ t('public.common.imprint') }}
                     </Link>
                     <Link
                         :href="legal.terms()"
-                        class="erin-focus rounded hover:text-blue-600"
+                        class="erin-focus rounded hover:text-[var(--erin-primary-text)]"
                     >
                         {{ t('public.common.terms') }}
                     </Link>
                     <Link
                         :href="contactRoute()"
-                        class="erin-focus rounded hover:text-blue-600"
+                        class="erin-focus rounded hover:text-[var(--erin-primary-text)]"
                     >
                         {{ t('public.common.contact') }}
                     </Link>

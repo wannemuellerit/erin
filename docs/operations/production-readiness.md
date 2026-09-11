@@ -78,22 +78,27 @@ Client seine IP oder das HTTPS-Schema nicht über mitgebrachte Header fälschen.
 Der veröffentlichte HTTP-Port darf ausschließlich hinter dem freigegebenen
 TLS-Terminator bzw. innerhalb des geschützten Ingress liegen.
 
-## Bucket-begrenzter MinIO-App-Nutzer
+## Externer, bucket-begrenzter S3-Objektspeicher
 
-Root-Zugangsdaten werden nur dem MinIO-Server und dem einmaligen
-`minio-init`-Container bereitgestellt. PHP-FPM, Queue, Scheduler, Reverb und
-Migrationen erhalten ausschließlich:
+Der Produktions-Compose-Stack betreibt bewusst keinen einzelnen
+Objektspeicher-Container. PHP-FPM, Queue und Migrationen erhalten ausschließlich
+eine auf `AWS_BUCKET` begrenzte Identität eines getrennt betriebenen oder
+verwalteten S3-kompatiblen Dienstes:
 
 ```dotenv
-MINIO_APP_USER=erin-app
-MINIO_APP_PASSWORD=<eigenes Deployment-Secret>
+AWS_ACCESS_KEY_ID=<bucket-begrenzte Identität>
+AWS_SECRET_ACCESS_KEY=<Deployment-Secret>
+AWS_ENDPOINT=https://<freigegebener-s3-endpunkt>
+AWS_BUCKET=erin-private
 ```
 
-`minio-init` verweigert identische Root-/App-Zugangsdaten, legt eine Policy für
-exakt `AWS_BUCKET` an und erlaubt nur benötigte Bucket-/Objektaktionen. Anonyme
-Bucketzugriffe bleiben deaktiviert. Änderungen an Bucketnamen oder
-Zugangsdaten erfordern anschließend einen aktiven Storage-Smoke-Test mit dem
-App-Nutzer.
+Vor einer Freigabe müssen Bucket-Scope, private Sichtbarkeit, Versionierung,
+Verschlüsselung, Zugriffsprotokollierung und eine getrennte Offsite-Kopie mit
+einer unveränderlichen HTTPS-Evidenz belegt werden. Die Security-Baseline bleibt
+rot, solange eines der `ERIN_STORAGE_*_VERIFIED`-Gates oder
+`ERIN_STORAGE_EVIDENCE_REFERENCE` fehlt. Änderungen an Anbieter, Bucket,
+Endpoint oder Zugangsdaten erfordern einen aktiven Schreib-/Lese-/signierter-
+Download-/Lösch-Smoke-Test.
 
 ## Observability
 
@@ -114,7 +119,7 @@ Grenzwerte werden nicht blind aus diesem Dokument übernommen. Sie sind mit Pilo
 ## Datenbank-Backup und Restore-Drill
 
 Die vollständige, verständliche Erklärung von RPO, RTO, Verschlüsselung,
-MySQL-/MinIO-Konsistenz und Pflicht-Evidenz steht in
+MySQL-/Objektspeicher-Konsistenz und Pflicht-Evidenz steht in
 [backup-restore-drill.md](backup-restore-drill.md).
 
 Ein lokaler, nur für den anschließenden Transfer vorgesehener Dump:
@@ -136,7 +141,7 @@ ERIN_RESTORE_DRILL_CONFIRM=RESTORE_IN_TEMP_DATABASE \
 Der einfache Datenbanklauf prüft Prüfsumme, Import und Migrationstabelle. Der
 vollständige lokale Drill in
 `scripts/ops/local-encrypted-restore-drill.sh` prüft zusätzlich verschlüsselte
-MySQL-/MinIO-Artefakte, kanonische Inhalte und Struktur, vollständige
+MySQL-/Objektspeicher-Artefakte, kanonische Inhalte und Struktur, vollständige
 DB-zu-Objekt-Referenzen, Negativkontrollen, Quell-Quiesce, Wiederanlauf sowie
 RPO/RTO. Er bleibt synthetische lokale Evidenz und ersetzt weder einen
 Produktions-Restore noch unabhängige Prüfung.
@@ -144,14 +149,14 @@ Produktions-Restore noch unabhängige Prüfung.
 ## Backup-Matrix
 
 - **MySQL:** verschlüsselter Dump, getrenntes Konto/Projekt, unveränderbare Versionen und regelmäßiger Restore-Drill.
-- **MinIO/S3:** Versionierung und Replikation in ein getrenntes Konto bzw. eine getrennte Region; Schlüssel nicht mit dem Primärsystem teilen. Stichproben müssen Dokument-Metadaten und Objektinhalt gemeinsam wiederherstellen.
+- **S3-Objektspeicher:** Versionierung und Replikation in ein getrenntes Konto bzw. eine getrennte Region; Schlüssel nicht mit dem Primärsystem teilen. Stichproben müssen Dokument-Metadaten und Objektinhalt gemeinsam wiederherstellen.
 - **Redis:** keine alleinige Datenquelle. Warteschlangen müssen idempotent sein; persistente Geschäftsdaten liegen in MySQL.
 - **Meilisearch:** aus MySQL rekonstruierbar. Suchindizes enthalten keine Identitätsdaten und werden nicht als maßgebliches Backup behandelt.
 - **Anwendung:** unveränderliches Image, versionierte Migrationen und separat gesicherte Secret-Referenzen. Secrets gehören nicht in Dumps oder das Repository.
 
 RPO, RTO, Backupfrequenz, Aufbewahrung und geografische Ablage werden vor dem
 Pilot anhand der dokumentierten Risiko- und Datenschutzentscheidung
-festgelegt. Ziel- und Messwerte für MySQL und MinIO/S3 müssen danach im
+festgelegt. Ziel- und Messwerte für MySQL und S3-Objektspeicher müssen danach im
 strukturierten Restore-Gate hinterlegt sein; ein Ziel darf nicht erst nach der
 Messung passend gewählt werden.
 

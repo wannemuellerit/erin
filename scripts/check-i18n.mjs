@@ -10,6 +10,7 @@ import { parse as parseSfc } from '@vue/compiler-sfc';
 const projectRoot = process.cwd();
 const messagesRoot = path.join(projectRoot, 'resources/js/i18n/messages');
 const vueRoot = path.join(projectRoot, 'resources/js');
+const requiredLocales = ['de', 'en', 'pl', 'ro', 'hr', 'es', 'pt'];
 const visibleAttributes = new Set([
     'title',
     'placeholder',
@@ -220,7 +221,7 @@ function translationKeyPaths(file, sourceText) {
                     `Doppelter Nachrichten-Key \`${dottedPath}\`.`,
                 );
             } else {
-                paths.set(dottedPath, location);
+                paths.set(dottedPath, { location, value: null });
             }
 
             const initializer = unwrapExpression(property.initializer);
@@ -231,6 +232,10 @@ function translationKeyPaths(file, sourceText) {
                 ts.isStringLiteral(initializer) ||
                 ts.isNoSubstitutionTemplateLiteral(initializer)
             ) {
+                paths.set(dottedPath, {
+                    location,
+                    value: initializer.text,
+                });
                 baseCompile(initializer.text, {
                     onError(error) {
                         issue(
@@ -251,28 +256,27 @@ function translationKeyPaths(file, sourceText) {
     return paths;
 }
 
-function counterpartFor(file) {
+function messageTokens(value) {
+    return [
+        ...new Set(
+            value.match(
+                /\{\{[^}]+\}\}|\{[^}]+\}|:[A-Za-z_][A-Za-z0-9_]*|<[^>]+>/gu,
+            ) ?? [],
+        ),
+    ].sort();
+}
+
+function localizedCatalogFor(file, locale) {
     const basename = path.basename(file);
 
-    if (basename === 'de.ts') {
-        return path.join(path.dirname(file), 'en.ts');
-    }
-
     if (basename === 'en.ts') {
-        return path.join(path.dirname(file), 'de.ts');
-    }
-
-    if (basename.endsWith('-de.ts')) {
-        return path.join(
-            path.dirname(file),
-            basename.replace(/-de\.ts$/u, '-en.ts'),
-        );
+        return path.join(path.dirname(file), `${locale}.ts`);
     }
 
     if (basename.endsWith('-en.ts')) {
         return path.join(
             path.dirname(file),
-            basename.replace(/-en\.ts$/u, '-de.ts'),
+            basename.replace(/-en\.ts$/u, `-${locale}.ts`),
         );
     }
 
@@ -282,59 +286,76 @@ function counterpartFor(file) {
 async function checkMessageCatalogs() {
     const files = await filesBelow(messagesRoot, '.ts');
     const fileSet = new Set(files);
-    const pairs = new Map();
+    const masters = files.filter((file) => {
+        const basename = path.basename(file);
 
-    for (const file of files) {
-        const counterpart = counterpartFor(file);
+        return basename === 'en.ts' || basename.endsWith('-en.ts');
+    });
 
-        if (counterpart === null) {
-            continue;
-        }
+    for (const master of masters) {
+        const masterSource = await readFile(master, 'utf8');
+        const masterPaths = translationKeyPaths(master, masterSource);
 
-        if (!fileSet.has(counterpart)) {
-            issue(
-                'message-pair',
-                file,
-                1,
-                1,
-                `Sprachpartner \`${displayPath(counterpart)}\` fehlt.`,
-            );
-            continue;
-        }
+        for (const locale of requiredLocales.filter((item) => item !== 'en')) {
+            const localized = localizedCatalogFor(master, locale);
 
-        const pairKey = [file, counterpart].sort().join('\0');
-        pairs.set(pairKey, [file, counterpart].sort());
-    }
-
-    for (const [leftFile, rightFile] of pairs.values()) {
-        const [leftSource, rightSource] = await Promise.all([
-            readFile(leftFile, 'utf8'),
-            readFile(rightFile, 'utf8'),
-        ]);
-        const leftPaths = translationKeyPaths(leftFile, leftSource);
-        const rightPaths = translationKeyPaths(rightFile, rightSource);
-
-        for (const [key, location] of leftPaths) {
-            if (!rightPaths.has(key)) {
+            if (localized === null || !fileSet.has(localized)) {
                 issue(
-                    'message-key',
-                    leftFile,
-                    location.line,
-                    location.column,
-                    `Key \`${key}\` fehlt in \`${displayPath(rightFile)}\`.`,
+                    'message-pair',
+                    master,
+                    1,
+                    1,
+                    `Sprachpartner \`${displayPath(localized ?? master)}\` fehlt.`,
                 );
+                continue;
             }
-        }
 
-        for (const [key, location] of rightPaths) {
-            if (!leftPaths.has(key)) {
-                issue(
-                    'message-key',
-                    rightFile,
-                    location.line,
-                    location.column,
-                    `Key \`${key}\` fehlt in \`${displayPath(leftFile)}\`.`,
-                );
+            const localizedSource = await readFile(localized, 'utf8');
+            const localizedPaths = translationKeyPaths(
+                localized,
+                localizedSource,
+            );
+
+            for (const [key, masterEntry] of masterPaths) {
+                if (!localizedPaths.has(key)) {
+                    issue(
+                        'message-key',
+                        master,
+                        masterEntry.location.line,
+                        masterEntry.location.column,
+                        `Key \`${key}\` fehlt in \`${displayPath(localized)}\`.`,
+                    );
+                    continue;
+                }
+
+                const localizedEntry = localizedPaths.get(key);
+
+                if (
+                    typeof masterEntry.value === 'string' &&
+                    typeof localizedEntry.value === 'string' &&
+                    JSON.stringify(messageTokens(masterEntry.value)) !==
+                        JSON.stringify(messageTokens(localizedEntry.value))
+                ) {
+                    issue(
+                        'message-placeholder',
+                        localized,
+                        localizedEntry.location.line,
+                        localizedEntry.location.column,
+                        `Platzhalter oder Pluraltrenner für \`${key}\` stimmen nicht mit \`${displayPath(master)}\` überein.`,
+                    );
+                }
+            }
+
+            for (const [key, localizedEntry] of localizedPaths) {
+                if (!masterPaths.has(key)) {
+                    issue(
+                        'message-key',
+                        localized,
+                        localizedEntry.location.line,
+                        localizedEntry.location.column,
+                        `Key \`${key}\` fehlt in \`${displayPath(master)}\`.`,
+                    );
+                }
             }
         }
     }

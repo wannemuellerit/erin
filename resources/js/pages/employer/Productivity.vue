@@ -29,6 +29,8 @@ type Reminder = {
     title: string;
     note?: string | null;
     priority: string;
+    timezone: string;
+    recurrence?: 'daily' | 'weekly' | 'monthly' | null;
     due_at: string;
     completed_at?: string | null;
     assignee: { id: number; name: string };
@@ -66,12 +68,14 @@ type ActivityEntry = {
     event: string;
     actor?: { id: number; name: string } | null;
     payload?: Record<string, string | number | null>;
+    url?: string | null;
     occurred_at: string;
 };
 
 const props = withDefaults(
     defineProps<{
         company_id: number;
+        timezone?: string;
         reminders?: Reminder[];
         members?: Array<{ id: number; name: string; role: string }>;
         jobs?: Array<{ id: number; title: string }>;
@@ -86,6 +90,7 @@ const props = withDefaults(
         imports: () => [],
         activity: () => [],
         import_fields: () => [],
+        timezone: 'UTC',
     },
 );
 
@@ -99,6 +104,9 @@ const reminderForm = useForm({
     note: '',
     due_at: '',
     priority: 'normal',
+    timezone: props.timezone,
+    recurrence: '' as '' | 'daily' | 'weekly' | 'monthly',
+    recurrence_ends_at: '',
     assignee_id: props.members[0]?.id ?? null,
     job_posting_id: null as number | null,
 });
@@ -159,6 +167,16 @@ const toggleReminder = (reminder: Reminder, completed: boolean) => {
     );
 };
 
+const snoozeReminder = (reminder: Reminder) => {
+    const nextDay = new Date();
+    nextDay.setDate(nextDay.getDate() + 1);
+    router.patch(
+        `/employer/reminders/${reminder.id}`,
+        { action: 'snooze', snoozed_until: nextDay.toISOString() },
+        { preserveScroll: true },
+    );
+};
+
 const deleteReminder = (reminder: Reminder) => {
     router.delete(`/employer/reminders/${reminder.id}`, {
         preserveScroll: true,
@@ -180,6 +198,14 @@ const startImport = () => {
 
     mappingForm.patch(
         `/employer/candidate-imports/${pendingImport.value.id}/mapping`,
+        { preserveScroll: true },
+    );
+};
+
+const cancelImport = (candidateImport: CandidateImport) => {
+    router.post(
+        `/employer/candidate-imports/${candidateImport.id}/cancel`,
+        {},
         { preserveScroll: true },
     );
 };
@@ -257,10 +283,11 @@ const activityLabel = (entry: ActivityEntry) => {
                         >
                             <input
                                 id="reminder-title"
+                                data-test="reminder-title"
                                 v-model="reminderForm.title"
                                 required
                                 maxlength="180"
-                                class="erin-focus h-11 w-full rounded-xl border border-slate-200 px-3.5 text-sm"
+                                class="erin-focus h-11 w-full rounded-xl border border-border px-3.5 text-sm"
                                 :placeholder="
                                     t(
                                         'operations.productivity.reminderTitlePlaceholder',
@@ -276,10 +303,11 @@ const activityLabel = (entry: ActivityEntry) => {
                         >
                             <input
                                 id="reminder-due"
+                                data-test="reminder-due"
                                 v-model="reminderForm.due_at"
                                 type="datetime-local"
                                 required
-                                class="erin-focus h-11 w-full rounded-xl border border-slate-200 px-3.5 text-sm"
+                                class="erin-focus h-11 w-full rounded-xl border border-border px-3.5 text-sm"
                             />
                         </FormField>
                         <FormField
@@ -290,7 +318,7 @@ const activityLabel = (entry: ActivityEntry) => {
                             <select
                                 id="reminder-assignee"
                                 v-model="reminderForm.assignee_id"
-                                class="erin-focus h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm"
+                                class="erin-focus h-11 w-full rounded-xl border border-border bg-card px-3.5 text-sm"
                             >
                                 <option
                                     v-for="member in members"
@@ -309,7 +337,7 @@ const activityLabel = (entry: ActivityEntry) => {
                             <select
                                 id="reminder-job"
                                 v-model="reminderForm.job_posting_id"
-                                class="erin-focus h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm"
+                                class="erin-focus h-11 w-full rounded-xl border border-border bg-card px-3.5 text-sm"
                             >
                                 <option :value="null">—</option>
                                 <option
@@ -347,7 +375,7 @@ const activityLabel = (entry: ActivityEntry) => {
                                 <select
                                     id="reminder-priority"
                                     v-model="reminderForm.priority"
-                                    class="erin-focus h-11 rounded-xl border border-slate-200 bg-white px-3.5 text-sm"
+                                    class="erin-focus h-11 rounded-xl border border-border bg-card px-3.5 text-sm"
                                 >
                                     <option
                                         v-for="priority in [
@@ -366,8 +394,51 @@ const activityLabel = (entry: ActivityEntry) => {
                                     </option>
                                 </select>
                             </FormField>
+                            <FormField
+                                id="reminder-recurrence"
+                                class="flex-1"
+                                :label="t('operations.productivity.recurrence')"
+                                :error="reminderForm.errors.recurrence"
+                            >
+                                <select
+                                    id="reminder-recurrence"
+                                    data-test="reminder-recurrence"
+                                    v-model="reminderForm.recurrence"
+                                    class="erin-focus h-11 w-full rounded-xl border border-border bg-card px-3.5 text-sm"
+                                >
+                                    <option value="">
+                                        {{
+                                            t(
+                                                'operations.productivity.recurrenceNone',
+                                            )
+                                        }}
+                                    </option>
+                                    <option value="daily">
+                                        {{
+                                            t(
+                                                'operations.productivity.recurrenceDaily',
+                                            )
+                                        }}
+                                    </option>
+                                    <option value="weekly">
+                                        {{
+                                            t(
+                                                'operations.productivity.recurrenceWeekly',
+                                            )
+                                        }}
+                                    </option>
+                                    <option value="monthly">
+                                        {{
+                                            t(
+                                                'operations.productivity.recurrenceMonthly',
+                                            )
+                                        }}
+                                    </option>
+                                </select>
+                            </FormField>
                             <button
                                 type="submit"
+                                data-test="reminder-submit"
                                 :disabled="reminderForm.processing"
                                 class="erin-focus h-11 rounded-xl bg-blue-600 px-5 text-sm font-bold text-white disabled:opacity-50"
                             >
@@ -378,23 +449,24 @@ const activityLabel = (entry: ActivityEntry) => {
 
                     <div
                         v-if="openReminders.length"
-                        class="mt-6 divide-y divide-slate-100 border-t border-slate-100"
+                        class="mt-6 divide-y divide-border border-t border-border"
                     >
                         <article
                             v-for="reminder in openReminders"
                             :key="reminder.id"
+                            :data-test="`reminder-${reminder.id}`"
                             class="flex flex-col gap-3 py-4 sm:flex-row sm:items-center"
                         >
                             <span
-                                class="grid size-10 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600"
+                                class="grid size-10 shrink-0 place-items-center rounded-xl bg-blue-50 text-[var(--erin-primary-text)]"
                             >
                                 <Clock3 class="size-4" />
                             </span>
                             <div class="min-w-0 flex-1">
-                                <p class="font-bold text-slate-900">
+                                <p class="font-bold text-foreground">
                                     {{ reminder.title }}
                                 </p>
-                                <p class="mt-1 text-xs text-slate-500">
+                                <p class="mt-1 text-xs text-muted-foreground">
                                     {{ formatDate(reminder.due_at) }} ·
                                     {{ reminder.assignee.name }}
                                     <template v-if="reminder.job_posting">
@@ -403,7 +475,7 @@ const activityLabel = (entry: ActivityEntry) => {
                                 </p>
                                 <p
                                     v-if="reminder.note"
-                                    class="mt-1.5 line-clamp-2 text-sm text-slate-600"
+                                    class="mt-1.5 line-clamp-2 text-sm text-muted-foreground"
                                 >
                                     {{ reminder.note }}
                                 </p>
@@ -433,6 +505,15 @@ const activityLabel = (entry: ActivityEntry) => {
                                 </button>
                                 <button
                                     type="button"
+                                    :data-test="`reminder-snooze-${reminder.id}`"
+                                    class="erin-focus rounded-lg border border-amber-200 px-2.5 py-1.5 text-xs font-bold text-amber-700"
+                                    @click="snoozeReminder(reminder)"
+                                >
+                                    {{ t('operations.productivity.snoozeDay') }}
+                                </button>
+                                <button
+                                    type="button"
+                                    :data-test="`reminder-delete-${reminder.id}`"
                                     class="erin-focus grid size-9 place-items-center rounded-xl bg-red-50 text-red-600"
                                     :aria-label="
                                         t('operations.productivity.delete')
@@ -456,7 +537,7 @@ const activityLabel = (entry: ActivityEntry) => {
 
                     <details v-if="completedReminders.length" class="mt-2">
                         <summary
-                            class="cursor-pointer text-xs font-bold text-slate-500"
+                            class="cursor-pointer text-xs font-bold text-muted-foreground"
                         >
                             {{ completedReminders.length }}
                             {{ t('operations.productivity.complete') }}
@@ -465,7 +546,7 @@ const activityLabel = (entry: ActivityEntry) => {
                             <div
                                 v-for="reminder in completedReminders"
                                 :key="reminder.id"
-                                class="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-500"
+                                class="flex items-center gap-3 rounded-xl bg-muted px-3 py-2 text-sm text-muted-foreground"
                             >
                                 <Check class="size-4 text-emerald-500" />
                                 <span class="flex-1 line-through">
@@ -507,7 +588,7 @@ const activityLabel = (entry: ActivityEntry) => {
                                 type="file"
                                 accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                                 required
-                                class="erin-focus block w-full rounded-xl border border-slate-200 p-2 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:font-bold file:text-blue-700"
+                                class="erin-focus block w-full rounded-xl border border-border p-2 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:font-bold file:text-[var(--erin-primary-text-hover)]"
                                 @change="
                                     uploadForm.file =
                                         ($event.target as HTMLInputElement)
@@ -527,7 +608,7 @@ const activityLabel = (entry: ActivityEntry) => {
                         </button>
                         <a
                             href="/employer/candidate-imports/template.csv"
-                            class="erin-focus inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-bold text-slate-700"
+                            class="erin-focus inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-border px-4 text-sm font-bold text-muted-foreground"
                         >
                             <Download class="size-4" />
                             {{ t('operations.productivity.template') }}
@@ -539,13 +620,13 @@ const activityLabel = (entry: ActivityEntry) => {
                         class="mt-6 rounded-2xl border border-blue-100 bg-blue-50/50 p-4"
                         @submit.prevent="startImport"
                     >
-                        <h3 class="font-bold text-slate-900">
+                        <h3 class="font-bold text-foreground">
                             {{ t('operations.productivity.mapping') }} ·
                             {{ pendingImport.original_filename }}
                         </h3>
                         <div
                             v-if="pendingImport.mapping?.preview?.length"
-                            class="mt-4 overflow-x-auto rounded-xl border border-blue-100 bg-white"
+                            class="mt-4 overflow-x-auto rounded-xl border border-blue-100 bg-card"
                         >
                             <table class="min-w-full text-left text-xs">
                                 <caption class="sr-only">
@@ -555,7 +636,7 @@ const activityLabel = (entry: ActivityEntry) => {
                                         )
                                     }}
                                 </caption>
-                                <thead class="bg-slate-50 text-slate-500">
+                                <thead class="bg-muted text-muted-foreground">
                                     <tr>
                                         <th
                                             v-for="header in pendingImport
@@ -567,7 +648,7 @@ const activityLabel = (entry: ActivityEntry) => {
                                         </th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-slate-100">
+                                <tbody class="divide-y divide-border">
                                     <tr
                                         v-for="(row, index) in pendingImport
                                             .mapping.preview"
@@ -577,7 +658,7 @@ const activityLabel = (entry: ActivityEntry) => {
                                             v-for="header in pendingImport
                                                 .mapping.headers ?? []"
                                             :key="header"
-                                            class="max-w-52 truncate px-3 py-2 text-slate-600"
+                                            class="max-w-52 truncate px-3 py-2 text-muted-foreground"
                                         >
                                             {{ row[header] ?? '—' }}
                                         </td>
@@ -607,7 +688,7 @@ const activityLabel = (entry: ActivityEntry) => {
                                 <select
                                     :id="`mapping-${field}`"
                                     v-model="mappingForm.mapping[field]"
-                                    class="erin-focus h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                                    class="erin-focus h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"
                                 >
                                     <option value="">
                                         {{
@@ -630,7 +711,7 @@ const activityLabel = (entry: ActivityEntry) => {
                         <button
                             type="submit"
                             :disabled="mappingForm.processing"
-                            class="erin-focus mt-4 h-10 rounded-xl bg-orange-500 px-4 text-sm font-bold text-white disabled:opacity-50"
+                            class="erin-focus mt-4 h-10 rounded-xl bg-orange-500 px-4 text-sm font-bold text-[#0f172a] disabled:opacity-50"
                         >
                             {{ t('operations.productivity.startImport') }}
                         </button>
@@ -638,11 +719,12 @@ const activityLabel = (entry: ActivityEntry) => {
 
                     <div
                         v-if="imports.length"
-                        class="mt-6 divide-y divide-slate-100 border-t border-slate-100"
+                        class="mt-6 divide-y divide-border border-t border-border"
                     >
                         <article
                             v-for="candidateImport in imports"
                             :key="candidateImport.id"
+                            :data-test="`candidate-import-${candidateImport.id}`"
                             class="flex flex-col gap-3 py-4 sm:flex-row sm:items-center"
                         >
                             <span
@@ -651,10 +733,10 @@ const activityLabel = (entry: ActivityEntry) => {
                                 <FileSpreadsheet class="size-4" />
                             </span>
                             <div class="min-w-0 flex-1">
-                                <p class="truncate font-bold text-slate-900">
+                                <p class="truncate font-bold text-foreground">
                                     {{ candidateImport.original_filename }}
                                 </p>
-                                <p class="mt-1 text-xs text-slate-500">
+                                <p class="mt-1 text-xs text-muted-foreground">
                                     {{ formatDate(candidateImport.created_at) }}
                                     <template
                                         v-if="candidateImport.total_rows > 0"
@@ -709,31 +791,57 @@ const activityLabel = (entry: ActivityEntry) => {
                                             : 'blue'
                                 "
                             />
+                            <button
+                                v-if="
+                                    canManageProductivity &&
+                                    [
+                                        'awaiting_mapping',
+                                        'queued',
+                                        'processing',
+                                    ].includes(candidateImport.status)
+                                "
+                                type="button"
+                                :data-test="`candidate-import-cancel-${candidateImport.id}`"
+                                class="erin-focus rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700"
+                                @click="cancelImport(candidateImport)"
+                            >
+                                {{ t('operations.productivity.cancelImport') }}
+                            </button>
                         </article>
                     </div>
                 </SectionCard>
             </div>
 
             <SectionCard :title="t('operations.productivity.activity')" flush>
-                <div
-                    v-if="activityItems.length"
-                    class="divide-y divide-slate-100"
-                >
+                <div v-if="activityItems.length" class="divide-y divide-border">
                     <article
                         v-for="entry in activityItems"
                         :key="entry.id"
                         class="flex gap-3 px-5 py-4"
                     >
                         <span
-                            class="grid size-9 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-500"
+                            class="grid size-9 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground"
                         >
                             <Activity class="size-4" />
                         </span>
                         <div class="min-w-0">
-                            <p class="text-sm leading-6 text-slate-700">
+                            <a
+                                v-if="entry.url"
+                                :href="entry.url"
+                                :data-test="`activity-link-${entry.id}`"
+                                class="erin-focus text-sm leading-6 font-semibold text-[var(--erin-primary-text-hover)] hover:text-blue-900 hover:underline"
+                            >
+                                {{ activityLabel(entry) }}
+                            </a>
+                            <p
+                                v-else
+                                class="text-sm leading-6 text-muted-foreground"
+                            >
                                 {{ activityLabel(entry) }}
                             </p>
-                            <time class="mt-1 block text-[11px] text-slate-400">
+                            <time
+                                class="mt-1 block text-[11px] text-muted-foreground"
+                            >
                                 {{ formatDate(entry.occurred_at) }}
                             </time>
                         </div>

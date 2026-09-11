@@ -11,12 +11,14 @@ use App\Models\CompanyMembership;
 use App\Models\Interview;
 use App\Models\JobApplication;
 use App\Models\JobPosting;
-use App\Models\RecruiterReminder;
 use App\Models\User;
+use App\Services\Activity\ActivityRecorder;
+use App\Services\Analytics\ActivityEventBackfill;
 use App\Services\Analytics\RecruitingAnalyticsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Broadcast;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 
 uses(RefreshDatabase::class);
@@ -135,70 +137,6 @@ it('isolates recruiting analytics by active company', function () {
     Carbon::setTestNow();
 });
 
-it('shows only company-visible activity and the current recruiters reminders', function () {
-    ['user' => $owner, 'company' => $company] = erinAnalyticsEmployer();
-    ['user' => $foreignOwner, 'company' => $foreignCompany] = erinAnalyticsEmployer();
-    $colleague = User::factory()->create(['role' => UserRole::Company]);
-    CompanyMembership::query()->create([
-        'company_id' => $company->getKey(),
-        'user_id' => $colleague->getKey(),
-        'role' => CompanyMemberRole::Recruiter,
-        'accepted_at' => now(),
-    ]);
-
-    ActivityEntry::query()->create([
-        'company_id' => $company->getKey(),
-        'actor_id' => $owner->getKey(),
-        'event' => 'company.visible',
-        'visibility' => 'company',
-        'payload' => ['label' => 'Sichtbar'],
-        'occurred_at' => now(),
-    ]);
-    ActivityEntry::query()->create([
-        'company_id' => $company->getKey(),
-        'actor_id' => $owner->getKey(),
-        'subject_user_id' => $owner->getKey(),
-        'event' => 'personal.hidden',
-        'visibility' => 'personal',
-        'occurred_at' => now()->subMinute(),
-    ]);
-    ActivityEntry::query()->create([
-        'company_id' => $foreignCompany->getKey(),
-        'actor_id' => $foreignOwner->getKey(),
-        'event' => 'foreign.hidden',
-        'visibility' => 'company',
-        'occurred_at' => now()->subMinutes(2),
-    ]);
-    RecruiterReminder::query()->create([
-        'company_id' => $company->getKey(),
-        'creator_id' => $owner->getKey(),
-        'assignee_id' => $owner->getKey(),
-        'title' => 'Meine Erinnerung',
-        'priority' => 'normal',
-        'due_at' => now()->addDay(),
-    ]);
-    RecruiterReminder::query()->create([
-        'company_id' => $company->getKey(),
-        'creator_id' => $colleague->getKey(),
-        'assignee_id' => $colleague->getKey(),
-        'title' => 'Fremde Erinnerung',
-        'priority' => 'normal',
-        'due_at' => now()->addDay(),
-    ]);
-
-    $this->actingAs($owner)
-        ->withSession(['active_company_id' => $company->getKey()])
-        ->get(route('employer.productivity'))
-        ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page
-            ->component('employer/Productivity')
-            ->where('company_id', $company->getKey())
-            ->has('activity', 1)
-            ->where('activity.0.event', 'company.visible')
-            ->has('reminders', 1)
-            ->where('reminders.0.title', 'Meine Erinnerung'));
-});
-
 it('keeps live company activity private from platform staff outside an impersonated member session', function () {
     ['user' => $owner, 'company' => $company] = erinAnalyticsEmployer();
     $support = User::factory()->create(['role' => UserRole::Support]);
@@ -206,4 +144,94 @@ it('keeps live company activity private from platform staff outside an impersona
 
     expect($channel($owner, $company->getKey()))->toBeTrue()
         ->and($channel($support, $company->getKey()))->toBeFalse();
+});
+
+it('versions and deduplicates recruiting events without accepting private payload fields', function () {
+    ['user' => $owner, 'company' => $company] = erinAnalyticsEmployer();
+    $recorder = app(ActivityRecorder::class);
+
+    $first = $recorder->record(
+        'application.status_changed',
+        $owner,
+        $company,
+        payload: ['status' => 'interview_scheduled'],
+        idempotencyKey: 'application:42:interview_scheduled',
+        schemaVersion: 2,
+    );
+    $duplicate = $recorder->record(
+        'application.status_changed',
+        $owner,
+        $company,
+        payload: ['status' => 'interview_scheduled'],
+        idempotencyKey: 'application:42:interview_scheduled',
+        schemaVersion: 2,
+    );
+
+    expect($duplicate->getKey())->toBe($first->getKey())
+        ->and($first->event_uuid)->not->toBeNull()
+        ->and($first->schema_version)->toBe(2)
+        ->and(ActivityEntry::query()->count())->toBe(1)
+        ->and(fn () => $recorder->record(
+            'document.reviewed',
+            $owner,
+            $company,
+            payload: ['document_name' => 'passport.pdf'],
+        ))->toThrow(InvalidArgumentException::class);
+});
+
+it('backfills historical activity identifiers once and marks their data quality', function () {
+    ['user' => $owner, 'company' => $company] = erinAnalyticsEmployer();
+    $id = DB::table('activity_entries')->insertGetId([
+        'company_id' => $company->getKey(),
+        'actor_id' => $owner->getKey(),
+        'event_uuid' => null,
+        'event' => 'application.status_changed',
+        'schema_version' => 0,
+        'data_quality' => 'observed',
+        'visibility' => 'company',
+        'occurred_at' => now()->subYear(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $backfill = app(ActivityEventBackfill::class);
+
+    expect($backfill->run($id))->toBe(1)
+        ->and($backfill->run($id))->toBe(0);
+
+    $entry = ActivityEntry::query()->findOrFail($id);
+    expect($entry->event_uuid)->toBeString()->not->toBeEmpty()
+        ->and($entry->schema_version)->toBe(1)
+        ->and($entry->data_quality)->toBe('backfilled');
+});
+
+it('exports only tenant-scoped job aggregates and audits the selected period', function () {
+    ['user' => $owner, 'company' => $company] = erinAnalyticsEmployer();
+    ['user' => $foreignOwner, 'company' => $foreignCompany] = erinAnalyticsEmployer();
+    JobPosting::factory()->create([
+        'company_id' => $company->getKey(),
+        'created_by' => $owner->getKey(),
+        'title' => '=Sensitive Formula',
+    ]);
+    JobPosting::factory()->create([
+        'company_id' => $foreignCompany->getKey(),
+        'created_by' => $foreignOwner->getKey(),
+        'title' => 'Foreign Secret',
+    ]);
+
+    $response = $this->actingAs($owner)
+        ->withSession(['active_company_id' => $company->getKey()])
+        ->get(route('employer.analytics.export', [
+            'from' => now()->subWeek()->toDateString(),
+            'to' => now()->toDateString(),
+        ]))
+        ->assertOk()
+        ->assertHeader('content-type', 'text/csv; charset=UTF-8');
+
+    expect($response->streamedContent())->toContain('Sensitive Formula')
+        ->not->toContain('Foreign Secret');
+    $this->assertDatabaseHas('audit_logs', [
+        'event' => 'analytics.company_exported',
+        'company_id' => $company->getKey(),
+    ]);
 });

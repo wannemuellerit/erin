@@ -3,6 +3,9 @@
 namespace App\Providers;
 
 use App\Contracts\AiProvider;
+use App\Contracts\ExternalMessageProvider;
+use App\Contracts\PartnerProvider;
+use App\Contracts\PayoutProvider;
 use App\Contracts\StripeBillingChangeGateway;
 use App\Contracts\StripeCatalogGateway;
 use App\Contracts\StripeSubscriptionGateway;
@@ -14,6 +17,10 @@ use App\Services\Ai\OpenAiResponsesProvider;
 use App\Services\Billing\StripeApiBillingChangeGateway;
 use App\Services\Billing\StripeApiCatalogGateway;
 use App\Services\Billing\StripeApiSubscriptionGateway;
+use App\Services\Notifications\TwilioMessageProvider;
+use App\Services\Partners\ManualPartnerProvider;
+use App\Services\Payouts\NullPayoutProvider;
+use App\Services\Payouts\StripeConnectPayoutProvider;
 use App\Services\Ticketing\NullTicketingProvider;
 use App\Services\Ticketing\ZammadTicketingProvider;
 use App\Services\Video\LiveKitVideoProvider;
@@ -39,6 +46,11 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(AiProvider::class, OpenAiResponsesProvider::class);
+        $this->app->bind(ExternalMessageProvider::class, TwilioMessageProvider::class);
+        $this->app->bind(PartnerProvider::class, ManualPartnerProvider::class);
+        $this->app->bind(PayoutProvider::class, fn (): PayoutProvider => config('services.payouts.provider') === 'stripe' && filled(config('cashier.secret'))
+            ? new StripeConnectPayoutProvider
+            : new NullPayoutProvider);
         $this->app->bind(
             StripeBillingChangeGateway::class,
             static fn (): StripeApiBillingChangeGateway => new StripeApiBillingChangeGateway,
