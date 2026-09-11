@@ -209,10 +209,14 @@ jobs:
       TELESCOPE_ENABLED: 'false'
       PLAYWRIGHT_BASE_URL: http://127.0.0.1:8000
       BROADCAST_CONNECTION: reverb
+      REVERB_APP_ID: erin-e2e
+      REVERB_APP_KEY: erin-e2e-key
+      REVERB_APP_SECRET: erin-e2e-local-only-secret
       REVERB_HOST: 127.0.0.1
       REVERB_PORT: 8080
       REVERB_SCHEME: http
       VITE_REVERB_HOST: 127.0.0.1
+      VITE_REVERB_APP_KEY: erin-e2e-key
       VITE_REVERB_PORT: 8080
       VITE_REVERB_SCHEME: http
 
