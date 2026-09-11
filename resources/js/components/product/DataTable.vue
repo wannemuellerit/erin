@@ -3,8 +3,7 @@ import { MoreHorizontal } from '@lucide/vue';
 import { computed, useSlots } from 'vue';
 import { useI18n } from 'vue-i18n';
 import EmptyState from '@/components/product/EmptyState.vue';
-import de from '@/i18n/messages/product-components-de';
-import en from '@/i18n/messages/product-components-en';
+import { productMessages } from '@/i18n/product-locales';
 import type { ProductTableRow, TableColumn } from '@/types';
 
 const props = withDefaults(
@@ -29,20 +28,20 @@ const hasActions = computed(() => props.showActions || Boolean(slots.actions));
 
 const { t } = useI18n({
     useScope: 'local',
-    messages: { de, en },
+    messages: productMessages,
 });
 </script>
 
 <template>
     <div>
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto" tabindex="0">
             <table class="w-full text-left text-sm" :style="{ minWidth }">
                 <thead>
-                    <tr class="border-b border-slate-200 bg-slate-50/70">
+                    <tr class="border-b border-border bg-muted/70">
                         <th
                             v-for="column in columns"
                             :key="column.key"
-                            class="px-5 py-3 text-[11px] font-bold tracking-wider text-slate-500 uppercase"
+                            class="px-5 py-3 text-[11px] font-bold tracking-wider text-muted-foreground uppercase"
                             :class="{
                                 'text-center': column.align === 'center',
                                 'text-right': column.align === 'right',
@@ -61,13 +60,13 @@ const { t } = useI18n({
                     <tr
                         v-for="row in rows"
                         :key="row.id"
-                        class="border-b border-slate-100 last:border-0"
-                        :class="{ 'hover:bg-slate-50/70': rowHover }"
+                        class="border-b border-border last:border-0"
+                        :class="{ 'hover:bg-muted/70': rowHover }"
                     >
                         <td
                             v-for="column in columns"
                             :key="column.key"
-                            class="px-5 py-4 text-slate-600"
+                            class="px-5 py-4 text-muted-foreground"
                             :class="{
                                 'text-center': column.align === 'center',
                                 'text-right': column.align === 'right',
@@ -85,7 +84,7 @@ const { t } = useI18n({
                             <slot name="actions" :row="row">
                                 <button
                                     type="button"
-                                    class="erin-focus rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                                    class="erin-focus rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-muted-foreground"
                                     :aria-label="t('dataTable.moreActions')"
                                 >
                                     <MoreHorizontal class="size-4" />

@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\NotificationPreference;
 use App\Models\User;
+use App\Services\Platform\EmailTemplateRenderer;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\BroadcastMessage;
@@ -16,6 +17,11 @@ use NotificationChannels\WebPush\WebPushMessage;
 class ActivityNotification extends Notification implements ShouldQueue
 {
     use Queueable;
+
+    public int $tries = 5;
+
+    /** @var list<int> */
+    public array $backoff = [30, 120, 600, 1800];
 
     /**
      * @param  array<string, mixed>  $data
@@ -46,6 +52,17 @@ class ActivityNotification extends Notification implements ShouldQueue
         return $channels;
     }
 
+    /** @return array<class-string|string, string> */
+    public function viaQueues(): array
+    {
+        return [
+            'mail' => 'notifications',
+            'database' => 'notifications',
+            'broadcast' => 'notifications',
+            WebPushChannel::class => 'notifications',
+        ];
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -63,24 +80,46 @@ class ActivityNotification extends Notification implements ShouldQueue
     {
         $payload = $this->localizedData($notifiable);
         $locale = $this->localeFor($notifiable);
-        $name = $notifiable instanceof User ? $notifiable->name : null;
+        $templateKey = is_string($payload['event'] ?? null)
+            ? (string) $payload['event']
+            : 'notification.activity';
+        $rendered = app(EmailTemplateRenderer::class)->render($templateKey, $locale, [
+            'name' => $notifiable instanceof User ? $notifiable->name : '',
+            'title' => (string) ($payload['title'] ?? $this->fallbackTitle($locale)),
+            'message' => (string) ($payload['message'] ?? ''),
+            'url' => is_string($payload['url'] ?? null) ? $payload['url'] : route('dashboard'),
+            'action_label' => __('In Faden ansehen', [], $locale),
+        ]);
+
         $message = (new MailMessage)
-            ->subject((string) ($payload['title'] ?? $this->fallbackTitle($locale)))
-            ->greeting($locale === 'en'
-                ? sprintf('Hello%s,', $name ? " {$name}" : '')
-                : sprintf('Hallo%s,', $name ? " {$name}" : ''))
-            ->line((string) ($payload['message'] ?? ''));
+            ->subject($rendered['subject'])
+            ->tag('erin-'.NotificationPreference::categoryFor((string) ($payload['event'] ?? 'system')))
+            ->metadata('notification_delivery_id', (string) ($payload['delivery_id'] ?? ''))
+            ->metadata('event', (string) ($payload['event'] ?? 'system'))
+            ->greeting(__('Hallo:name,', [
+                'name' => $notifiable instanceof User ? " {$notifiable->name}" : '',
+            ], $locale));
 
         if (is_string($payload['url'] ?? null) && $payload['url'] !== '') {
             $message->action(
-                $locale === 'en' ? 'View in Faden' : 'In Faden ansehen',
+                __('In Faden ansehen', [], $locale),
                 $payload['url'],
             );
         }
 
-        return $message->salutation($locale === 'en'
-            ? 'Your Faden team'
-            : 'Dein Faden-Team');
+        return $message
+            ->view('emails.activity-template', [
+                'locale' => $locale,
+                'subject' => $rendered['subject'],
+                'bodyHtml' => $rendered['body_html'],
+            ])
+            ->text('emails.activity-template-text', [
+                'locale' => $locale,
+                'subject' => $rendered['subject'],
+                'bodyHtml' => $rendered['body_html'],
+                'bodyText' => $rendered['body_text'],
+            ])
+            ->salutation(__('Dein Faden-Team', [], $locale));
     }
 
     public function toWebPush(
@@ -101,7 +140,7 @@ class ActivityNotification extends Notification implements ShouldQueue
                 'event' => $event,
                 'url' => is_string($payload['url'] ?? null) ? $payload['url'] : route('dashboard'),
             ])
-            ->action($locale === 'en' ? 'Open' : 'Öffnen', 'open')
+            ->action(__('Öffnen', [], $locale), 'open')
             ->options(['TTL' => 3600]);
     }
 
@@ -152,9 +191,20 @@ class ActivityNotification extends Notification implements ShouldQueue
         $locale = $this->localeFor($notifiable);
         $translations = $this->data['translations'] ?? null;
         $localized = is_array($translations)
-            && is_array($translations[$locale] ?? null)
-                ? $translations[$locale]
-                : [];
+            ? ($translations[$locale] ?? [])
+            : [];
+        $localized = is_array($localized) ? $localized : [];
+        $contentLocale = in_array($locale, ['de', 'en'], true) ? $locale : null;
+        $localizedTitle = $localized['title']
+            ?? $this->data["title_{$locale}"]
+            ?? ($contentLocale !== null ? $this->data["title_{$contentLocale}"] ?? null : null)
+            ?? ($contentLocale !== null ? $this->data['title'] ?? null : null)
+            ?? $this->fallbackTitle($locale);
+        $localizedMessage = $localized['message']
+            ?? $this->data["message_{$locale}"]
+            ?? ($contentLocale !== null ? $this->data["message_{$contentLocale}"] ?? null : null)
+            ?? ($contentLocale !== null ? $this->data['message'] ?? null : null)
+            ?? __('In Faden gibt es eine neue Aktualisierung. Öffne die Plattform für Details.', [], $locale);
 
         return [
             ...Arr::except($this->data, [
@@ -164,32 +214,21 @@ class ActivityNotification extends Notification implements ShouldQueue
                 'message_de',
                 'message_en',
             ]),
-            'title' => $localized['title']
-                ?? $this->data["title_{$locale}"]
-                ?? $this->data['title']
-                ?? $this->fallbackTitle($locale),
-            'message' => $localized['message']
-                ?? $this->data["message_{$locale}"]
-                ?? $this->data['message']
-                ?? '',
+            'title' => $localizedTitle,
+            'message' => $localizedMessage,
         ];
     }
 
-    /**
-     * @return 'de'|'en'
-     */
     private function localeFor(object $notifiable): string
     {
-        return $notifiable instanceof User && $notifiable->locale === 'en'
-            ? 'en'
-            : 'de';
+        return $notifiable instanceof User
+            && in_array($notifiable->locale, config('app.supported_locales'), true)
+                ? $notifiable->locale
+                : 'de';
     }
 
-    /**
-     * @param  'de'|'en'  $locale
-     */
     private function fallbackTitle(string $locale): string
     {
-        return $locale === 'en' ? 'News from Faden' : 'Neuigkeiten von Faden';
+        return __('Neue Aktivität in Faden', [], $locale);
     }
 }

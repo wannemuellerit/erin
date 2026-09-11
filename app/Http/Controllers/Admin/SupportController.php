@@ -10,6 +10,10 @@ use App\Jobs\SyncSupportMessageToProvider;
 use App\Jobs\SyncSupportTicketToProvider;
 use App\Models\Feedback;
 use App\Models\ModerationCase;
+use App\Models\SupportChatMessage;
+use App\Models\SupportChatPrompt;
+use App\Models\SupportChatSession;
+use App\Models\SupportKnowledgeArticle;
 use App\Models\SupportTicket;
 use App\Models\User;
 use App\Notifications\ActivityNotification;
@@ -128,7 +132,37 @@ class SupportController extends AdminController
                     ->get(),
             ],
             'attachmentLimits' => $attachmentLimits->forFrontend(),
+            'chatbotGovernance' => [
+                'metrics' => [
+                    'sessions' => SupportChatSession::query()->count(),
+                    'handoff_rate' => $this->percentage(
+                        SupportChatSession::query()->where('status', 'handed_off')->count(),
+                        SupportChatSession::query()->count(),
+                    ),
+                    'helpful_rate' => $this->percentage(
+                        SupportChatMessage::query()->where('feedback', 'helpful')->count(),
+                        SupportChatMessage::query()->whereNotNull('feedback')->count(),
+                    ),
+                    'average_latency_ms' => (int) round((float) SupportChatMessage::query()
+                        ->where('author', 'assistant')->avg('latency_ms')),
+                    'escalations' => SupportChatMessage::query()
+                        ->where('author', 'assistant')->where('escalation_required', true)->count(),
+                    'expired_sources' => SupportKnowledgeArticle::query()
+                        ->where('status', 'published')->where('expires_at', '<=', now())->count(),
+                ],
+                'articles' => SupportKnowledgeArticle::query()
+                    ->latest('stable_key')->latest('version')->limit(50)
+                    ->get(['id', 'stable_key', 'version', 'locale', 'title', 'source_url', 'status', 'target_roles', 'published_at', 'expires_at']),
+                'prompts' => SupportChatPrompt::query()
+                    ->latest('version')->limit(20)
+                    ->get(['id', 'version', 'model', 'active', 'allowed_tools', 'created_at']),
+            ],
         ]);
+    }
+
+    private function percentage(int $part, int $total): float
+    {
+        return $total === 0 ? 0 : round(($part / $total) * 100, 1);
     }
 
     public function update(

@@ -95,6 +95,25 @@ type AddOns = {
     seat_enabled?: boolean;
     seat_quantity?: number;
 };
+type Invoice = {
+    id: number;
+    number?: string | null;
+    status: string;
+    currency: string;
+    subtotal_cents: number;
+    discount_cents: number;
+    tax_cents: number;
+    total_cents: number;
+    amount_paid_cents: number;
+    amount_due_cents: number;
+    billing_reason?: string | null;
+    hosted_invoice_url?: string | null;
+    invoice_pdf_url?: string | null;
+    promotion_codes?: string[] | null;
+    customer_tax_ids?: Array<{ type: string; value: string }> | null;
+    issued_at?: string | null;
+    paid_at?: string | null;
+};
 
 const props = withDefaults(
     defineProps<{
@@ -103,6 +122,7 @@ const props = withDefaults(
         entitlements?: Entitlements;
         subscription?: Subscription | null;
         add_ons?: AddOns;
+        invoices?: Invoice[];
     }>(),
     {
         company: null,
@@ -110,6 +130,7 @@ const props = withDefaults(
         entitlements: () => ({}),
         subscription: null,
         add_ons: () => ({}),
+        invoices: () => [],
     },
 );
 
@@ -141,6 +162,23 @@ const money = (cents?: number | null, currency = 'EUR') =>
         : formatCurrency(cents / 100, currency, {
               maximumFractionDigits: 0,
           });
+const invoiceMoney = (cents: number, currency = 'EUR') =>
+    formatCurrency(cents / 100, currency, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
+const invoiceStatusLabel = (status: string) =>
+    te(`employer.billing.invoiceStatus.${status}`)
+        ? t(`employer.billing.invoiceStatus.${status}`)
+        : status;
+const invoiceTone = (status: string) =>
+    status === 'paid'
+        ? 'green'
+        : status === 'open'
+          ? 'yellow'
+          : status === 'void'
+            ? 'slate'
+            : 'red';
 const subscriptionStatusLabel = computed(() => {
     const status = props.company?.subscription_status;
 
@@ -176,7 +214,7 @@ const changePlan = (plan: Plan) => {
                 <button
                     v-if="subscription && canManageBilling"
                     type="button"
-                    class="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700"
+                    class="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-bold text-muted-foreground"
                     @click="router.post(portal.url())"
                 >
                     {{ t('employer.billing.openStripePortal') }}
@@ -260,7 +298,7 @@ const changePlan = (plan: Plan) => {
                     :value="percent(entitlements.jobs)"
                     :show-value="false"
                 />
-                <p class="mt-3 text-xs text-slate-600">
+                <p class="mt-3 text-xs text-muted-foreground">
                     {{
                         t('employer.billing.usage.available', {
                             count: entitlements.jobs?.remaining ?? 0,
@@ -279,7 +317,7 @@ const changePlan = (plan: Plan) => {
                     :show-value="false"
                     tone="teal"
                 />
-                <p class="mt-3 text-xs text-slate-600">
+                <p class="mt-3 text-xs text-muted-foreground">
                     {{
                         t('employer.billing.usage.additionalSeats', {
                             count: entitlements.seats?.additional ?? 0,
@@ -301,7 +339,7 @@ const changePlan = (plan: Plan) => {
                     :show-value="false"
                     tone="orange"
                 />
-                <p class="mt-3 text-xs text-slate-600">
+                <p class="mt-3 text-xs text-muted-foreground">
                     {{
                         t('employer.billing.usage.used', {
                             count: entitlements.ai_credits?.used ?? 0,
@@ -319,7 +357,7 @@ const changePlan = (plan: Plan) => {
                     :show-value="false"
                     tone="teal"
                 />
-                <p class="mt-3 text-xs text-slate-600">
+                <p class="mt-3 text-xs text-muted-foreground">
                     {{
                         t('employer.billing.usage.additionallyPurchased', {
                             count: entitlements.visa_credits?.purchased ?? 0,
@@ -344,7 +382,7 @@ const changePlan = (plan: Plan) => {
                     :class="
                         currentPlan?.id === plan.id
                             ? 'border-[var(--erin-primary)] bg-blue-50/50 ring-1 ring-[var(--erin-primary)]'
-                            : 'border-slate-200'
+                            : 'border-border'
                     "
                 >
                     <div class="flex items-center justify-between">
@@ -358,17 +396,19 @@ const changePlan = (plan: Plan) => {
                     <p class="mt-3 text-2xl font-extrabold">
                         {{ money(plan.price_cents, plan.currency) }}
                     </p>
-                    <p class="mt-1 text-xs text-slate-600">
+                    <p class="mt-1 text-xs text-muted-foreground">
                         {{
                             t('employer.billing.months', {
                                 count: plan.term_months ?? 0,
                             })
                         }}
                     </p>
-                    <p class="mt-3 min-h-10 text-xs leading-5 text-slate-500">
+                    <p
+                        class="mt-3 min-h-10 text-xs leading-5 text-muted-foreground"
+                    >
                         {{ plan.description }}
                     </p>
-                    <ul class="mt-4 space-y-2 text-xs text-slate-600">
+                    <ul class="mt-4 space-y-2 text-xs text-muted-foreground">
                         <li class="flex gap-2">
                             <Check class="size-3.5 text-teal-500" />
                             {{
@@ -398,13 +438,26 @@ const changePlan = (plan: Plan) => {
                             }}
                         </li>
                     </ul>
+                    <a
+                        v-if="
+                            canManageBilling &&
+                            plan.is_enterprise &&
+                            currentPlan?.id !== plan.id
+                        "
+                        href="/contact"
+                        class="mt-5 inline-flex h-10 w-full items-center justify-center rounded-xl bg-[var(--erin-primary)] text-xs font-bold text-[var(--erin-primary-foreground)]"
+                    >
+                        {{ t('employer.billing.contactUs') }}
+                    </a>
                     <button
-                        v-if="canManageBilling && currentPlan?.id !== plan.id"
+                        v-else-if="
+                            canManageBilling && currentPlan?.id !== plan.id
+                        "
                         type="button"
                         :disabled="
                             plan.is_enterprise || !plan.checkout_available
                         "
-                        class="mt-5 h-10 w-full rounded-xl bg-[var(--erin-primary)] text-xs font-bold text-white disabled:bg-slate-200 disabled:text-slate-600"
+                        class="mt-5 h-10 w-full rounded-xl bg-[var(--erin-primary)] text-xs font-bold text-[var(--erin-primary-foreground)] disabled:bg-border disabled:text-muted-foreground"
                         @click="changePlan(plan)"
                     >
                         {{
@@ -417,8 +470,151 @@ const changePlan = (plan: Plan) => {
                     </button>
                 </article>
             </div>
-            <p v-else class="py-8 text-center text-sm text-slate-600">
+            <p v-else class="py-8 text-center text-sm text-muted-foreground">
                 {{ t('employer.billing.noPlans') }}
+            </p>
+        </SectionCard>
+
+        <SectionCard
+            :title="t('employer.billing.invoicesTitle')"
+            :description="t('employer.billing.invoicesDescription')"
+            data-test="billing-invoices"
+        >
+            <div v-if="invoices.length" class="divide-y divide-border">
+                <article
+                    v-for="invoice in invoices"
+                    :key="invoice.id"
+                    class="grid gap-4 py-4 first:pt-0 last:pb-0 lg:grid-cols-[1fr_auto]"
+                >
+                    <div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <p class="text-sm font-extrabold text-foreground">
+                                {{
+                                    invoice.number ??
+                                    t('employer.billing.invoiceFallback', {
+                                        id: invoice.id,
+                                    })
+                                }}
+                            </p>
+                            <StatusBadge
+                                :label="invoiceStatusLabel(invoice.status)"
+                                :tone="invoiceTone(invoice.status)"
+                            />
+                        </div>
+                        <p class="mt-1 text-xs text-muted-foreground">
+                            {{
+                                invoice.issued_at
+                                    ? formatDate(invoice.issued_at, {
+                                          dateStyle: 'long',
+                                      })
+                                    : '—'
+                            }}
+                        </p>
+                        <div class="mt-3 flex flex-wrap gap-2 text-xs">
+                            <span
+                                v-for="code in invoice.promotion_codes ?? []"
+                                :key="code"
+                                class="rounded-full bg-violet-50 px-2.5 py-1 font-bold text-violet-700"
+                            >
+                                {{
+                                    t('employer.billing.promotionCode', {
+                                        code,
+                                    })
+                                }}
+                            </span>
+                            <span
+                                v-for="taxId in invoice.customer_tax_ids ?? []"
+                                :key="`${taxId.type}:${taxId.value}`"
+                                class="rounded-full bg-muted px-2.5 py-1 font-semibold text-muted-foreground"
+                            >
+                                {{ taxId.type.toUpperCase() }} ·
+                                {{ taxId.value }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="min-w-64">
+                        <dl class="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
+                            <dt class="text-muted-foreground">
+                                {{ t('employer.billing.invoiceSubtotal') }}
+                            </dt>
+                            <dd class="text-right font-semibold">
+                                {{
+                                    invoiceMoney(
+                                        invoice.subtotal_cents,
+                                        invoice.currency,
+                                    )
+                                }}
+                            </dd>
+                            <dt
+                                v-if="invoice.discount_cents"
+                                class="text-muted-foreground"
+                            >
+                                {{ t('employer.billing.invoiceDiscount') }}
+                            </dt>
+                            <dd
+                                v-if="invoice.discount_cents"
+                                class="text-right font-semibold text-emerald-700"
+                            >
+                                −{{
+                                    invoiceMoney(
+                                        invoice.discount_cents,
+                                        invoice.currency,
+                                    )
+                                }}
+                            </dd>
+                            <dt class="text-muted-foreground">
+                                {{ t('employer.billing.invoiceTax') }}
+                            </dt>
+                            <dd class="text-right font-semibold">
+                                {{
+                                    invoiceMoney(
+                                        invoice.tax_cents,
+                                        invoice.currency,
+                                    )
+                                }}
+                            </dd>
+                            <dt class="font-bold text-foreground">
+                                {{ t('employer.billing.invoiceTotal') }}
+                            </dt>
+                            <dd
+                                class="text-right font-extrabold text-foreground"
+                            >
+                                {{
+                                    invoiceMoney(
+                                        invoice.total_cents,
+                                        invoice.currency,
+                                    )
+                                }}
+                            </dd>
+                        </dl>
+                        <div
+                            class="mt-3 flex justify-end gap-3 text-xs font-bold"
+                        >
+                            <a
+                                v-if="invoice.hosted_invoice_url"
+                                :href="invoice.hosted_invoice_url"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="text-[var(--erin-primary-text)]"
+                                >{{ t('employer.billing.openInvoice') }}</a
+                            >
+                            <a
+                                v-if="invoice.invoice_pdf_url"
+                                :href="invoice.invoice_pdf_url"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="text-[var(--erin-primary-text)]"
+                                >{{ t('employer.billing.downloadInvoice') }}</a
+                            >
+                        </div>
+                    </div>
+                </article>
+            </div>
+            <p v-else class="py-6 text-center text-sm text-muted-foreground">
+                {{ t('employer.billing.noInvoices') }}
+            </p>
+            <p class="mt-4 rounded-xl bg-blue-50 p-3 text-xs text-blue-800">
+                {{ t('employer.billing.taxAndPromotionHint') }}
             </p>
         </SectionCard>
 
@@ -434,107 +630,107 @@ const changePlan = (plan: Plan) => {
                     "
                 >
                     <label class="sm:col-span-2"
-                        ><span class="text-xs font-bold text-slate-600">{{
-                            t('employer.billing.fields.legalName')
-                        }}</span
+                        ><span
+                            class="text-xs font-bold text-muted-foreground"
+                            >{{ t('employer.billing.fields.legalName') }}</span
                         ><input
                             v-model="billingForm.legal_name"
                             required
-                            class="mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                            class="mt-1.5 h-10 w-full rounded-xl border border-border px-3 text-sm"
                     /></label>
                     <label
-                        ><span class="text-xs font-bold text-slate-600">{{
-                            t('employer.billing.fields.email')
-                        }}</span
+                        ><span
+                            class="text-xs font-bold text-muted-foreground"
+                            >{{ t('employer.billing.fields.email') }}</span
                         ><input
                             v-model="billingForm.email"
                             required
                             type="email"
-                            class="mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                            class="mt-1.5 h-10 w-full rounded-xl border border-border px-3 text-sm"
                     /></label>
                     <label
-                        ><span class="text-xs font-bold text-slate-600">{{
-                            t('employer.billing.fields.vatId')
-                        }}</span
+                        ><span
+                            class="text-xs font-bold text-muted-foreground"
+                            >{{ t('employer.billing.fields.vatId') }}</span
                         ><input
                             v-model="billingForm.vat_id"
-                            class="mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                            class="mt-1.5 h-10 w-full rounded-xl border border-border px-3 text-sm"
                     /></label>
                     <label
-                        ><span class="text-xs font-bold text-slate-600">{{
-                            t('employer.billing.fields.street')
-                        }}</span
+                        ><span
+                            class="text-xs font-bold text-muted-foreground"
+                            >{{ t('employer.billing.fields.street') }}</span
                         ><input
                             v-model="billingForm.address_line1"
                             required
-                            class="mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                            class="mt-1.5 h-10 w-full rounded-xl border border-border px-3 text-sm"
                     /></label>
                     <label
-                        ><span class="text-xs font-bold text-slate-600">{{
-                            t('employer.billing.fields.postalCode')
-                        }}</span
+                        ><span
+                            class="text-xs font-bold text-muted-foreground"
+                            >{{ t('employer.billing.fields.postalCode') }}</span
                         ><input
                             v-model="billingForm.postal_code"
                             required
-                            class="mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                            class="mt-1.5 h-10 w-full rounded-xl border border-border px-3 text-sm"
                     /></label>
                     <label
-                        ><span class="text-xs font-bold text-slate-600">{{
-                            t('employer.billing.fields.city')
-                        }}</span
+                        ><span
+                            class="text-xs font-bold text-muted-foreground"
+                            >{{ t('employer.billing.fields.city') }}</span
                         ><input
                             v-model="billingForm.city"
                             required
-                            class="mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                            class="mt-1.5 h-10 w-full rounded-xl border border-border px-3 text-sm"
                     /></label>
                     <label
-                        ><span class="text-xs font-bold text-slate-600">{{
-                            t('employer.billing.fields.country')
-                        }}</span
+                        ><span
+                            class="text-xs font-bold text-muted-foreground"
+                            >{{ t('employer.billing.fields.country') }}</span
                         ><input
                             v-model="billingForm.country_code"
                             required
                             maxlength="2"
-                            class="mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm uppercase"
+                            class="mt-1.5 h-10 w-full rounded-xl border border-border px-3 text-sm uppercase"
                     /></label>
                     <button
                         type="submit"
                         :disabled="billingForm.processing"
-                        class="h-10 rounded-xl bg-[var(--erin-primary)] text-xs font-bold text-white disabled:opacity-50 sm:col-span-2"
+                        class="h-10 rounded-xl bg-[var(--erin-primary)] text-xs font-bold text-[var(--erin-primary-foreground)] disabled:opacity-50 sm:col-span-2"
                     >
                         {{ t('employer.billing.saveBillingDetails') }}
                     </button>
                 </form>
                 <dl v-else class="grid gap-3 text-sm sm:grid-cols-2">
-                    <div class="rounded-xl bg-slate-50 p-3">
-                        <dt class="text-xs font-bold text-slate-500">
+                    <div class="rounded-xl bg-muted p-3">
+                        <dt class="text-xs font-bold text-muted-foreground">
                             {{ t('employer.billing.fields.legalName') }}
                         </dt>
-                        <dd class="mt-1 font-semibold text-slate-800">
+                        <dd class="mt-1 font-semibold text-foreground">
                             {{ billingForm.legal_name || '—' }}
                         </dd>
                     </div>
-                    <div class="rounded-xl bg-slate-50 p-3">
-                        <dt class="text-xs font-bold text-slate-500">
+                    <div class="rounded-xl bg-muted p-3">
+                        <dt class="text-xs font-bold text-muted-foreground">
                             {{ t('employer.billing.fields.email') }}
                         </dt>
-                        <dd class="mt-1 font-semibold text-slate-800">
+                        <dd class="mt-1 font-semibold text-foreground">
                             {{ billingForm.email || '—' }}
                         </dd>
                     </div>
-                    <div class="rounded-xl bg-slate-50 p-3">
-                        <dt class="text-xs font-bold text-slate-500">
+                    <div class="rounded-xl bg-muted p-3">
+                        <dt class="text-xs font-bold text-muted-foreground">
                             {{ t('employer.billing.fields.vatId') }}
                         </dt>
-                        <dd class="mt-1 font-semibold text-slate-800">
+                        <dd class="mt-1 font-semibold text-foreground">
                             {{ billingForm.vat_id || '—' }}
                         </dd>
                     </div>
-                    <div class="rounded-xl bg-slate-50 p-3">
-                        <dt class="text-xs font-bold text-slate-500">
+                    <div class="rounded-xl bg-muted p-3">
+                        <dt class="text-xs font-bold text-muted-foreground">
                             {{ t('employer.billing.fields.city') }}
                         </dt>
-                        <dd class="mt-1 font-semibold text-slate-800">
+                        <dd class="mt-1 font-semibold text-foreground">
                             {{ billingForm.city || '—' }}
                         </dd>
                     </div>
@@ -559,11 +755,11 @@ const changePlan = (plan: Plan) => {
                             min="1"
                             max="100"
                             type="number"
-                            class="h-10 w-20 rounded-xl border border-slate-200 px-3 text-sm"
+                            class="h-10 w-20 rounded-xl border border-border px-3 text-sm"
                         />
                         <button
                             type="submit"
-                            class="h-10 flex-1 rounded-xl border border-slate-200 text-xs font-bold"
+                            class="h-10 flex-1 rounded-xl border border-border text-xs font-bold"
                         >
                             {{ t('employer.billing.addRecruiterSeats') }}
                         </button>
@@ -571,7 +767,7 @@ const changePlan = (plan: Plan) => {
                     <button
                         v-if="add_ons.visa_enabled"
                         type="button"
-                        class="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 text-xs font-bold"
+                        class="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-border text-xs font-bold"
                         @click="router.post(visaCredits.url(), { credits: 1 })"
                     >
                         <Plus class="size-4" />
@@ -579,7 +775,7 @@ const changePlan = (plan: Plan) => {
                     </button>
                     <p
                         v-if="!add_ons.seat_enabled && !add_ons.visa_enabled"
-                        class="text-sm text-slate-600"
+                        class="text-sm text-muted-foreground"
                     >
                         {{ t('employer.billing.addOnsUnavailable') }}
                     </p>
@@ -588,7 +784,7 @@ const changePlan = (plan: Plan) => {
                     v-if="subscription && canManageBilling"
                     :title="t('employer.billing.subscriptionTitle')"
                 >
-                    <p class="text-xs leading-5 text-slate-500">
+                    <p class="text-xs leading-5 text-muted-foreground">
                         {{ t('employer.billing.cancellationDescription') }}
                     </p>
                     <button

@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    private bool $preserveBillingHistoryColumns = false;
+
     public function up(): void
     {
         $this->assertUniqueConfiguredPlanPrices();
@@ -19,6 +21,9 @@ return new class extends Migration
 
     public function down(): void
     {
+        $this->preserveBillingHistoryColumns = $this->preserveBillingHistoryColumns
+            || (Schema::hasTable('plan_stripe_prices')
+                && Schema::hasColumns('plan_stripe_prices', ['tax_behavior', 'tax_code', 'plan_snapshot']));
         $this->dropVerifiedTable('billing_change_intents');
         $this->dropVerifiedTable('stripe_addon_prices');
         $this->dropVerifiedTable('plan_stripe_prices');
@@ -39,6 +44,11 @@ return new class extends Migration
                     $table->unsignedInteger('price_cents');
                     $table->char('currency', 3);
                     $table->unsignedSmallInteger('term_months');
+                    if ($this->preserveBillingHistoryColumns) {
+                        $table->string('tax_behavior', 24)->default('unspecified');
+                        $table->string('tax_code', 80)->nullable();
+                        $table->json('plan_snapshot')->nullable();
+                    }
                     $table->char('version_hash', 64);
                     $table->string('source', 40);
                     $table->boolean('is_current')->default(true)->index();
@@ -510,8 +520,8 @@ return new class extends Migration
      */
     private function expectedColumns(string $tableName): array
     {
-        return match ($tableName) {
-            'plan_stripe_prices' => [
+        if ($tableName === 'plan_stripe_prices') {
+            $columns = [
                 'id' => ['bigint unsigned', false, null, true, null],
                 'plan_id' => ['bigint unsigned', false, null, false, null],
                 'stripe_product_id' => ['varchar(255)', false, null, false, null],
@@ -519,6 +529,15 @@ return new class extends Migration
                 'price_cents' => ['int unsigned', false, null, false, null],
                 'currency' => ['char(3)', false, null, false, null],
                 'term_months' => ['smallint unsigned', false, null, false, null],
+            ];
+            if (Schema::hasColumns($tableName, ['tax_behavior', 'tax_code', 'plan_snapshot'])) {
+                $columns['tax_behavior'] = ['varchar(24)', false, 'unspecified', false, null];
+                $columns['tax_code'] = ['varchar(80)', true, null, false, null];
+                $columns['plan_snapshot'] = ['json', true, null, false, null];
+            }
+
+            return [
+                ...$columns,
                 'version_hash' => ['char(64)', false, null, false, null],
                 'source' => ['varchar(40)', false, null, false, null],
                 'is_current' => ['tinyint(1)', false, '1', false, null],
@@ -526,7 +545,10 @@ return new class extends Migration
                 'retired_at' => ['timestamp', true, null, false, null],
                 'created_at' => ['timestamp', true, null, false, null],
                 'updated_at' => ['timestamp', true, null, false, null],
-            ],
+            ];
+        }
+
+        return match ($tableName) {
             'stripe_addon_prices' => [
                 'id' => ['bigint unsigned', false, null, true, null],
                 'code' => ['varchar(80)', false, null, false, null],

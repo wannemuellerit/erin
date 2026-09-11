@@ -25,6 +25,7 @@ import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
 import { Button } from '@/components/ui/button';
 import { useCapabilities } from '@/composables/useCapabilities';
+import { newUuid } from '@/lib/uuid';
 import { index as candidatesIndex } from '@/routes/employer/candidates';
 
 type Candidate = {
@@ -106,6 +107,7 @@ type Filters = {
 const props = withDefaults(
     defineProps<{
         candidates?: CandidatePage;
+        published_count?: number;
         jobs?: JobOption[];
         occupations?: OccupationOption[];
         skills?: NamedOption[];
@@ -125,6 +127,7 @@ const props = withDefaults(
             links: [],
         }),
         jobs: () => [],
+        published_count: 0,
         occupations: () => [],
         skills: () => [],
         languages: () => [],
@@ -155,9 +158,11 @@ const activeTab = ref(
           : 'all',
 );
 const selectedIds = ref<number[]>([]);
+const allResultsSelected = ref(false);
 const bulkJobId = ref<number | null>(null);
 const bulkMessage = ref('');
 const bulkProcessing = ref(false);
+const bulkIdempotencyKey = ref(newUuid());
 
 const visibleCandidateIds = computed(() =>
     props.candidates.data.map((candidate) => Number(candidate.id)),
@@ -166,7 +171,7 @@ const activeFilterCount = computed(
     () =>
         Object.entries(props.filters).filter(
             ([key, value]) =>
-                !['view', 'sort', 'per_page', 'job'].includes(key) &&
+                !['view', 'sort', 'per_page', 'job', 'page'].includes(key) &&
                 value !== undefined &&
                 value !== null &&
                 value !== '' &&
@@ -193,7 +198,7 @@ const visit = (
               : undefined;
     router.get(
         candidatesIndex.url(),
-        { ...props.filters, ...changes, view },
+        { ...props.filters, page: 1, ...changes, view },
         {
             preserveScroll: true,
             preserveState: true,
@@ -278,18 +283,33 @@ const setCandidateSelected = (
     selectedIds.value = selected
         ? [...new Set([...selectedIds.value, id])].slice(0, 100)
         : selectedIds.value.filter((selectedId) => selectedId !== id);
+    allResultsSelected.value = false;
 };
 const toggleAllVisible = () => {
     selectedIds.value = allVisibleSelected.value
         ? []
         : visibleCandidateIds.value.slice(0, 100);
+    allResultsSelected.value = false;
 };
 const runBulkAction = (action: 'invite' | 'message') => {
     bulkProcessing.value = true;
     router.post(
         `/employer/candidates/bulk/${action}`,
         {
-            candidate_ids: selectedIds.value,
+            idempotency_key: bulkIdempotencyKey.value,
+            selection_mode: allResultsSelected.value ? 'all_results' : 'ids',
+            candidate_ids: allResultsSelected.value
+                ? undefined
+                : selectedIds.value,
+            filter_snapshot: allResultsSelected.value
+                ? {
+                      search: props.filters.search,
+                      country: props.filters.country,
+                      occupation: props.filters.occupation,
+                      experience: props.filters.experience,
+                      visa: props.filters.visa,
+                  }
+                : undefined,
             ...(action === 'invite'
                 ? {
                       job_posting_id: bulkJobId.value,
@@ -301,7 +321,9 @@ const runBulkAction = (action: 'invite' | 'message') => {
             preserveScroll: true,
             onSuccess: () => {
                 selectedIds.value = [];
+                allResultsSelected.value = false;
                 bulkMessage.value = '';
+                bulkIdempotencyKey.value = newUuid();
             },
             onFinish: () => {
                 bulkProcessing.value = false;
@@ -333,14 +355,18 @@ const tabs = computed(() => [
         >
             <template #actions
                 ><StatusBadge
-                    :label="t('employer.candidates.publishedProfiles')"
+                    :label="
+                        t('employer.candidates.publishedProfiles', {
+                            count: published_count,
+                        })
+                    "
                     tone="teal"
             /></template>
         </PageHeader>
 
         <FilterToolbar>
             <template #tabs>
-                <div class="flex rounded-xl bg-slate-100 p-1">
+                <div class="flex rounded-xl bg-muted p-1">
                     <button
                         v-for="tab in tabs"
                         :key="tab.key"
@@ -348,8 +374,8 @@ const tabs = computed(() => [
                         class="flex-1 rounded-lg px-4 py-2 text-xs font-bold whitespace-nowrap transition xl:flex-none"
                         :class="
                             activeTab === tab.key
-                                ? 'bg-white text-blue-700 shadow-sm'
-                                : 'text-slate-500 hover:text-slate-800'
+                                ? 'bg-card text-[var(--erin-primary-text-hover)] shadow-sm'
+                                : 'text-muted-foreground hover:text-foreground'
                         "
                         @click="
                             selectTab(
@@ -373,13 +399,13 @@ const tabs = computed(() => [
             <template #actions>
                 <button
                     type="button"
-                    class="erin-focus inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                    class="erin-focus inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-border px-4 text-sm font-bold text-muted-foreground hover:bg-muted"
                     @click="filterPanelOpen = !filterPanelOpen"
                 >
                     <SlidersHorizontal class="size-4" />
                     {{ t('employer.candidates.filters') }}
                     <span
-                        class="rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] text-blue-700"
+                        class="rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] text-[var(--erin-primary-text-hover)]"
                         >{{ activeFilterCount }}</span
                     >
                 </button>
@@ -404,7 +430,7 @@ const tabs = computed(() => [
                 <button
                     v-if="Object.values(filters).some(Boolean)"
                     type="button"
-                    class="px-2 text-xs font-semibold text-slate-400 hover:text-red-600"
+                    class="px-2 text-xs font-semibold text-muted-foreground hover:text-red-600"
                     @click="clearFilters"
                 >
                     {{ t('employer.candidates.clearAll') }}
@@ -421,11 +447,13 @@ const tabs = computed(() => [
                 class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
                 @submit.prevent="applyFilters"
             >
-                <label class="space-y-1 text-xs font-bold text-slate-600">
+                <label
+                    class="space-y-1 text-xs font-bold text-muted-foreground"
+                >
                     <span>{{ t('employer.candidates.filterPanel.job') }}</span>
                     <select
                         v-model="filterForm.job"
-                        class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                        class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                     >
                         <option value="">
                             {{ t('employer.candidates.filterPanel.all') }}
@@ -439,13 +467,15 @@ const tabs = computed(() => [
                         </option>
                     </select>
                 </label>
-                <label class="space-y-1 text-xs font-bold text-slate-600">
+                <label
+                    class="space-y-1 text-xs font-bold text-muted-foreground"
+                >
                     <span>{{
                         t('employer.candidates.filterPanel.country')
                     }}</span>
                     <select
                         v-model="filterForm.country"
-                        class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                        class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                     >
                         <option value="">
                             {{ t('employer.candidates.filterPanel.all') }}
@@ -459,13 +489,15 @@ const tabs = computed(() => [
                         </option>
                     </select>
                 </label>
-                <label class="space-y-1 text-xs font-bold text-slate-600">
+                <label
+                    class="space-y-1 text-xs font-bold text-muted-foreground"
+                >
                     <span>{{
                         t('employer.candidates.filterPanel.occupation')
                     }}</span>
                     <select
                         v-model="filterForm.occupation"
-                        class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                        class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                     >
                         <option value="">
                             {{ t('employer.candidates.filterPanel.all') }}
@@ -479,13 +511,15 @@ const tabs = computed(() => [
                         </option>
                     </select>
                 </label>
-                <label class="space-y-1 text-xs font-bold text-slate-600">
+                <label
+                    class="space-y-1 text-xs font-bold text-muted-foreground"
+                >
                     <span>{{
                         t('employer.candidates.filterPanel.skill')
                     }}</span>
                     <select
                         v-model="filterForm.skill"
-                        class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                        class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                     >
                         <option value="">
                             {{ t('employer.candidates.filterPanel.all') }}
@@ -499,13 +533,15 @@ const tabs = computed(() => [
                         </option>
                     </select>
                 </label>
-                <label class="space-y-1 text-xs font-bold text-slate-600">
+                <label
+                    class="space-y-1 text-xs font-bold text-muted-foreground"
+                >
                     <span>{{
                         t('employer.candidates.filterPanel.language')
                     }}</span>
                     <select
                         v-model="filterForm.language"
-                        class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                        class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                     >
                         <option value="">
                             {{ t('employer.candidates.filterPanel.all') }}
@@ -519,13 +555,15 @@ const tabs = computed(() => [
                         </option>
                     </select>
                 </label>
-                <label class="space-y-1 text-xs font-bold text-slate-600">
+                <label
+                    class="space-y-1 text-xs font-bold text-muted-foreground"
+                >
                     <span>{{
                         t('employer.candidates.filterPanel.languageLevel')
                     }}</span>
                     <select
                         v-model="filterForm.language_level"
-                        class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                        class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                     >
                         <option value="">
                             {{ t('employer.candidates.filterPanel.all') }}
@@ -546,7 +584,9 @@ const tabs = computed(() => [
                         </option>
                     </select>
                 </label>
-                <label class="space-y-1 text-xs font-bold text-slate-600">
+                <label
+                    class="space-y-1 text-xs font-bold text-muted-foreground"
+                >
                     <span>{{
                         t('employer.candidates.filterPanel.experience')
                     }}</span>
@@ -555,16 +595,18 @@ const tabs = computed(() => [
                         type="number"
                         min="0"
                         max="60"
-                        class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                        class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                     />
                 </label>
-                <label class="space-y-1 text-xs font-bold text-slate-600">
+                <label
+                    class="space-y-1 text-xs font-bold text-muted-foreground"
+                >
                     <span>{{
                         t('employer.candidates.filterPanel.employmentType')
                     }}</span>
                     <select
                         v-model="filterForm.employment_type"
-                        class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                        class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                     >
                         <option value="">
                             {{ t('employer.candidates.filterPanel.all') }}
@@ -583,7 +625,9 @@ const tabs = computed(() => [
                         </option>
                     </select>
                 </label>
-                <label class="space-y-1 text-xs font-bold text-slate-600">
+                <label
+                    class="space-y-1 text-xs font-bold text-muted-foreground"
+                >
                     <span>{{
                         t('employer.candidates.filterPanel.weeklyHours')
                     }}</span>
@@ -592,20 +636,24 @@ const tabs = computed(() => [
                         type="number"
                         min="1"
                         max="80"
-                        class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                        class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                     />
                 </label>
-                <label class="space-y-1 text-xs font-bold text-slate-600">
+                <label
+                    class="space-y-1 text-xs font-bold text-muted-foreground"
+                >
                     <span>{{
                         t('employer.candidates.filterPanel.drivingLicense')
                     }}</span>
                     <input
                         v-model="filterForm.driving_license"
                         maxlength="10"
-                        class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                        class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                     />
                 </label>
-                <label class="space-y-1 text-xs font-bold text-slate-600">
+                <label
+                    class="space-y-1 text-xs font-bold text-muted-foreground"
+                >
                     <span>{{
                         t('employer.candidates.filterPanel.salaryMax')
                     }}</span>
@@ -614,24 +662,28 @@ const tabs = computed(() => [
                         type="number"
                         min="0"
                         step="10000"
-                        class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                        class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                     />
                 </label>
-                <label class="space-y-1 text-xs font-bold text-slate-600">
+                <label
+                    class="space-y-1 text-xs font-bold text-muted-foreground"
+                >
                     <span>{{
                         t('employer.candidates.filterPanel.availableBefore')
                     }}</span>
                     <input
                         v-model="filterForm.available_before"
                         type="date"
-                        class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                        class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                     />
                 </label>
-                <label class="space-y-1 text-xs font-bold text-slate-600">
+                <label
+                    class="space-y-1 text-xs font-bold text-muted-foreground"
+                >
                     <span>{{ t('employer.candidates.filterPanel.visa') }}</span>
                     <select
                         v-model="filterForm.visa"
-                        class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                        class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                     >
                         <option value="">
                             {{ t('employer.candidates.filterPanel.all') }}
@@ -699,16 +751,16 @@ const tabs = computed(() => [
 
             <div
                 v-if="canManageCandidates"
-                class="mt-6 grid gap-4 border-t border-slate-100 pt-5 lg:grid-cols-2"
+                class="mt-6 grid gap-4 border-t border-border pt-5 lg:grid-cols-2"
             >
                 <div>
-                    <p class="text-sm font-extrabold text-slate-800">
+                    <p class="text-sm font-extrabold text-foreground">
                         {{ t('employer.candidates.savedSearches') }}
                     </p>
                     <div class="mt-2 flex gap-2">
                         <input
                             v-model="savedSearchName"
-                            class="erin-focus h-10 min-w-0 flex-1 rounded-xl border border-slate-200 px-3 text-sm"
+                            class="erin-focus h-10 min-w-0 flex-1 rounded-xl border border-border px-3 text-sm"
                             :placeholder="
                                 t('employer.candidates.savedSearchName')
                             "
@@ -722,7 +774,7 @@ const tabs = computed(() => [
                         <div
                             v-for="saved in saved_searches"
                             :key="saved.id"
-                            class="inline-flex overflow-hidden rounded-lg bg-blue-50 text-xs font-bold text-blue-700"
+                            class="inline-flex overflow-hidden rounded-lg bg-blue-50 text-xs font-bold text-[var(--erin-primary-text-hover)]"
                         >
                             <button
                                 type="button"
@@ -747,13 +799,13 @@ const tabs = computed(() => [
                     </div>
                 </div>
                 <div>
-                    <p class="text-sm font-extrabold text-slate-800">
+                    <p class="text-sm font-extrabold text-foreground">
                         {{ t('employer.candidates.talentLists') }}
                     </p>
                     <div class="mt-2 flex gap-2">
                         <input
                             v-model="newListName"
-                            class="erin-focus h-10 min-w-0 flex-1 rounded-xl border border-slate-200 px-3 text-sm"
+                            class="erin-focus h-10 min-w-0 flex-1 rounded-xl border border-border px-3 text-sm"
                             :placeholder="
                                 t('employer.candidates.talentListName')
                             "
@@ -770,9 +822,9 @@ const tabs = computed(() => [
                         >
                             <input
                                 v-model="talentListNames[list.id]"
-                                class="erin-focus h-9 min-w-0 flex-1 rounded-lg border border-slate-200 px-3 text-xs font-semibold"
+                                class="erin-focus h-9 min-w-0 flex-1 rounded-lg border border-border px-3 text-xs font-semibold"
                             />
-                            <span class="text-xs text-slate-500">
+                            <span class="text-xs text-muted-foreground">
                                 {{ list.members_count ?? 0 }}
                             </span>
                             <Button
@@ -804,13 +856,13 @@ const tabs = computed(() => [
         </SectionCard>
 
         <div class="flex items-center justify-between">
-            <p class="text-sm text-slate-500">
-                <strong class="text-slate-900">{{ candidates.total }}</strong>
+            <p class="text-sm text-muted-foreground">
+                <strong class="text-foreground">{{ candidates.total }}</strong>
                 {{ t('employer.candidates.results') }}
             </p>
             <select
                 :value="filters.sort || 'published_desc'"
-                class="erin-focus h-9 rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-600"
+                class="erin-focus h-9 rounded-xl border border-border px-3 text-xs font-semibold text-muted-foreground"
                 @change="
                     visit({
                         sort: ($event.target as HTMLSelectElement).value,
@@ -836,25 +888,54 @@ const tabs = computed(() => [
             class="flex items-center gap-2"
         >
             <label
-                class="inline-flex cursor-pointer items-center gap-2 text-xs font-bold text-slate-600"
+                class="inline-flex cursor-pointer items-center gap-2 text-xs font-bold text-muted-foreground"
             >
                 <input
                     type="checkbox"
-                    class="erin-focus size-4 rounded border-slate-300 text-blue-600"
+                    class="erin-focus size-4 rounded border-border text-[var(--erin-primary-text)]"
                     :checked="allVisibleSelected"
                     @change="toggleAllVisible"
                 />
                 {{ t('employer.candidates.selectAll') }}
             </label>
+            <button
+                v-if="
+                    allVisibleSelected &&
+                    candidates.total > visibleCandidateIds.length
+                "
+                type="button"
+                data-test="select-all-candidate-results"
+                class="erin-focus text-xs font-bold text-[var(--erin-primary-text-hover)] underline"
+                @click="allResultsSelected = true"
+            >
+                {{
+                    t('employer.candidates.selectAllResults', {
+                        count: candidates.total,
+                    })
+                }}
+            </button>
+            <span
+                v-if="allResultsSelected"
+                class="text-xs font-bold text-emerald-700"
+            >
+                {{
+                    t('employer.candidates.allResultsSelected', {
+                        count: candidates.total,
+                    })
+                }}
+            </span>
         </div>
         <BulkActionBar
             v-if="canManageCandidates"
-            :count="selectedIds.length"
-            @clear="selectedIds = []"
+            :count="allResultsSelected ? candidates.total : selectedIds.length"
+            @clear="
+                selectedIds = [];
+                allResultsSelected = false;
+            "
         >
             <select
                 v-model="bulkJobId"
-                class="erin-focus h-9 min-w-44 rounded-xl border border-blue-200 bg-white px-3 text-xs font-bold text-slate-700"
+                class="erin-focus h-9 min-w-44 rounded-xl border border-blue-200 bg-card px-3 text-xs font-bold text-muted-foreground"
                 :aria-label="t('employer.candidates.chooseJob')"
             >
                 <option :value="null">
@@ -872,12 +953,12 @@ const tabs = computed(() => [
                 v-model="bulkMessage"
                 type="text"
                 maxlength="3000"
-                class="erin-focus h-9 min-w-52 rounded-xl border border-blue-200 bg-white px-3 text-xs"
+                class="erin-focus h-9 min-w-52 rounded-xl border border-blue-200 bg-card px-3 text-xs"
                 :placeholder="t('employer.candidates.bulkMessagePlaceholder')"
             />
             <button
                 type="button"
-                class="erin-focus inline-flex h-9 items-center gap-1.5 rounded-xl border border-blue-200 bg-white px-3 text-xs font-bold text-blue-700 disabled:opacity-50"
+                class="erin-focus inline-flex h-9 items-center gap-1.5 rounded-xl border border-blue-200 bg-card px-3 text-xs font-bold text-[var(--erin-primary-text-hover)] disabled:opacity-50"
                 :disabled="bulkProcessing || !bulkMessage"
                 @click="runBulkAction('message')"
             >
@@ -929,7 +1010,7 @@ const tabs = computed(() => [
             >
                 <ChevronLeft class="size-4" />
             </Button>
-            <span class="px-3 text-xs font-bold text-slate-600">
+            <span class="px-3 text-xs font-bold text-muted-foreground">
                 {{
                     t('employer.candidates.pageOf', {
                         current: candidates.current_page,

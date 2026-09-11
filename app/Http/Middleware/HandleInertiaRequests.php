@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Models\AdCampaign;
 use App\Services\Authorization\CapabilityResolver;
+use App\Services\Platform\FeatureFlagResolver;
 use App\Services\Platform\PlatformSettings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -84,9 +85,11 @@ class HandleInertiaRequests extends Middleware
             'platform' => fn (): array => [
                 'demo_mode' => (bool) config('app.demo_mode'),
                 'locale' => app()->getLocale(),
-                'supported_locales' => ['de', 'en'],
+                'supported_locales' => config('app.supported_locales', ['de', 'en']),
                 'dashboard_ad' => $user ? $this->dashboardAd($settings, $user->role->value, $user->locale) : null,
             ],
+            'features' => fn (): array => app(FeatureFlagResolver::class)
+                ->decisionsForRequest($request),
             'impersonation' => fn (): ?array => $request->session()->has('impersonation_session_id') ? [
                 'active' => true,
                 'read_only' => true,
@@ -132,7 +135,7 @@ class HandleInertiaRequests extends Middleware
             return null;
         }
 
-        $language = $locale === 'en' ? 'en' : 'de';
+        $language = $locale === 'de' ? 'de' : 'en';
         $campaign = isset($ad['campaign_id'])
             ? AdCampaign::query()->whereKey($ad['campaign_id'])->first()
             : null;

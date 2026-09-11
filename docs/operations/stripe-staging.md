@@ -73,6 +73,49 @@ HTTPS-URL oder Webhook-Secret bleibt sie absichtlich rot.
 | Ausfälle | sicherer Retry mit identischem Ereignis | Timeout, HTTP 429, HTTP 5xx, keine Secrets in Antwort/Receipt |
 | Missbrauchsschutz | normale Billing-Aktion | zu viele Versuche ergeben lokal HTTP 429 |
 
+## Vollständiger Stripe-Test-Clock-Acceptance-Run
+
+Dieser Run wird in einem isolierten Stripe-Sandbox-Workspace ausgeführt. Stripe
+bezeichnet Test Clocks im Dashboard inzwischen auch als „Simulations“; sie
+verschieben die Zeit kontrolliert und lösen dabei echte Billing-Webhooks aus
+([Stripe-Dokumentation](https://docs.stripe.com/billing/testing/test-clocks)).
+
+1. `erin:stripe:staging-check --remote --no-interaction` muss grün sein. In
+   Workbench müssen mindestens Subscription-, Subscription-Schedule-, Invoice-,
+   Checkout- und `charge.refunded`-Events an `/billing/webhook` aktiviert sein.
+2. Eine neue Erin-Testfirma mit vollständiger Rechnungsadresse und gültiger
+   Test-USt-ID anlegen, Basic buchen und im Checkout einen aktiven Promotion-Code
+   verwenden. Erst nach `customer.subscription.*` und `invoice.paid` dürfen
+   Portalzugriff und Kontingente aktiv sein; Rechnung, Rabatt, Steuer und Tax-ID
+   müssen unter „Paket & Abrechnung“ erscheinen.
+3. Im Stripe-Dashboard am erzeugten Testabonnement „Run simulation“ starten.
+   Zur Mitte der Basic-Laufzeit auf Business upgraden und Zusatzsitze buchen.
+   Die anteilige Rechnung muss genau einmal erscheinen; ein Webhook-Retry darf
+   weder Rechnung noch Sitze verdoppeln.
+4. Ein Visa-Paket kaufen. Vor dem `checkout.session.completed`-Webhook darf kein
+   Credit sichtbar sein. Anschließend den zugehörigen Test-Charge vollständig
+   erstatten und prüfen, dass der nicht verfallende Kaufbestand wieder auf null
+   steht. `charge.refunded` vor dem Checkout-Event in einer zweiten Simulation
+   muss zum selben Endzustand führen.
+5. Eine fehlgeschlagene Testzahlung als Standardzahlmethode setzen und die Uhr
+   bis zur Verlängerung vorziehen. `invoice.payment_failed`/`past_due` müssen als
+   Warnzustand erscheinen und dürfen keine neuen Kontingente freischalten. Nach
+   erfolgreicher Nachzahlung müssen Rechnung und Status genau einmal auf
+   „bezahlt/aktiv“ wechseln.
+6. Premium als Downgrade vormerken und bis zum Renewal vorziehen: Bis dahin
+   bleiben Preisversion und Entitlements unverändert, danach wechseln beide
+   gemeinsam. Anschließend einmal mehr als 14 Tage und einmal weniger als 14
+   Tage vor Laufzeitende kündigen; der zweite Fall muss um eine volle
+   Tariflaufzeit verschoben werden.
+7. Für jeden Schritt Stripe-Event-ID, Test-Clock-ID, Erin-Firma, sichtbaren
+   Rechnungsstatus und erwartete Kontingente im Abnahmeprotokoll festhalten.
+   Danach `erin:stripe:reconcile-billing --no-interaction` ausführen; Exitcode 0
+   und keine manuelle Review sind Abschlussbedingung.
+
+Der Dashboard-Flow folgt Stripes dokumentiertem Simulationsablauf; eine Clock
+kann jeweils nur begrenzt über Abrechnungsintervalle vorgezogen werden
+([Stripe: Subscriptions simulieren](https://docs.stripe.com/billing/testing/test-clocks/simulate-subscriptions)).
+
 ## Testbefehle
 
 ```bash

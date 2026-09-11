@@ -36,9 +36,8 @@ trap cleanup EXIT
 
 mkdir -m 0700 "$work_dir/mysql" "$work_dir/objects"
 mysql_id="$(docker compose --env-file "$env_file" -f "$compose_file" ps -q mysql)"
-minio_id="$(docker compose --env-file "$env_file" -f "$compose_file" ps -q minio)"
-[[ -n "$mysql_id" && -n "$minio_id" ]] || {
-    echo "MySQL oder MinIO läuft nicht." >&2
+[[ -n "$mysql_id" ]] || {
+    echo "MySQL läuft nicht." >&2
     exit 1
 }
 
@@ -53,25 +52,35 @@ docker compose --env-file "$env_file" -f "$compose_file" exec -T mysql sh -ec '
     exit 1
 }
 
-minio_user="$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$minio_id" | sed -n 's/^MINIO_ROOT_USER=//p' | head -n1)"
-minio_password="$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$minio_id" | sed -n 's/^MINIO_ROOT_PASSWORD=//p' | head -n1)"
-bucket="$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$minio_id" | sed -n 's/^MINIO_BUCKET=//p' | head -n1)"
-bucket="${bucket:-erin-private}"
+compose_json="$(docker compose --env-file "$env_file" -f "$compose_file" config --format json)"
+storage_access_key="$(jq -r '.services["php-fpm"].environment.AWS_ACCESS_KEY_ID // empty' <<<"$compose_json")"
+storage_secret_key="$(jq -r '.services["php-fpm"].environment.AWS_SECRET_ACCESS_KEY // empty' <<<"$compose_json")"
+storage_region="$(jq -r '.services["php-fpm"].environment.AWS_DEFAULT_REGION // empty' <<<"$compose_json")"
+storage_bucket="$(jq -r '.services["php-fpm"].environment.AWS_BUCKET // empty' <<<"$compose_json")"
+storage_endpoint="$(jq -r '.services["php-fpm"].environment.AWS_ENDPOINT // empty' <<<"$compose_json")"
+unset compose_json
+for variable in storage_access_key storage_secret_key storage_region storage_bucket storage_endpoint; do
+    if [[ -z "${!variable}" ]]; then
+        echo "Produktive S3-Konfiguration ist unvollständig: ${variable}." >&2
+        exit 2
+    fi
+done
 docker run --rm \
-    --network "container:${minio_id}" \
     --user "$(id -u):$(id -g)" \
+    --entrypoint /bin/sh \
     -e HOME=/tmp \
-    -e MC_CONFIG_DIR=/tmp/.mc \
-    -e "MINIO_ROOT_USER=${minio_user}" \
-    -e "MINIO_ROOT_PASSWORD=${minio_password}" \
-    -e "AWS_BUCKET=${bucket}" \
+    -e "AWS_ACCESS_KEY_ID=${storage_access_key}" \
+    -e "AWS_SECRET_ACCESS_KEY=${storage_secret_key}" \
+    -e "AWS_DEFAULT_REGION=${storage_region}" \
+    -e "AWS_BUCKET=${storage_bucket}" \
+    -e "AWS_ENDPOINT=${storage_endpoint}" \
     -v "$work_dir/objects:/backup" \
-    minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727 \
-    sh -ec '
-        mc alias set source http://127.0.0.1:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null
-        mc mirror --preserve --overwrite "source/$AWS_BUCKET" /backup
+    amazon/aws-cli:2.36.10@sha256:1ce4fd2ea9b640019af76a94e91adeed901d20363b4bb2ed095b45c75e5565cc \
+    -ec '
+        aws --endpoint-url "$AWS_ENDPOINT" s3 sync \
+            "s3://$AWS_BUCKET" /backup --no-progress --only-show-errors
     '
-unset minio_user minio_password
+unset storage_access_key storage_secret_key storage_region storage_bucket storage_endpoint
 
 (
     cd "$work_dir"
@@ -90,7 +99,7 @@ fi
 restic backup "$work_dir" \
     --host erin-production \
     --tag erin \
-    --tag mysql-minio \
+    --tag mysql-object-storage \
     --tag "$timestamp"
 restic check --read-data-subset=1/50
 restic forget --host erin-production --tag erin \

@@ -7,10 +7,10 @@ import {
     ShieldCheck,
     Webhook,
 } from '@lucide/vue';
+import { useAdminI18n } from '../_i18n';
 import MetricCard from '@/components/product/MetricCard.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
-import { useAdminI18n } from '../_i18n';
 
 defineProps<{
     runtime: {
@@ -79,32 +79,44 @@ const { t } = useAdminI18n();
             :description="t('system.runtime.description')"
         >
             <dl class="grid gap-3 sm:grid-cols-2">
-                <div class="rounded-xl bg-slate-50 p-4">
-                    <dt class="text-[10px] font-bold text-slate-600 uppercase">
+                <div class="rounded-xl bg-muted p-4">
+                    <dt
+                        class="text-[10px] font-bold text-muted-foreground uppercase"
+                    >
                         Laravel
                     </dt>
-                    <dd class="mt-1 font-mono text-sm font-bold text-slate-800">
+                    <dd
+                        class="mt-1 font-mono text-sm font-bold text-foreground"
+                    >
                         {{ runtime.laravel }}
                     </dd>
                 </div>
-                <div class="rounded-xl bg-slate-50 p-4">
-                    <dt class="text-[10px] font-bold text-slate-600 uppercase">
+                <div class="rounded-xl bg-muted p-4">
+                    <dt
+                        class="text-[10px] font-bold text-muted-foreground uppercase"
+                    >
                         PHP
                     </dt>
-                    <dd class="mt-1 font-mono text-sm font-bold text-slate-800">
+                    <dd
+                        class="mt-1 font-mono text-sm font-bold text-foreground"
+                    >
                         {{ runtime.php }}
                     </dd>
                 </div>
-                <div class="rounded-xl bg-slate-50 p-4">
-                    <dt class="text-[10px] font-bold text-slate-600 uppercase">
+                <div class="rounded-xl bg-muted p-4">
+                    <dt
+                        class="text-[10px] font-bold text-muted-foreground uppercase"
+                    >
                         {{ t('system.runtime.environment') }}
                     </dt>
-                    <dd class="mt-1 text-sm font-bold text-slate-800">
+                    <dd class="mt-1 text-sm font-bold text-foreground">
                         {{ runtime.environment }}
                     </dd>
                 </div>
-                <div class="rounded-xl bg-slate-50 p-4">
-                    <dt class="text-[10px] font-bold text-slate-600 uppercase">
+                <div class="rounded-xl bg-muted p-4">
+                    <dt
+                        class="text-[10px] font-bold text-muted-foreground uppercase"
+                    >
                         {{ t('system.runtime.debugMode') }}
                     </dt>
                     <dd class="mt-2">
@@ -142,15 +154,15 @@ const { t } = useAdminI18n();
                         },
                     ]"
                     :key="integration.name"
-                    class="flex items-center justify-between rounded-xl border border-slate-200 p-4"
+                    class="flex items-center justify-between rounded-xl border border-border p-4"
                 >
                     <div class="flex items-center gap-3">
                         <span
-                            class="grid size-9 place-items-center rounded-xl bg-blue-50 text-blue-600"
+                            class="grid size-9 place-items-center rounded-xl bg-blue-50 text-[var(--erin-primary-text)]"
                         >
                             <Server class="size-4" />
                         </span>
-                        <span class="text-sm font-bold text-slate-800">
+                        <span class="text-sm font-bold text-foreground">
                             {{ integration.name }}
                         </span>
                     </div>
@@ -164,7 +176,7 @@ const { t } = useAdminI18n();
                     />
                 </div>
                 <div
-                    class="flex items-center justify-between rounded-xl border border-slate-200 p-4"
+                    class="flex items-center justify-between rounded-xl border border-border p-4"
                 >
                     <div class="flex items-center gap-3">
                         <span
@@ -172,7 +184,7 @@ const { t } = useAdminI18n();
                         >
                             <Webhook class="size-4" />
                         </span>
-                        <span class="text-sm font-bold text-slate-800">
+                        <span class="text-sm font-bold text-foreground">
                             {{ t('system.integrations.webhookErrors') }}
                         </span>
                     </div>

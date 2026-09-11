@@ -64,6 +64,18 @@ class JobPosting extends Model
         return $this->belongsTo(CompanyLocation::class, 'location_id');
     }
 
+    /** @return BelongsTo<CompanyTeam, $this> */
+    public function companyTeam(): BelongsTo
+    {
+        return $this->belongsTo(CompanyTeam::class, 'company_team_id');
+    }
+
+    /** @return BelongsTo<CompanyMembership, $this> */
+    public function contactMembership(): BelongsTo
+    {
+        return $this->belongsTo(CompanyMembership::class, 'contact_membership_id');
+    }
+
     /**
      * @return BelongsTo<User, $this>
      */
@@ -94,6 +106,32 @@ class JobPosting extends Model
     public function media(): HasMany
     {
         return $this->hasMany(JobMedia::class);
+    }
+
+    /**
+     * @return HasMany<JobTranslation, $this>
+     */
+    public function translations(): HasMany
+    {
+        return $this->hasMany(JobTranslation::class);
+    }
+
+    public function useTranslation(string $locale): self
+    {
+        if ($locale === 'de') {
+            return $this;
+        }
+
+        $this->loadMissing('translations');
+        /** @var JobTranslation|null $translation */
+        $translation = $this->translations->firstWhere('locale', $locale);
+        if ($translation !== null) {
+            $this->setAttribute('title', $translation->title);
+            $this->setAttribute('position', $translation->position);
+            $this->setAttribute('description', $translation->description);
+        }
+
+        return $this;
     }
 
     /**
@@ -152,7 +190,7 @@ class JobPosting extends Model
      * recruiter identities, exact addresses and private media metadata are
      * deliberately not loaded or serialized.
      *
-     * @return array<string, bool|float|int|string|array<int, int|string>|null>
+     * @return array<string, mixed>
      */
     public function toSearchableArray(): array
     {
@@ -166,7 +204,18 @@ class JobPosting extends Model
             'occupation:id,slug,name_de,name_en',
             'skills:id,slug,name_de,name_en',
             'languages:id,code,name_de,name_en',
+            'translations:id,job_posting_id,locale,title,position,description',
         ]);
+
+        $translations = $this->translations
+            ->mapWithKeys(fn (JobTranslation $translation): array => [
+                $translation->locale => [
+                    'title' => $translation->title,
+                    'position' => $translation->position,
+                    'description' => $translation->description,
+                ],
+            ])
+            ->all();
 
         $occupationNames = $this->occupation === null
             ? []
@@ -224,6 +273,10 @@ class JobPosting extends Model
             'responsibilities' => $this->responsibilities,
             'requirements' => $this->requirements,
             'benefits' => $this->benefits,
+            'translations' => $translations,
+            'localized_titles' => $this->translations->pluck('title')->filter()->values()->all(),
+            'localized_positions' => $this->translations->pluck('position')->filter()->values()->all(),
+            'localized_descriptions' => $this->translations->pluck('description')->filter()->values()->all(),
             'occupation_id' => $this->occupation_id,
             'occupation_slug' => $this->occupation === null
                 ? null
@@ -274,6 +327,7 @@ class JobPosting extends Model
                 'occupation:id,slug,name_de,name_en',
                 'skills:id,slug,name_de,name_en',
                 'languages:id,code,name_de,name_en',
+                'translations:id,job_posting_id,locale,title,position,description',
             ]);
         }
 
@@ -292,6 +346,7 @@ class JobPosting extends Model
             'occupation:id,slug,name_de,name_en',
             'skills:id,slug,name_de,name_en',
             'languages:id,code,name_de,name_en',
+            'translations:id,job_posting_id,locale,title,position,description',
         ]);
     }
 

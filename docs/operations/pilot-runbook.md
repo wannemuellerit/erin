@@ -41,7 +41,7 @@ nicht im Repository.
 - Mandanten-, Rollen- und Support-Read-only-Matrix vollständig bestanden.
 - Stripe-, Zammad-, Reverb-, Mail-, Storage-, ClamAV- und LiveKit-Smoke-Tests
   grün.
-- MySQL-/MinIO-Restore innerhalb der festgelegten RPO-/RTO-Ziele.
+- MySQL-/Objektspeicher-Restore innerhalb der festgelegten RPO-/RTO-Ziele.
 - Datenschutz-, Legal-, Support-, Incident- und Kommunikationsabläufe
   schriftlich freigegeben.
 - Monitoring, Alarmempfänger und Ruf-/Vertretungsplan aktiv.

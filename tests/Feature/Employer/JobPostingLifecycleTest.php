@@ -115,6 +115,11 @@ it('rejects cross-tenant locations invalid ranges missing qualifications and mal
 it('duplicates all matching rules as an isolated draft but never copies media or applications', function () {
     [$user, $company] = fadenEmployer();
     $payload = fadenJobPayload($company);
+    $payload['translations'] = ['en' => [
+        'title' => 'Industrial electrician',
+        'position' => 'Electrician',
+        'description' => 'Maintenance of industrial equipment in an experienced team.',
+    ]];
     $this->actingAs($user)->withSession(['active_company_id' => $company->id])->post(route('employer.jobs.store'), $payload);
     $job = $company->jobPostings()->firstOrFail();
 
@@ -126,6 +131,10 @@ it('duplicates all matching rules as an isolated draft but never copies media or
         ->and($copy->screeningQuestions()->count())->toBe(1)
         ->and($copy->media()->count())->toBe(0)
         ->and($copy->applications()->count())->toBe(0);
+    expect($copy->translations()->where('locale', 'en')->value('title'))->toBe('Industrial electrician')
+        ->and($copy->translations()->where('locale', 'de')->value('title'))->toBe($copy->title);
+    $copy->translations()->where('locale', 'en')->update(['title' => 'Changed copy']);
+    expect($job->translations()->where('locale', 'en')->value('title'))->toBe('Industrial electrician');
 });
 
 it('only deletes empty drafts or archives and preserves jobs with recruiting history', function () {

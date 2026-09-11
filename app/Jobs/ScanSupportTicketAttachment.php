@@ -20,7 +20,10 @@ class ScanSupportTicketAttachment implements ShouldQueue
     /** @var list<int> */
     public array $backoff = [30, 120, 300, 900];
 
-    public function __construct(public readonly int $attachmentId) {}
+    public function __construct(public readonly int $attachmentId)
+    {
+        $this->onQueue('scans');
+    }
 
     public function handle(ClamAvScanner $scanner): void
     {

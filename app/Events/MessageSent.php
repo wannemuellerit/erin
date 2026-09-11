@@ -32,17 +32,24 @@ class MessageSent implements ShouldBroadcastNow
      */
     public function broadcastWith(): array
     {
-        $this->message->loadMissing(['sender:id,name', 'attachments']);
+        $this->message->loadMissing(['sender:id,name', 'attachments', 'messageTranslations']);
 
         return [
             'message' => [
                 'id' => $this->message->getKey(),
+                'client_id' => $this->message->client_id,
                 'sender' => $this->message->sender?->only(['id', 'name']),
                 'sender_id' => $this->message->sender_id,
                 'reply_to_id' => $this->message->reply_to_id,
                 'type' => $this->message->type,
                 'body' => $this->message->body,
-                'translations' => $this->message->translations,
+                'translations' => $this->message->messageTranslations
+                    ->mapWithKeys(fn ($translation): array => [$translation->target_locale => [
+                        'status' => $translation->status,
+                        'body' => $translation->translated_body,
+                        'model' => $translation->model,
+                        'prompt_version' => $translation->prompt_version,
+                    ]])->all(),
                 'created_at' => $this->message->created_at?->toIso8601String(),
                 'attachments' => $this->message->attachments
                     ->map(fn (MessageAttachment $attachment): array => [
@@ -50,6 +57,8 @@ class MessageSent implements ShouldBroadcastNow
                         'original_name' => $attachment->original_name,
                         'mime_type' => $attachment->mime_type,
                         'size_bytes' => $attachment->size_bytes,
+                        'duration_seconds' => $attachment->duration_seconds,
+                        'waveform' => $attachment->waveform,
                         'scan_result' => $attachment->scan_result,
                         'download_url' => $attachment->scan_result === 'clean'
                             ? URL::temporarySignedRoute(

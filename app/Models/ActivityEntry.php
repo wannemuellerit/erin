@@ -7,9 +7,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 /**
  * @property array<string, mixed>|null $payload
+ * @property string $data_quality
  * @property Carbon $occurred_at
  */
 class ActivityEntry extends Model
@@ -20,8 +22,18 @@ class ActivityEntry extends Model
     {
         return [
             'payload' => 'array',
+            'schema_version' => 'integer',
             'occurred_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (ActivityEntry $entry): void {
+            $entry->event_uuid ??= (string) Str::uuid();
+            $entry->schema_version ??= 1;
+            $entry->data_quality ??= 'observed';
+        });
     }
 
     /**

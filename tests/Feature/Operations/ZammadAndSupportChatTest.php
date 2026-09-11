@@ -342,7 +342,7 @@ it('reconciles uncertain Zammad writes instead of creating duplicate tickets or 
                     '912' => [
                         'id' => 912,
                         'number' => '99120',
-                        'note' => 'Erin operation ticket:'.$ticket->number,
+                        'note' => 'Faden operation ticket:'.$ticket->number,
                     ],
                 ],
             ],
@@ -1487,7 +1487,7 @@ it('does not correlate a guessable or forged customer message marker', function 
                 'id' => 9205,
                 'ticket_id' => 826,
                 'subject' => sprintf(
-                    'Erin operation message:%d:%s',
+                    'Faden operation message:%d:%s',
                     $outboundMessage->getKey(),
                     str_repeat('0', 64),
                 ),

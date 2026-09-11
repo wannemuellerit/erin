@@ -1,13 +1,12 @@
 import { useI18n } from 'vue-i18n';
 import { useFormatters } from '@/composables/useFormatters';
 import { useLocalizedField } from '@/composables/useLocalizedField';
-import de from '@/i18n/messages/admin-de';
-import en from '@/i18n/messages/admin-en';
+import { adminMessages } from '@/i18n/admin-locales';
 
 export function useAdminI18n() {
     const composer = useI18n({
         useScope: 'local',
-        messages: { de, en },
+        messages: adminMessages,
     });
     const formatters = useFormatters();
     const { localizedField } = useLocalizedField();

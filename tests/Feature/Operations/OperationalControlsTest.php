@@ -18,10 +18,10 @@ use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
-it('isolates large imports on the low queue and deduplicates each import', function () {
+it('isolates large imports on the imports queue and deduplicates each import', function () {
     $job = new ProcessCandidateImport(1234);
 
-    expect($job->queue)->toBe('low')
+    expect($job->queue)->toBe('imports')
         ->and($job->uniqueId())->toBe('1234')
         ->and($job->uniqueFor)->toBe(3600);
 })->group('ops');

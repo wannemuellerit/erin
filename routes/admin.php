@@ -9,12 +9,17 @@ use App\Http\Controllers\Admin\DocumentController;
 use App\Http\Controllers\Admin\EmailTemplateController;
 use App\Http\Controllers\Admin\FeatureFlagController;
 use App\Http\Controllers\Admin\GdprRequestController;
+use App\Http\Controllers\Admin\MaintenanceController;
+use App\Http\Controllers\Admin\MatchScoreVersionController;
 use App\Http\Controllers\Admin\ModerationController;
+use App\Http\Controllers\Admin\PartnerPlatformController;
+use App\Http\Controllers\Admin\PlatformNotificationController;
 use App\Http\Controllers\Admin\PlatformRoleController;
 use App\Http\Controllers\Admin\ReferralController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\SkillTaxonomyController;
 use App\Http\Controllers\Admin\SupportController;
+use App\Http\Controllers\Admin\SupportKnowledgeController;
 use App\Http\Controllers\Admin\SystemController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\VisaController;
@@ -46,6 +51,7 @@ Route::middleware(['auth', 'verified', 'role:super_admin,support', 'staff.2fa'])
             Route::get('audit', [AuditController::class, 'index'])->name('audit.index');
             Route::get('settings', [SettingController::class, 'index'])->name('settings.index');
             Route::get('system', [SystemController::class, 'index'])->name('system.index');
+            Route::get('partners', [PartnerPlatformController::class, 'index'])->name('partners.index');
         });
 
         Route::middleware(['role:super_admin', 'capability:platform.manage'])->group(function (): void {
@@ -57,6 +63,12 @@ Route::middleware(['auth', 'verified', 'role:super_admin,support', 'staff.2fa'])
             Route::patch('audit/alerts/{alert}/resolve', [AuditController::class, 'resolve'])
                 ->name('audit.alerts.resolve');
             Route::get('documents', [DocumentController::class, 'index'])->name('documents.index');
+            Route::patch('visa/{case}', [VisaController::class, 'update'])->name('visa.update');
+            Route::post('visa/{case}/steps/{step}/tasks', [VisaController::class, 'storeTask'])->name('visa.tasks.store');
+            Route::patch('visa/tasks/{task}', [VisaController::class, 'updateTask'])->name('visa.tasks.update');
+            Route::post('visa/{case}/documents', [VisaController::class, 'attachDocument'])->name('visa.documents.store');
+            Route::get('visa/{case}/export', [VisaController::class, 'export'])
+                ->middleware('throttle:10,1')->name('visa.export');
             Route::patch('documents/{document}/review', [DocumentController::class, 'review'])
                 ->name('documents.review');
             Route::patch('users/{user}/status', [UserController::class, 'updateStatus'])
@@ -77,6 +89,12 @@ Route::middleware(['auth', 'verified', 'role:super_admin,support', 'staff.2fa'])
             )->name('billing.manual-reviews.resolve');
             Route::patch('referrals/{referral}', [ReferralController::class, 'update'])
                 ->name('referrals.update');
+            Route::post('referrals/payouts/{intent}/approve', [ReferralController::class, 'approvePayout'])
+                ->middleware('password.confirm')->name('referrals.payouts.approve');
+            Route::post('referrals/payouts/{intent}/retry', [ReferralController::class, 'retryPayout'])
+                ->name('referrals.payouts.retry');
+            Route::get('referrals/payouts/export', [ReferralController::class, 'exportPayouts'])
+                ->middleware('throttle:5,1')->name('referrals.payouts.export');
             Route::patch('moderation/feedback/{feedback}', [ModerationController::class, 'reviewFeedback'])
                 ->name('moderation.feedback.review');
             Route::patch('moderation/cases/{case}', [ModerationController::class, 'updateCase'])
@@ -107,6 +125,16 @@ Route::middleware(['auth', 'verified', 'role:super_admin,support', 'staff.2fa'])
                 ->name('feature-flags.update');
             Route::delete('system/feature-flags/{featureFlag}', [FeatureFlagController::class, 'destroy'])
                 ->name('feature-flags.destroy');
+            Route::patch('system/maintenance', [MaintenanceController::class, 'update'])
+                ->name('maintenance.update');
+            Route::post('system/platform-notifications', [PlatformNotificationController::class, 'store'])
+                ->middleware('throttle:3,1')
+                ->name('platform-notifications.store');
+            Route::post('system/match-score-versions', [MatchScoreVersionController::class, 'store'])
+                ->name('match-score-versions.store');
+            Route::post('system/match-score-versions/{matchScoreVersion}/activate', [MatchScoreVersionController::class, 'activate'])
+                ->middleware('password.confirm')
+                ->name('match-score-versions.activate');
             Route::post('system/gdpr-requests', [GdprRequestController::class, 'store'])
                 ->name('gdpr-requests.store');
             Route::patch('system/gdpr-requests/{gdprRequest}', [GdprRequestController::class, 'update'])
@@ -122,9 +150,32 @@ Route::middleware(['auth', 'verified', 'role:super_admin,support', 'staff.2fa'])
                 ->name('access-list.destroy');
             Route::post('system/email-templates', [EmailTemplateController::class, 'upsert'])
                 ->name('email-templates.upsert');
+            Route::get('system/email-templates/{key}/preview', [EmailTemplateController::class, 'preview'])
+                ->where('key', '[a-z0-9._-]+')
+                ->middleware('throttle:30,1')
+                ->name('email-templates.preview');
+            Route::post('system/email-templates/test', [EmailTemplateController::class, 'sendTest'])
+                ->middleware('throttle:5,1')
+                ->name('email-templates.test');
             Route::delete('system/email-templates/{key}', [EmailTemplateController::class, 'destroy'])
                 ->where('key', '[a-z0-9._-]+')
                 ->name('email-templates.destroy');
+            Route::post('support/knowledge', [SupportKnowledgeController::class, 'storeArticle'])
+                ->name('support.knowledge.store');
+            Route::post('support/knowledge/{article}/publish', [SupportKnowledgeController::class, 'publishArticle'])
+                ->middleware('password.confirm')->name('support.knowledge.publish');
+            Route::post('support/knowledge/{article}/retire', [SupportKnowledgeController::class, 'retireArticle'])
+                ->name('support.knowledge.retire');
+            Route::post('support/prompts', [SupportKnowledgeController::class, 'storePrompt'])
+                ->name('support.prompts.store');
+            Route::post('support/prompts/{prompt}/activate', [SupportKnowledgeController::class, 'activatePrompt'])
+                ->middleware('password.confirm')->name('support.prompts.activate');
+            Route::post('partners/organizations', [PartnerPlatformController::class, 'storeOrganization'])->name('partners.organizations.store');
+            Route::patch('partners/organizations/{organization}/approve', [PartnerPlatformController::class, 'approveOrganization'])->middleware('password.confirm')->name('partners.organizations.approve');
+            Route::post('partners/organizations/{organization}/block', [PartnerPlatformController::class, 'blockOrganization'])->middleware('password.confirm')->name('partners.organizations.block');
+            Route::post('partners/organizations/{organization}/members', [PartnerPlatformController::class, 'storeMember'])->name('partners.members.store');
+            Route::post('partners/organizations/{organization}/offerings', [PartnerPlatformController::class, 'storeOffering'])->name('partners.offerings.store');
+            Route::post('partners/country-rules', [PartnerPlatformController::class, 'storeCountryRule'])->middleware('password.confirm')->name('partners.country-rules.store');
         });
     });
 

@@ -9,7 +9,7 @@ import {
     Send,
     UserRound,
 } from '@lucide/vue';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import FormField from '@/components/product/FormField.vue';
 import FileAttachmentPicker from '@/components/product/FileAttachmentPicker.vue';
@@ -67,19 +67,46 @@ const draftError = computed(() =>
     props.messageField === 'body' ? form.errors.body : form.errors.message,
 );
 
+const replaceOrAppend = (message: SupportTicketMessage) => {
+    const existingIndex = messages.value.findIndex(
+        (item) => item.id === message.id,
+    );
+
+    if (existingIndex === -1) {
+        messages.value.push(message);
+    } else {
+        messages.value.splice(existingIndex, 1, message);
+    }
+};
+
+watch(
+    () => props.ticket.messages,
+    (serverMessages) => {
+        for (const message of serverMessages) {
+            const optimisticIndex = messages.value.findIndex(
+                (item) =>
+                    item.id < 0 &&
+                    item.author_id === message.author_id &&
+                    item.body === message.body,
+            );
+
+            if (optimisticIndex !== -1) {
+                messages.value.splice(optimisticIndex, 1, message);
+
+                continue;
+            }
+
+            replaceOrAppend(message);
+        }
+    },
+    { deep: true },
+);
+
 useEcho<{ message: SupportTicketMessage }>(
     `support-ticket.${props.ticket.id}`,
     '.support.message.created',
     ({ message }) => {
-        const existingIndex = messages.value.findIndex(
-            (item) => item.id === message.id,
-        );
-
-        if (existingIndex === -1) {
-            messages.value.push(message);
-        } else {
-            messages.value.splice(existingIndex, 1, message);
-        }
+        replaceOrAppend(message);
     },
 );
 
@@ -97,27 +124,69 @@ const formatDate = (value: string) =>
         timeStyle: 'short',
     });
 
-const send = () => {
+const markFailed = (messageId: number) => {
+    const message = messages.value.find((item) => item.id === messageId);
+
+    if (message) {
+        message.delivery_status = 'failed';
+    }
+};
+
+const send = (retryMessage?: SupportTicketMessage) => {
+    const body = retryMessage?.body ?? draft.value.trim();
+    const hasAttachments = form.attachments.length > 0;
+
+    if (!body && !hasAttachments) {
+        return;
+    }
+
+    const optimisticMessage = retryMessage ?? {
+        id: -Date.now(),
+        author_id: props.currentUserId,
+        author: null,
+        body,
+        is_internal: false,
+        source: 'erin',
+        delivery_status: 'sending',
+        created_at: new Date().toISOString(),
+        attachments: [],
+    };
+
+    if (!retryMessage) {
+        messages.value.push(optimisticMessage);
+    } else {
+        optimisticMessage.delivery_status = 'sending';
+    }
+
+    if (props.messageField === 'body') {
+        form.body = body;
+    } else {
+        form.message = body;
+    }
+
     form.post(props.replyUrl, {
         forceFormData: true,
         preserveScroll: true,
         onSuccess: () => {
             form.reset('message', 'body', 'is_internal', 'attachments');
         },
+        onError: () => markFailed(optimisticMessage.id),
     });
 };
+
+const submit = () => send();
 </script>
 
 <template>
     <div class="flex min-h-[32rem] flex-col">
         <header
-            class="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
+            class="flex flex-col gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
         >
             <div>
-                <p class="text-xs font-bold text-slate-600">
+                <p class="text-xs font-bold text-muted-foreground">
                     {{ ticket.number }}
                 </p>
-                <h2 class="mt-1 font-bold text-slate-950">
+                <h2 class="mt-1 font-bold text-foreground">
                     {{ ticket.subject }}
                 </h2>
             </div>
@@ -139,12 +208,13 @@ const send = () => {
         </header>
 
         <div
-            class="flex-1 space-y-4 overflow-y-auto bg-slate-50/70 p-4 sm:p-6"
+            class="flex-1 space-y-4 overflow-y-auto bg-muted/70 p-4 sm:p-6"
             aria-live="polite"
         >
             <article
                 v-for="message in messages"
                 :key="message.id"
+                :data-test="`support-message-${message.id}`"
                 class="flex gap-3"
                 :class="
                     message.author_id === currentUserId
@@ -171,7 +241,7 @@ const send = () => {
                     :class="
                         message.author_id === currentUserId
                             ? 'rounded-tr-sm bg-blue-600 text-white'
-                            : 'rounded-tl-sm border border-slate-200 bg-white text-slate-700'
+                            : 'rounded-tl-sm border border-border bg-card text-muted-foreground'
                     "
                 >
                     <p class="text-sm leading-6 whitespace-pre-wrap">
@@ -212,8 +282,8 @@ const send = () => {
                         class="mt-2 flex flex-wrap items-center gap-2 text-[10px]"
                         :class="
                             message.author_id === currentUserId
-                                ? 'text-blue-100'
-                                : 'text-slate-600'
+                                ? 'text-white'
+                                : 'text-muted-foreground'
                         "
                     >
                         <span>
@@ -241,6 +311,18 @@ const send = () => {
                                 )
                             }}
                         </span>
+                        <button
+                            v-if="
+                                message.author_id === currentUserId &&
+                                message.delivery_status === 'failed'
+                            "
+                            type="button"
+                            class="erin-focus rounded px-1.5 py-0.5 text-[10px] font-bold underline underline-offset-2"
+                            data-test="support-retry-message"
+                            @click="send(message)"
+                        >
+                            {{ t('operations.support.retry') }}
+                        </button>
                     </div>
                 </div>
             </article>
@@ -248,8 +330,8 @@ const send = () => {
 
         <form
             v-if="!readOnly"
-            class="border-t border-slate-100 bg-white p-4"
-            @submit.prevent="send"
+            class="border-t border-border bg-card p-4"
+            @submit.prevent="submit"
         >
             <FormField
                 id="support-reply"
@@ -277,7 +359,7 @@ const send = () => {
                 >
                     {{ form.errors.attachments }}
                 </p>
-                <p class="mt-1 text-xs text-slate-500">
+                <p class="mt-1 text-xs text-muted-foreground">
                     {{
                         t('operations.support.attachmentHint', attachmentLimits)
                     }}
@@ -288,12 +370,12 @@ const send = () => {
             >
                 <label
                     v-if="allowInternal"
-                    class="inline-flex items-center gap-2 text-xs font-semibold text-slate-600"
+                    class="inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground"
                 >
                     <input
                         v-model="form.is_internal"
                         type="checkbox"
-                        class="size-4 rounded border-slate-300 text-blue-600"
+                        class="size-4 rounded border-border text-[var(--erin-primary-text)]"
                     />
                     {{ t('operations.support.internal') }}
                 </label>

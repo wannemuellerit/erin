@@ -2,6 +2,8 @@
 
 namespace App\Services\Matching;
 
+use App\Models\MatchScoreVersion;
+
 final class MatchScoreCalculator
 {
     public const VERSION = '1.0';
@@ -27,10 +29,15 @@ final class MatchScoreCalculator
      */
     public function calculate(array $factors): array
     {
+        $configuration = app()->bound('db')
+            ? MatchScoreVersion::query()->where('status', 'active')->latest('activated_at')->first()
+            : null;
+        /** @var array<string, int> $weights */
+        $weights = $configuration instanceof MatchScoreVersion ? $configuration->weights : self::WEIGHTS;
         $breakdown = [];
         $total = 0.0;
 
-        foreach (self::WEIGHTS as $factor => $weight) {
+        foreach ($weights as $factor => $weight) {
             $score = max(0.0, min(1.0, (float) ($factors[$factor] ?? 0)));
             $contribution = round($score * $weight, 2);
             $total += $contribution;
@@ -42,7 +49,7 @@ final class MatchScoreCalculator
         }
 
         return [
-            'version' => self::VERSION,
+            'version' => $configuration instanceof MatchScoreVersion ? $configuration->version : self::VERSION,
             'score' => (int) round($total),
             'factors' => $breakdown,
         ];

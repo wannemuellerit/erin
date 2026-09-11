@@ -31,7 +31,7 @@ const copyrightYear = computed(() => new Date().getFullYear());
 
 <template>
     <div
-        class="grid min-h-svh bg-white lg:grid-cols-[minmax(0,1fr)_minmax(32rem,0.82fr)]"
+        class="grid min-h-svh bg-card lg:grid-cols-[minmax(0,1fr)_minmax(32rem,0.82fr)]"
     >
         <aside
             class="relative hidden overflow-hidden bg-[#0F2854] p-10 text-white lg:flex lg:flex-col xl:p-14"
@@ -109,22 +109,28 @@ const copyrightYear = computed(() => new Date().getFullYear());
         </aside>
 
         <main
-            class="relative flex min-h-svh min-w-0 flex-col bg-white lg:h-svh lg:min-h-0 lg:overflow-y-auto"
+            class="relative flex min-h-svh min-w-0 flex-col bg-card lg:h-svh lg:min-h-0 lg:overflow-y-auto"
         >
-            <div class="flex items-center justify-between px-5 py-5 sm:px-8">
+            <div
+                class="flex flex-wrap items-center justify-between gap-3 px-5 py-5 sm:flex-nowrap sm:px-8"
+            >
                 <Link
                     :href="home()"
-                    class="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-blue-600"
+                    class="inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-[var(--erin-primary-text)]"
                 >
                     <ArrowLeft class="size-4" />
                     {{ t('auth.backHome') }}
                 </Link>
-                <div class="flex items-center gap-3">
+                <div
+                    class="flex w-full min-w-0 items-center justify-end gap-3 sm:w-auto"
+                >
                     <LocaleSwitcher :show-label="false" compact />
                     <div class="hidden items-center gap-2 sm:flex lg:hidden">
                         <AppLogoIcon class="size-8" />
-                        <span class="font-extrabold text-slate-950"
-                            >faden<span class="text-blue-600">.</span></span
+                        <span class="font-extrabold text-foreground"
+                            >faden<span class="text-[var(--erin-primary-text)]"
+                                >.</span
+                            ></span
                         >
                     </div>
                 </div>
@@ -136,19 +142,19 @@ const copyrightYear = computed(() => new Date().getFullYear());
                 >
                     <div class="mb-8">
                         <p
-                            class="mb-2 text-xs font-bold tracking-[0.12em] text-[var(--erin-primary,#2563EB)] uppercase"
+                            class="mb-2 text-xs font-bold tracking-[0.12em] text-[var(--erin-primary-text)] uppercase"
                         >
                             {{ t('auth.welcomeEyebrow') }}
                         </p>
                         <h1
                             v-if="title"
-                            class="text-3xl font-extrabold tracking-tight text-slate-950"
+                            class="text-3xl font-extrabold tracking-tight text-foreground"
                         >
                             {{ title }}
                         </h1>
                         <p
                             v-if="description"
-                            class="mt-2 text-sm leading-6 text-slate-500"
+                            class="mt-2 text-sm leading-6 text-muted-foreground"
                         >
                             {{ description }}
                         </p>
@@ -157,7 +163,9 @@ const copyrightYear = computed(() => new Date().getFullYear());
                 </div>
             </div>
 
-            <div class="px-8 py-5 text-center text-[11px] text-slate-600">
+            <div
+                class="px-8 py-5 text-center text-[11px] text-muted-foreground"
+            >
                 © {{ copyrightYear }} Faden · {{ t('auth.privacy') }} ·
                 {{ t('auth.imprint') }}
             </div>

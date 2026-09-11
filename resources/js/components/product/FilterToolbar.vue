@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import type { Component } from 'vue';
 import { useI18n } from 'vue-i18n';
-import de from '@/i18n/messages/product-components-de';
-import en from '@/i18n/messages/product-components-en';
+import { productMessages } from '@/i18n/product-locales';
 
 withDefaults(
     defineProps<{
@@ -19,7 +18,7 @@ withDefaults(
 
 const { t } = useI18n({
     useScope: 'local',
-    messages: { de, en },
+    messages: productMessages,
 });
 </script>
 
@@ -45,7 +44,7 @@ const { t } = useI18n({
         </div>
         <div
             v-if="$slots.filters"
-            class="flex flex-wrap items-center gap-2 border-t border-slate-100 px-4 py-3"
+            class="flex flex-wrap items-center gap-2 border-t border-border px-4 py-3"
         >
             <slot name="filters" />
         </div>

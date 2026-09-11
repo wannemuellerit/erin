@@ -77,7 +77,7 @@ const percentage = (value?: number | null) =>
     <div class="erin-page">
         <Link
             :href="companiesIndex.url()"
-            class="inline-flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-[var(--erin-primary)]"
+            class="inline-flex items-center gap-2 text-sm font-bold text-muted-foreground hover:text-[var(--erin-primary-text)]"
         >
             <ArrowLeft class="size-4" />
             {{ t('candidate.companyDetail.back') }}
@@ -144,7 +144,7 @@ const percentage = (value?: number | null) =>
                             tone="orange"
                         />
                     </div>
-                    <p v-else class="text-sm leading-6 text-slate-500">
+                    <p v-else class="text-sm leading-6 text-muted-foreground">
                         {{ t('candidate.companyDetail.trustThreshold') }}
                     </p>
                 </SectionCard>
@@ -155,18 +155,18 @@ const percentage = (value?: number | null) =>
                             v-for="job in jobs"
                             :key="job.id"
                             :href="showJob.url(job.id)"
-                            class="flex items-center justify-between gap-4 rounded-xl border border-slate-200 p-4 transition hover:border-blue-300 hover:bg-blue-50/40"
+                            class="flex items-center justify-between gap-4 rounded-xl border border-border p-4 transition hover:border-blue-300 hover:bg-blue-50/40"
                         >
                             <div>
-                                <p class="font-extrabold text-slate-950">
+                                <p class="font-extrabold text-foreground">
                                     {{ job.title }}
                                 </p>
-                                <p class="mt-1 text-xs text-slate-500">
+                                <p class="mt-1 text-xs text-muted-foreground">
                                     {{ job.position || job.employment_type }}
                                 </p>
                             </div>
                             <BriefcaseBusiness
-                                class="size-5 shrink-0 text-blue-600"
+                                class="size-5 shrink-0 text-[var(--erin-primary-text)]"
                             />
                         </Link>
                     </div>
@@ -194,7 +194,9 @@ const percentage = (value?: number | null) =>
                 <SectionCard :title="t('candidate.companyDetail.facts')">
                     <div class="grid gap-4 text-sm">
                         <div class="flex gap-3">
-                            <Users class="mt-0.5 size-4 text-blue-600" />
+                            <Users
+                                class="mt-0.5 size-4 text-[var(--erin-primary-text)]"
+                            />
                             <span>
                                 {{
                                     company.employee_count
@@ -234,10 +236,10 @@ const percentage = (value?: number | null) =>
                     <div
                         v-for="location in company.locations"
                         :key="location.id"
-                        class="border-b border-slate-100 py-3 text-sm last:border-0"
+                        class="border-b border-border py-3 text-sm last:border-0"
                     >
                         <p class="font-bold">{{ location.name }}</p>
-                        <p class="text-xs text-slate-500">
+                        <p class="text-xs text-muted-foreground">
                             {{ location.city }}, {{ location.country_code }}
                         </p>
                     </div>

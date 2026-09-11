@@ -135,16 +135,16 @@ const accents: Record<string, string> = {
     <Head :title="t('public.pricing.metaTitle')">
         <meta name="description" :content="t('public.pricing.description')" />
     </Head>
-    <div class="min-h-screen bg-slate-50 text-slate-950">
+    <div class="min-h-screen bg-muted text-foreground">
         <PublicHeader />
         <main>
             <section
-                class="relative overflow-hidden border-b border-slate-200 bg-white px-5 py-16 text-center sm:px-6 lg:py-20"
+                class="relative overflow-hidden border-b border-border bg-card px-5 py-16 text-center sm:px-6 lg:py-20"
             >
                 <div class="erin-grid absolute inset-0 opacity-40" />
                 <div class="relative mx-auto max-w-3xl">
                     <p
-                        class="text-xs font-bold tracking-[0.15em] text-blue-600 uppercase"
+                        class="text-xs font-bold tracking-[0.15em] text-[var(--erin-primary-text)] uppercase"
                     >
                         {{ t('public.pricing.eyebrow') }}
                     </p>
@@ -154,7 +154,7 @@ const accents: Record<string, string> = {
                         {{ t('public.pricing.title') }}
                     </h1>
                     <p
-                        class="mx-auto mt-5 max-w-2xl text-base leading-7 text-slate-500"
+                        class="mx-auto mt-5 max-w-2xl text-base leading-7 text-muted-foreground"
                     >
                         {{ t('public.pricing.description') }}
                     </p>
@@ -170,11 +170,11 @@ const accents: Record<string, string> = {
                     <article
                         v-for="plan in plans"
                         :key="plan.id"
-                        class="relative flex flex-col rounded-2xl border bg-white p-6 shadow-sm"
+                        class="relative flex flex-col rounded-2xl border bg-card p-6 shadow-sm"
                         :class="
                             plan.slug === 'business'
                                 ? 'border-blue-500 shadow-xl ring-2 shadow-blue-950/10 ring-blue-500'
-                                : 'border-slate-200'
+                                : 'border-border'
                         "
                     >
                         <span
@@ -187,8 +187,7 @@ const accents: Record<string, string> = {
                             <span
                                 class="size-2.5 rounded-full"
                                 :class="{
-                                    'bg-slate-500':
-                                        accents[plan.slug] === 'slate',
+                                    'bg-muted0': accents[plan.slug] === 'slate',
                                     'bg-blue-600':
                                         accents[plan.slug] === 'blue',
                                     'bg-teal-500':
@@ -204,7 +203,7 @@ const accents: Record<string, string> = {
                         <p class="mt-4 text-3xl font-extrabold tracking-tight">
                             {{ money(plan) }}
                         </p>
-                        <p class="mt-1 text-xs text-slate-400">
+                        <p class="mt-1 text-xs text-muted-foreground">
                             {{
                                 plan.term_months
                                     ? t('public.pricing.term', {
@@ -214,14 +213,14 @@ const accents: Record<string, string> = {
                             }}
                         </p>
                         <p
-                            class="mt-4 min-h-12 text-sm leading-6 text-slate-500"
+                            class="mt-4 min-h-12 text-sm leading-6 text-muted-foreground"
                         >
                             {{ planDescription(plan) }}
                         </p>
                         <Link
                             v-if="plan.is_enterprise"
                             :href="contact()"
-                            class="erin-focus mt-6 inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-300 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                            class="erin-focus mt-6 inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-border text-sm font-bold text-muted-foreground hover:bg-muted"
                         >
                             {{ t('public.pricing.contact') }}
                             <ArrowRight class="size-4" />
@@ -233,7 +232,7 @@ const accents: Record<string, string> = {
                             :class="
                                 plan.slug === 'business'
                                     ? 'bg-blue-600 text-white hover:bg-blue-700'
-                                    : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
+                                    : 'border border-border text-muted-foreground hover:bg-muted'
                             "
                         >
                             {{ t('public.pricing.select') }}
@@ -241,17 +240,17 @@ const accents: Record<string, string> = {
                         </Link>
                         <div
                             v-else
-                            class="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-slate-100 px-4 text-sm font-bold text-slate-400"
+                            class="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-muted px-4 text-sm font-bold text-muted-foreground"
                         >
                             {{ t('public.pricing.notAvailable') }}
                         </div>
-                        <div class="my-6 h-px bg-slate-100" />
+                        <div class="my-6 h-px bg-muted" />
                         <p
-                            class="mb-3 text-[10px] font-bold tracking-wider text-slate-400 uppercase"
+                            class="mb-3 text-[10px] font-bold tracking-wider text-muted-foreground uppercase"
                         >
                             {{ t('public.pricing.included') }}
                         </p>
-                        <ul class="space-y-3 text-sm text-slate-600">
+                        <ul class="space-y-3 text-sm text-muted-foreground">
                             <li
                                 v-for="feature in included(plan)"
                                 :key="feature"
@@ -267,10 +266,10 @@ const accents: Record<string, string> = {
                             <li
                                 v-for="feature in unavailable(plan)"
                                 :key="feature"
-                                class="flex items-start gap-2.5 text-slate-400"
+                                class="flex items-start gap-2.5 text-muted-foreground"
                             >
                                 <span
-                                    class="mt-0.5 grid size-4 shrink-0 place-items-center rounded-full bg-slate-100"
+                                    class="mt-0.5 grid size-4 shrink-0 place-items-center rounded-full bg-muted"
                                 >
                                     <Minus class="size-3" />
                                 </span>
@@ -281,12 +280,12 @@ const accents: Record<string, string> = {
                 </div>
                 <div
                     v-else
-                    class="mx-auto max-w-xl rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm"
+                    class="mx-auto max-w-xl rounded-2xl border border-border bg-card p-8 text-center shadow-sm"
                 >
-                    <h2 class="text-lg font-extrabold text-slate-900">
+                    <h2 class="text-lg font-extrabold text-foreground">
                         {{ t('public.pricing.emptyTitle') }}
                     </h2>
-                    <p class="mt-2 text-sm leading-6 text-slate-500">
+                    <p class="mt-2 text-sm leading-6 text-muted-foreground">
                         {{ t('public.pricing.emptyText') }}
                     </p>
                     <Link
@@ -297,15 +296,17 @@ const accents: Record<string, string> = {
                         <ArrowRight class="size-4" />
                     </Link>
                 </div>
-                <p class="mt-8 text-center text-xs leading-5 text-slate-400">
+                <p
+                    class="mt-8 text-center text-xs leading-5 text-muted-foreground"
+                >
                     {{ t('public.pricing.renewal') }}
                 </p>
             </section>
         </main>
 
-        <footer class="border-t border-slate-200 bg-white">
+        <footer class="border-t border-border bg-card">
             <div
-                class="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-8 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8"
+                class="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-8 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8"
             >
                 <p>
                     {{
@@ -320,25 +321,25 @@ const accents: Record<string, string> = {
                 >
                     <Link
                         :href="legal.privacy()"
-                        class="erin-focus rounded hover:text-blue-600"
+                        class="erin-focus rounded hover:text-[var(--erin-primary-text)]"
                     >
                         {{ t('public.common.privacy') }}
                     </Link>
                     <Link
                         :href="legal.imprint()"
-                        class="erin-focus rounded hover:text-blue-600"
+                        class="erin-focus rounded hover:text-[var(--erin-primary-text)]"
                     >
                         {{ t('public.common.imprint') }}
                     </Link>
                     <Link
                         :href="legal.terms()"
-                        class="erin-focus rounded hover:text-blue-600"
+                        class="erin-focus rounded hover:text-[var(--erin-primary-text)]"
                     >
                         {{ t('public.common.terms') }}
                     </Link>
                     <Link
                         :href="contact()"
-                        class="erin-focus rounded hover:text-blue-600"
+                        class="erin-focus rounded hover:text-[var(--erin-primary-text)]"
                     >
                         {{ t('public.common.contact') }}
                     </Link>

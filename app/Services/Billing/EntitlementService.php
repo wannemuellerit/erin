@@ -50,7 +50,7 @@ class EntitlementService
         $seatLimit = $plan->seat_limit === null
             ? null
             : $plan->seat_limit + $additionalSeats;
-        $purchasedVisa = $this->purchasedBalance($company, 'visa');
+        $purchasedVisa = max(0, $this->purchasedBalance($company, 'visa'));
 
         return [
             'plan' => [
@@ -161,9 +161,10 @@ class EntitlementService
         });
     }
 
-    public function consumeVisaCredit(Company $company, ?int $visaCaseId = null): void
+    /** @return array{source: 'included'|'purchased', usage_period_id: int|null, ledger_id: int|null} */
+    public function consumeVisaCredit(Company $company, ?int $visaCaseId = null): array
     {
-        DB::transaction(function () use ($company, $visaCaseId): void {
+        return DB::transaction(function () use ($company, $visaCaseId): array {
             /** @var Company $lockedCompany */
             $lockedCompany = Company::query()->with('plan')->lockForUpdate()->findOrFail((int) $company->getKey());
             $period = $this->termUsage($lockedCompany, true);
@@ -172,7 +173,11 @@ class EntitlementService
             if ($lockedCompany->plan !== null && ($limit === null || $period->visa_credits_used < $limit)) {
                 $period->increment('visa_credits_used');
 
-                return;
+                return [
+                    'source' => 'included',
+                    'usage_period_id' => (int) $period->getKey(),
+                    'ledger_id' => null,
+                ];
             }
 
             $balance = $this->purchasedBalance($lockedCompany, 'visa', true);
@@ -180,7 +185,7 @@ class EntitlementService
                 throw new DomainException(__('Es ist kein Visumpaket-Kontingent verfügbar.'));
             }
 
-            EntitlementLedger::query()->create([
+            $ledger = EntitlementLedger::query()->create([
                 'company_id' => $lockedCompany->getKey(),
                 'resource' => 'visa',
                 'amount' => -1,
@@ -188,6 +193,12 @@ class EntitlementService
                 'reference_type' => 'visa_case',
                 'reference_id' => $visaCaseId,
             ]);
+
+            return [
+                'source' => 'purchased',
+                'usage_period_id' => null,
+                'ledger_id' => (int) $ledger->getKey(),
+            ];
         });
     }
 

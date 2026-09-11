@@ -319,7 +319,7 @@ const name = computed(
             .join(' ') || t('candidate.profile.setupFallback'),
 );
 const input =
-    'erin-focus mt-1.5 h-11 w-full rounded-xl border border-slate-200 px-3.5 text-sm';
+    'erin-focus mt-1.5 h-11 w-full rounded-xl border border-border px-3.5 text-sm';
 const hasSkill = (id: number) => form.skills.some((skill) => skill.id === id);
 const toggleSkill = (id: number) => {
     form.skills = hasSkill(id)
@@ -488,7 +488,7 @@ onBeforeUnmount(() => {
             <template #actions>
                 <button
                     :disabled="form.processing || !profile"
-                    class="inline-flex h-10 items-center gap-2 rounded-xl bg-[var(--erin-primary)] px-4 text-sm font-bold text-white disabled:opacity-50"
+                    class="inline-flex h-10 items-center gap-2 rounded-xl bg-[var(--erin-primary)] px-4 text-sm font-bold text-[var(--erin-primary-foreground)] disabled:opacity-50"
                     @click="submitProfile"
                 >
                     <Save class="size-4" />
@@ -502,11 +502,11 @@ onBeforeUnmount(() => {
             class="erin-panel grid min-h-72 place-items-center p-8 text-center"
         >
             <div>
-                <UserRound class="mx-auto size-9 text-slate-300" />
+                <UserRound class="mx-auto size-9 text-muted-foreground" />
                 <h2 class="mt-4 font-bold">
                     {{ t('candidate.profile.preparingTitle') }}
                 </h2>
-                <p class="mt-2 text-sm text-slate-500">
+                <p class="mt-2 text-sm text-muted-foreground">
                     {{ t('candidate.profile.preparingDescription') }}
                 </p>
             </div>
@@ -523,7 +523,7 @@ onBeforeUnmount(() => {
                     />
                     <div
                         v-else
-                        class="grid size-20 shrink-0 place-items-center rounded-2xl bg-blue-50 text-xl font-extrabold text-[var(--erin-primary)]"
+                        class="grid size-20 shrink-0 place-items-center rounded-2xl bg-blue-50 text-xl font-extrabold text-[var(--erin-primary-text)]"
                     >
                         {{
                             name
@@ -535,7 +535,7 @@ onBeforeUnmount(() => {
                     </div>
                     <div class="flex-1">
                         <div class="flex flex-wrap items-center gap-2">
-                            <h2 class="text-xl font-extrabold text-slate-950">
+                            <h2 class="text-xl font-extrabold text-foreground">
                                 {{ name }}
                             </h2>
                             <BadgeCheck
@@ -550,7 +550,7 @@ onBeforeUnmount(() => {
                                 :tone="profile.published_at ? 'green' : 'slate'"
                             />
                         </div>
-                        <p class="mt-1 text-sm text-slate-500">
+                        <p class="mt-1 text-sm text-muted-foreground">
                             {{
                                 profile.desired_position ||
                                 profile.current_position ||
@@ -568,7 +568,7 @@ onBeforeUnmount(() => {
                         </div>
                     </div>
                     <button
-                        class="h-10 rounded-xl border border-slate-200 px-4 text-xs font-bold text-slate-700"
+                        class="h-10 rounded-xl border border-border px-4 text-xs font-bold text-muted-foreground"
                         @click="router.post(publish.url())"
                     >
                         {{
@@ -581,15 +581,16 @@ onBeforeUnmount(() => {
             </section>
 
             <div class="overflow-x-auto">
-                <div class="flex min-w-max gap-1 rounded-xl bg-slate-100 p-1">
+                <div class="flex min-w-max gap-1 rounded-xl bg-muted p-1">
                     <button
                         v-for="tab in tabs"
                         :key="tab.key"
-                        class="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold"
+                        :data-test="`profile-tab-${tab.key}`"
+                        class="erin-focus inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold hover:bg-card"
                         :class="
                             active === tab.key
-                                ? 'bg-white text-[var(--erin-primary)] shadow-sm'
-                                : 'text-slate-500'
+                                ? 'bg-card text-[var(--erin-primary-text)] shadow-sm'
+                                : 'text-muted-foreground'
                         "
                         @click="active = tab.key"
                     >
@@ -610,51 +611,65 @@ onBeforeUnmount(() => {
                 >
                     <div class="grid gap-5 sm:grid-cols-2">
                         <label
-                            ><span class="text-sm font-bold text-slate-700">{{
-                                t('candidate.profile.personal.firstName')
-                            }}</span
+                            ><span
+                                class="text-sm font-bold text-muted-foreground"
+                                >{{
+                                    t('candidate.profile.personal.firstName')
+                                }}</span
                             ><input
                                 v-model="form.first_name"
                                 required
                                 :class="input"
                         /></label>
                         <label
-                            ><span class="text-sm font-bold text-slate-700">{{
-                                t('candidate.profile.personal.lastName')
-                            }}</span
+                            ><span
+                                class="text-sm font-bold text-muted-foreground"
+                                >{{
+                                    t('candidate.profile.personal.lastName')
+                                }}</span
                             ><input
                                 v-model="form.last_name"
                                 required
                                 :class="input"
                         /></label>
                         <label
-                            ><span class="text-sm font-bold text-slate-700">{{
-                                t('candidate.profile.personal.birthDate')
-                            }}</span
+                            ><span
+                                class="text-sm font-bold text-muted-foreground"
+                                >{{
+                                    t('candidate.profile.personal.birthDate')
+                                }}</span
                             ><input
                                 v-model="form.birth_date"
                                 type="date"
                                 :class="input"
                         /></label>
                         <label
-                            ><span class="text-sm font-bold text-slate-700">{{
-                                t('candidate.profile.personal.gender')
-                            }}</span
+                            ><span
+                                class="text-sm font-bold text-muted-foreground"
+                                >{{
+                                    t('candidate.profile.personal.gender')
+                                }}</span
                             ><input v-model="form.gender" :class="input"
                         /></label>
                         <label
-                            ><span class="text-sm font-bold text-slate-700">{{
-                                t('candidate.profile.personal.nationality')
-                            }}</span
+                            ><span
+                                class="text-sm font-bold text-muted-foreground"
+                                >{{
+                                    t('candidate.profile.personal.nationality')
+                                }}</span
                             ><input
                                 v-model="form.nationality_country_code"
                                 maxlength="2"
                                 :class="input"
                         /></label>
                         <label
-                            ><span class="text-sm font-bold text-slate-700">{{
-                                t('candidate.profile.personal.currentCountry')
-                            }}</span
+                            ><span
+                                class="text-sm font-bold text-muted-foreground"
+                                >{{
+                                    t(
+                                        'candidate.profile.personal.currentCountry',
+                                    )
+                                }}</span
                             ><input
                                 v-model="form.current_country_code"
                                 required
@@ -662,33 +677,41 @@ onBeforeUnmount(() => {
                                 :class="input"
                         /></label>
                         <label
-                            ><span class="text-sm font-bold text-slate-700">{{
-                                t('candidate.profile.personal.currentCity')
-                            }}</span
+                            ><span
+                                class="text-sm font-bold text-muted-foreground"
+                                >{{
+                                    t('candidate.profile.personal.currentCity')
+                                }}</span
                             ><input
                                 v-model="form.current_city"
                                 required
                                 :class="input"
                         /></label>
                         <label
-                            ><span class="text-sm font-bold text-slate-700">{{
-                                t('candidate.profile.personal.phone')
-                            }}</span
+                            ><span
+                                class="text-sm font-bold text-muted-foreground"
+                                >{{
+                                    t('candidate.profile.personal.phone')
+                                }}</span
                             ><input
                                 v-model="form.phone"
                                 required
                                 :class="input"
                         /></label>
                         <label
-                            ><span class="text-sm font-bold text-slate-700">{{
-                                t('candidate.profile.personal.whatsapp')
-                            }}</span
+                            ><span
+                                class="text-sm font-bold text-muted-foreground"
+                                >{{
+                                    t('candidate.profile.personal.whatsapp')
+                                }}</span
                             ><input v-model="form.whatsapp" :class="input"
                         /></label>
                         <label
-                            ><span class="text-sm font-bold text-slate-700">{{
-                                t('candidate.profile.personal.email')
-                            }}</span
+                            ><span
+                                class="text-sm font-bold text-muted-foreground"
+                                >{{
+                                    t('candidate.profile.personal.email')
+                                }}</span
                             ><input
                                 v-model="form.email"
                                 required
@@ -697,14 +720,14 @@ onBeforeUnmount(() => {
                         /></label>
                     </div>
                     <label class="mt-5 block"
-                        ><span class="text-sm font-bold text-slate-700">{{
-                            t('candidate.profile.personal.summary')
-                        }}</span
+                        ><span
+                            class="text-sm font-bold text-muted-foreground"
+                            >{{ t('candidate.profile.personal.summary') }}</span
                         ><textarea
                             v-model="form.summary"
                             required
                             rows="5"
-                            class="erin-focus mt-1.5 w-full rounded-xl border border-slate-200 p-3.5 text-sm leading-6"
+                            class="erin-focus mt-1.5 w-full rounded-xl border border-border p-3.5 text-sm leading-6"
                         />
                     </label>
                 </SectionCard>
@@ -714,7 +737,7 @@ onBeforeUnmount(() => {
                         :description="t('candidate.profile.photo.description')"
                     >
                         <label
-                            class="erin-focus flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 px-4 py-4 text-sm font-bold text-slate-600 hover:border-blue-400 hover:text-blue-700"
+                            class="erin-focus flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-border px-4 py-4 text-sm font-bold text-muted-foreground hover:border-blue-400 hover:text-[var(--erin-primary-text-hover)]"
                         >
                             <ImagePlus class="size-4" />
                             {{
@@ -784,7 +807,7 @@ onBeforeUnmount(() => {
                     </SectionCard>
                     <SectionCard :title="t('candidate.profile.privacy.title')"
                         ><div
-                            class="space-y-3 text-xs leading-5 text-slate-500"
+                            class="space-y-3 text-xs leading-5 text-muted-foreground"
                         >
                             <p class="flex gap-2">
                                 <ShieldCheck
@@ -794,7 +817,7 @@ onBeforeUnmount(() => {
                             </p>
                             <p class="flex gap-2">
                                 <LockKeyhole
-                                    class="size-4 shrink-0 text-[var(--erin-primary)]"
+                                    class="size-4 shrink-0 text-[var(--erin-primary-text)]"
                                 />
                                 {{ t('candidate.profile.privacy.contact') }}
                             </p>
@@ -830,9 +853,11 @@ onBeforeUnmount(() => {
             >
                 <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                     <label
-                        ><span class="text-sm font-bold text-slate-700">{{
-                            t('candidate.profile.profession.occupation')
-                        }}</span
+                        ><span
+                            class="text-sm font-bold text-muted-foreground"
+                            >{{
+                                t('candidate.profile.profession.occupation')
+                            }}</span
                         ><select
                             v-model="form.occupation_id"
                             required
@@ -851,24 +876,34 @@ onBeforeUnmount(() => {
                         </select></label
                     >
                     <label
-                        ><span class="text-sm font-bold text-slate-700">{{
-                            t('candidate.profile.profession.currentPosition')
-                        }}</span
+                        ><span
+                            class="text-sm font-bold text-muted-foreground"
+                            >{{
+                                t(
+                                    'candidate.profile.profession.currentPosition',
+                                )
+                            }}</span
                         ><input v-model="form.current_position" :class="input"
                     /></label>
                     <label
-                        ><span class="text-sm font-bold text-slate-700">{{
-                            t('candidate.profile.profession.desiredPosition')
-                        }}</span
+                        ><span
+                            class="text-sm font-bold text-muted-foreground"
+                            >{{
+                                t(
+                                    'candidate.profile.profession.desiredPosition',
+                                )
+                            }}</span
                         ><input
                             v-model="form.desired_position"
                             required
                             :class="input"
                     /></label>
                     <label
-                        ><span class="text-sm font-bold text-slate-700">{{
-                            t('candidate.profile.profession.experience')
-                        }}</span
+                        ><span
+                            class="text-sm font-bold text-muted-foreground"
+                            >{{
+                                t('candidate.profile.profession.experience')
+                            }}</span
                         ><input
                             v-model.number="form.experience_years"
                             required
@@ -878,26 +913,32 @@ onBeforeUnmount(() => {
                             :class="input"
                     /></label>
                     <label
-                        ><span class="text-sm font-bold text-slate-700">{{
-                            t('candidate.profile.profession.qualification')
-                        }}</span
+                        ><span
+                            class="text-sm font-bold text-muted-foreground"
+                            >{{
+                                t('candidate.profile.profession.qualification')
+                            }}</span
                         ><input
                             v-model="form.highest_qualification"
                             :class="input"
                     /></label>
                     <label
-                        ><span class="text-sm font-bold text-slate-700">{{
-                            t('candidate.profile.profession.availableFrom')
-                        }}</span
+                        ><span
+                            class="text-sm font-bold text-muted-foreground"
+                            >{{
+                                t('candidate.profile.profession.availableFrom')
+                            }}</span
                         ><input
                             v-model="form.available_from"
                             type="date"
                             :class="input"
                     /></label>
                     <label
-                        ><span class="text-sm font-bold text-slate-700">{{
-                            t('candidate.profile.profession.salary')
-                        }}</span
+                        ><span
+                            class="text-sm font-bold text-muted-foreground"
+                            >{{
+                                t('candidate.profile.profession.salary')
+                            }}</span
                         ><input
                             v-model.number="form.salary_expectation_cents"
                             min="0"
@@ -905,9 +946,11 @@ onBeforeUnmount(() => {
                             :class="input"
                     /></label>
                     <label
-                        ><span class="text-sm font-bold text-slate-700">{{
-                            t('candidate.profile.profession.weeklyHours')
-                        }}</span
+                        ><span
+                            class="text-sm font-bold text-muted-foreground"
+                            >{{
+                                t('candidate.profile.profession.weeklyHours')
+                            }}</span
                         ><input
                             v-model.number="form.weekly_hours"
                             min="1"
@@ -918,14 +961,14 @@ onBeforeUnmount(() => {
                 </div>
                 <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     <label
-                        class="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-sm"
+                        class="flex items-center gap-2 rounded-xl border border-border p-3 text-sm"
                         ><input v-model="form.travel_ready" type="checkbox" />
                         {{
                             t('candidate.profile.profession.travelReady')
                         }}</label
                     >
                     <label
-                        class="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-sm"
+                        class="flex items-center gap-2 rounded-xl border border-border p-3 text-sm"
                         ><input
                             v-model="form.relocation_ready"
                             type="checkbox"
@@ -935,14 +978,14 @@ onBeforeUnmount(() => {
                         }}</label
                     >
                     <label
-                        class="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-sm"
+                        class="flex items-center gap-2 rounded-xl border border-border p-3 text-sm"
                         ><input v-model="form.requires_visa" type="checkbox" />
                         {{
                             t('candidate.profile.profession.requiresVisa')
                         }}</label
                     >
                     <label
-                        class="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-sm"
+                        class="flex items-center gap-2 rounded-xl border border-border p-3 text-sm"
                         ><input
                             v-model="form.has_work_permit"
                             type="checkbox"
@@ -954,7 +997,7 @@ onBeforeUnmount(() => {
                 </div>
                 <div class="mt-6 grid gap-6 lg:grid-cols-2">
                     <div>
-                        <p class="text-sm font-extrabold text-slate-800">
+                        <p class="text-sm font-extrabold text-foreground">
                             {{ t('candidate.profile.profession.licenses') }}
                         </p>
                         <div class="mt-2 flex flex-wrap gap-2">
@@ -970,11 +1013,11 @@ onBeforeUnmount(() => {
                                 ]"
                                 :key="license"
                                 type="button"
-                                class="rounded-lg border px-3 py-2 text-xs font-bold"
+                                class="erin-focus rounded-lg border px-3 py-2 text-xs font-bold hover:border-blue-400"
                                 :class="
                                     form.driving_licenses.includes(license)
-                                        ? 'border-blue-300 bg-blue-50 text-blue-700'
-                                        : 'border-slate-200 text-slate-500'
+                                        ? 'border-blue-300 bg-blue-50 text-[var(--erin-primary-text-hover)]'
+                                        : 'border-border text-muted-foreground'
                                 "
                                 @click="
                                     toggleArrayValue(
@@ -988,7 +1031,7 @@ onBeforeUnmount(() => {
                         </div>
                     </div>
                     <div>
-                        <p class="text-sm font-extrabold text-slate-800">
+                        <p class="text-sm font-extrabold text-foreground">
                             {{
                                 t(
                                     'candidate.profile.profession.employmentPreferences',
@@ -1004,7 +1047,7 @@ onBeforeUnmount(() => {
                                     'permanent',
                                 ]"
                                 :key="preference"
-                                class="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-sm"
+                                class="flex items-center gap-2 rounded-xl border border-border p-3 text-sm"
                             >
                                 <input
                                     type="checkbox"
@@ -1042,12 +1085,12 @@ onBeforeUnmount(() => {
                         <article
                             v-for="(experience, index) in form.experiences"
                             :key="experience.id ?? `new-experience-${index}`"
-                            class="rounded-2xl border border-slate-200 p-4"
+                            class="rounded-2xl border border-border p-4"
                         >
                             <div class="mb-4 flex items-center justify-between">
                                 <div class="flex items-center gap-2">
                                     <GripVertical
-                                        class="size-4 text-slate-300"
+                                        class="size-4 text-muted-foreground"
                                     />
                                     <strong class="text-sm">{{
                                         t(
@@ -1099,7 +1142,9 @@ onBeforeUnmount(() => {
                             <div
                                 class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
                             >
-                                <label class="text-xs font-bold text-slate-600">
+                                <label
+                                    class="text-xs font-bold text-muted-foreground"
+                                >
                                     {{
                                         t('candidate.profile.history.employer')
                                     }}
@@ -1109,7 +1154,9 @@ onBeforeUnmount(() => {
                                         :class="input"
                                     />
                                 </label>
-                                <label class="text-xs font-bold text-slate-600">
+                                <label
+                                    class="text-xs font-bold text-muted-foreground"
+                                >
                                     {{
                                         t('candidate.profile.history.position')
                                     }}
@@ -1119,7 +1166,9 @@ onBeforeUnmount(() => {
                                         :class="input"
                                     />
                                 </label>
-                                <label class="text-xs font-bold text-slate-600">
+                                <label
+                                    class="text-xs font-bold text-muted-foreground"
+                                >
                                     {{ t('candidate.profile.history.country') }}
                                     <input
                                         v-model="experience.country_code"
@@ -1127,7 +1176,9 @@ onBeforeUnmount(() => {
                                         :class="input"
                                     />
                                 </label>
-                                <label class="text-xs font-bold text-slate-600">
+                                <label
+                                    class="text-xs font-bold text-muted-foreground"
+                                >
                                     {{
                                         t('candidate.profile.history.startedAt')
                                     }}
@@ -1138,7 +1189,9 @@ onBeforeUnmount(() => {
                                         :class="input"
                                     />
                                 </label>
-                                <label class="text-xs font-bold text-slate-600">
+                                <label
+                                    class="text-xs font-bold text-muted-foreground"
+                                >
                                     {{ t('candidate.profile.history.endedAt') }}
                                     <input
                                         v-model="experience.ended_at"
@@ -1158,13 +1211,13 @@ onBeforeUnmount(() => {
                                 </label>
                             </div>
                             <label
-                                class="mt-4 block text-xs font-bold text-slate-600"
+                                class="mt-4 block text-xs font-bold text-muted-foreground"
                             >
                                 {{ t('candidate.profile.history.description') }}
                                 <textarea
                                     v-model="experience.description"
                                     rows="3"
-                                    class="erin-focus mt-1.5 w-full rounded-xl border border-slate-200 p-3 text-sm"
+                                    class="erin-focus mt-1.5 w-full rounded-xl border border-border p-3 text-sm"
                                 />
                             </label>
                         </article>
@@ -1187,7 +1240,7 @@ onBeforeUnmount(() => {
                         <article
                             v-for="(education, index) in form.educations"
                             :key="education.id ?? `new-education-${index}`"
-                            class="rounded-2xl border border-slate-200 p-4"
+                            class="rounded-2xl border border-border p-4"
                         >
                             <div class="mb-4 flex items-center justify-between">
                                 <strong class="text-sm">{{
@@ -1234,7 +1287,9 @@ onBeforeUnmount(() => {
                             <div
                                 class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
                             >
-                                <label class="text-xs font-bold text-slate-600">
+                                <label
+                                    class="text-xs font-bold text-muted-foreground"
+                                >
                                     {{
                                         t(
                                             'candidate.profile.history.institution',
@@ -1246,7 +1301,9 @@ onBeforeUnmount(() => {
                                         :class="input"
                                     />
                                 </label>
-                                <label class="text-xs font-bold text-slate-600">
+                                <label
+                                    class="text-xs font-bold text-muted-foreground"
+                                >
                                     {{
                                         t(
                                             'candidate.profile.history.qualification',
@@ -1258,14 +1315,18 @@ onBeforeUnmount(() => {
                                         :class="input"
                                     />
                                 </label>
-                                <label class="text-xs font-bold text-slate-600">
+                                <label
+                                    class="text-xs font-bold text-muted-foreground"
+                                >
                                     {{ t('candidate.profile.history.field') }}
                                     <input
                                         v-model="education.field"
                                         :class="input"
                                     />
                                 </label>
-                                <label class="text-xs font-bold text-slate-600">
+                                <label
+                                    class="text-xs font-bold text-muted-foreground"
+                                >
                                     {{ t('candidate.profile.history.country') }}
                                     <input
                                         v-model="education.country_code"
@@ -1273,7 +1334,9 @@ onBeforeUnmount(() => {
                                         :class="input"
                                     />
                                 </label>
-                                <label class="text-xs font-bold text-slate-600">
+                                <label
+                                    class="text-xs font-bold text-muted-foreground"
+                                >
                                     {{
                                         t('candidate.profile.history.startedAt')
                                     }}
@@ -1283,7 +1346,9 @@ onBeforeUnmount(() => {
                                         :class="input"
                                     />
                                 </label>
-                                <label class="text-xs font-bold text-slate-600">
+                                <label
+                                    class="text-xs font-bold text-muted-foreground"
+                                >
                                     {{
                                         t(
                                             'candidate.profile.history.completedAt',
@@ -1320,18 +1385,18 @@ onBeforeUnmount(() => {
                             v-for="skill in skills"
                             :key="skill.id"
                             type="button"
-                            class="rounded-lg border px-3 py-2 text-xs font-bold"
+                            class="erin-focus rounded-lg border px-3 py-2 text-xs font-bold hover:border-teal-400"
                             :class="
                                 hasSkill(skill.id)
                                     ? 'border-teal-300 bg-teal-50 text-teal-700'
-                                    : 'border-slate-200 text-slate-500'
+                                    : 'border-border text-muted-foreground'
                             "
                             @click="toggleSkill(skill.id)"
                         >
                             {{ localizedField(skill) }}
                         </button>
                     </div>
-                    <p v-else class="text-sm text-slate-400">
+                    <p v-else class="text-sm text-muted-foreground">
                         {{ t('candidate.profile.skills.empty') }}
                     </p></SectionCard
                 >
@@ -1341,7 +1406,7 @@ onBeforeUnmount(() => {
                         <div
                             v-for="language in languages"
                             :key="language.id"
-                            class="flex items-center gap-3 rounded-xl border border-slate-200 p-3"
+                            class="flex items-center gap-3 rounded-xl border border-border p-3"
                         >
                             <input
                                 :checked="hasLanguage(language.id)"
@@ -1353,7 +1418,7 @@ onBeforeUnmount(() => {
                             ><select
                                 v-if="hasLanguage(language.id)"
                                 :value="languageLevel(language.id)"
-                                class="h-8 rounded-lg border border-slate-200 px-2 text-xs"
+                                class="h-8 rounded-lg border border-border px-2 text-xs"
                                 @change="
                                     updateLanguageLevel(
                                         language.id,
@@ -1378,7 +1443,7 @@ onBeforeUnmount(() => {
                             </select>
                         </div>
                     </div>
-                    <p v-else class="text-sm text-slate-400">
+                    <p v-else class="text-sm text-muted-foreground">
                         {{ t('candidate.profile.skills.languagesEmpty') }}
                     </p></SectionCard
                 >
@@ -1393,9 +1458,9 @@ onBeforeUnmount(() => {
                     <div
                         v-for="(slot, index) in form.availability"
                         :key="`${slot.weekday}-${index}`"
-                        class="grid items-end gap-3 rounded-xl border border-slate-200 p-4 sm:grid-cols-[1fr_1fr_1fr_auto]"
+                        class="grid items-end gap-3 rounded-xl border border-border p-4 sm:grid-cols-[1fr_1fr_1fr_auto]"
                     >
-                        <label class="text-xs font-bold text-slate-600">
+                        <label class="text-xs font-bold text-muted-foreground">
                             {{ t('candidate.profile.availability.weekday') }}
                             <select v-model="slot.weekday" :class="input">
                                 <option
@@ -1411,7 +1476,7 @@ onBeforeUnmount(() => {
                                 </option>
                             </select>
                         </label>
-                        <label class="text-xs font-bold text-slate-600">
+                        <label class="text-xs font-bold text-muted-foreground">
                             {{ t('candidate.profile.availability.from') }}
                             <input
                                 v-model="slot.starts_at"
@@ -1419,7 +1484,7 @@ onBeforeUnmount(() => {
                                 :class="input"
                             />
                         </label>
-                        <label class="text-xs font-bold text-slate-600">
+                        <label class="text-xs font-bold text-muted-foreground">
                             {{ t('candidate.profile.availability.until') }}
                             <input
                                 v-model="slot.ends_at"

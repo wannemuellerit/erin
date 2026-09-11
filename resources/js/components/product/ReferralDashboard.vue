@@ -3,6 +3,7 @@ import { router, useForm } from '@inertiajs/vue3';
 import {
     Check,
     Copy,
+    CreditCard,
     Euro,
     Gift,
     Mail,
@@ -24,8 +25,7 @@ import Textarea from '@/components/product/Textarea.vue';
 import { useFormatters } from '@/composables/useFormatters';
 import { useCapabilities } from '@/composables/useCapabilities';
 import { useStatusLabels } from '@/composables/useStatusLabels';
-import de from '@/i18n/messages/product-components-de';
-import en from '@/i18n/messages/product-components-en';
+import { productMessages } from '@/i18n/product-locales';
 import { create, email as sendReferralEmail } from '@/routes/referrals';
 import type { Referral, ReferralDashboardProps, StatusTone } from '@/types';
 
@@ -41,11 +41,13 @@ const props = withDefaults(defineProps<ReferralDashboardProps>(), {
         paid_cents: 0,
     }),
     referrals: () => [],
+    payoutAccount: null,
+    payoutIntents: () => [],
 });
 
 const { t } = useI18n({
     useScope: 'local',
-    messages: { de, en },
+    messages: productMessages,
 });
 const { formatCurrency, formatDate: formatLocalizedDate } = useFormatters();
 const { can } = useCapabilities();
@@ -57,6 +59,27 @@ const emailForm = useForm({
     email: '',
     message: '',
 });
+const payoutForm = useForm({
+    provider: 'stripe',
+    external_account_token: '',
+    country_code: 'DE',
+    currency_code: 'EUR',
+    terms_version: 'payout-v1',
+    terms_accepted: false,
+});
+const connectPayout = () =>
+    payoutForm.post('/referrals/payout-account', {
+        preserveScroll: true,
+        onSuccess: () =>
+            payoutForm.reset('external_account_token', 'terms_accepted'),
+    });
+const disconnectPayout = () => {
+    if (props.payoutAccount) {
+        router.delete(`/referrals/payout-account/${props.payoutAccount.id}`, {
+            preserveScroll: true,
+        });
+    }
+};
 
 const money = (amount: number, currency = 'EUR') =>
     formatCurrency(amount / 100, currency);
@@ -163,16 +186,16 @@ const sendEmail = () => {
                         {{ t('referralDashboard.heroDescription') }}
                     </p>
                     <div v-if="code" class="mt-5 max-w-xl">
-                        <div class="flex rounded-xl bg-white p-1.5">
+                        <div class="flex rounded-xl bg-card p-1.5">
                             <input
                                 readonly
                                 :value="code.url"
-                                class="min-w-0 flex-1 bg-transparent px-3 text-xs font-medium text-slate-600 outline-none"
+                                class="min-w-0 flex-1 bg-transparent px-3 text-xs font-medium text-muted-foreground outline-none"
                             />
                             <button
                                 v-if="canManageReferrals()"
                                 type="button"
-                                class="inline-flex h-9 items-center gap-2 rounded-lg bg-[var(--erin-primary)] px-3 text-xs font-bold text-white"
+                                class="inline-flex h-9 items-center gap-2 rounded-lg bg-[var(--erin-primary)] px-3 text-xs font-bold text-[var(--erin-primary-foreground)]"
                                 @click="copyLink"
                             >
                                 <Check v-if="copied" class="size-3.5" />
@@ -209,7 +232,7 @@ const sendEmail = () => {
                     <button
                         v-else-if="canManageReferrals()"
                         type="button"
-                        class="mt-5 h-10 rounded-xl bg-white px-4 text-xs font-bold text-[var(--erin-primary)]"
+                        class="mt-5 h-10 rounded-xl bg-card px-4 text-xs font-bold text-[var(--erin-primary-text)]"
                         @click="createLink"
                     >
                         {{ t('referralDashboard.createLink') }}
@@ -227,6 +250,98 @@ const sendEmail = () => {
             </div>
         </section>
 
+        <SectionCard
+            :title="t('referralDashboard.payout.title')"
+            :description="t('referralDashboard.payout.description')"
+        >
+            <div
+                v-if="payoutAccount"
+                class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border p-4"
+            >
+                <div class="flex items-center gap-3">
+                    <CreditCard class="size-5 text-teal-600" />
+                    <div>
+                        <p class="font-semibold">
+                            {{ payoutAccount.provider }} ·
+                            {{ payoutAccount.country_code }} ·
+                            {{ payoutAccount.currency_code }}
+                        </p>
+                        <p class="text-sm text-muted-foreground">
+                            {{
+                                t('referralDashboard.payout.accountStatus', {
+                                    status: payoutAccount.status,
+                                    kyc: payoutAccount.kyc_status,
+                                })
+                            }}
+                        </p>
+                    </div>
+                </div>
+                <button
+                    type="button"
+                    class="erin-button erin-button-secondary"
+                    @click="disconnectPayout"
+                >
+                    {{ t('referralDashboard.payout.disconnect') }}
+                </button>
+            </div>
+            <form
+                v-else
+                class="grid gap-3 md:grid-cols-3"
+                @submit.prevent="connectPayout"
+            >
+                <label class="grid gap-1 text-sm md:col-span-2"
+                    ><span>{{
+                        t('referralDashboard.payout.accountToken')
+                    }}</span
+                    ><input
+                        v-model="payoutForm.external_account_token"
+                        class="erin-input"
+                        :placeholder="
+                            t(
+                                'referralDashboard.payout.accountTokenPlaceholder',
+                            )
+                        "
+                        required /></label
+                ><label class="grid gap-1 text-sm"
+                    ><span>{{ t('referralDashboard.payout.country') }}</span
+                    ><input
+                        v-model="payoutForm.country_code"
+                        class="erin-input uppercase"
+                        maxlength="2"
+                        required /></label
+                ><label class="flex items-start gap-2 text-sm md:col-span-3"
+                    ><input
+                        v-model="payoutForm.terms_accepted"
+                        class="mt-1"
+                        type="checkbox"
+                        required
+                    /><span>{{
+                        t('referralDashboard.payout.terms')
+                    }}</span></label
+                ><button
+                    class="erin-button erin-button-primary md:w-fit"
+                    :disabled="payoutForm.processing"
+                >
+                    {{ t('referralDashboard.payout.connect') }}
+                </button>
+            </form>
+            <div v-if="payoutIntents.length" class="mt-4 space-y-2">
+                <div
+                    v-for="intent in payoutIntents"
+                    :key="intent.public_id"
+                    class="flex items-center justify-between rounded-lg bg-muted px-3 py-2 text-sm"
+                >
+                    <span>{{
+                        money(intent.amount_cents, intent.currency_code)
+                    }}</span
+                    ><StatusBadge
+                        :label="intent.status"
+                        :tone="statusTone(intent.status)"
+                    />
+                </div>
+            </div>
+        </SectionCard>
+
         <form
             v-if="showEmailForm && code && canManageReferrals()"
             class="erin-panel grid gap-4 p-5 sm:grid-cols-2"
@@ -243,7 +358,7 @@ const sendEmail = () => {
                     v-model="emailForm.email"
                     required
                     type="email"
-                    class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                    class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                 />
             </FormField>
             <FormField
@@ -260,7 +375,7 @@ const sendEmail = () => {
             <button
                 type="submit"
                 :disabled="emailForm.processing"
-                class="h-10 rounded-xl bg-[var(--erin-primary)] text-xs font-bold text-white disabled:opacity-50"
+                class="h-10 rounded-xl bg-[var(--erin-primary)] text-xs font-bold text-[var(--erin-primary-foreground)] disabled:opacity-50"
             >
                 {{ t('referralDashboard.sendRecommendation') }}
             </button>
@@ -311,7 +426,7 @@ const sendEmail = () => {
                 <table class="w-full min-w-[640px] text-sm">
                     <thead>
                         <tr
-                            class="border-b border-slate-200 text-left text-[10px] font-bold tracking-wider text-slate-400 uppercase"
+                            class="border-b border-border text-left text-[10px] font-bold tracking-wider text-muted-foreground uppercase"
                         >
                             <th class="pb-3">
                                 {{ t('referralDashboard.columns.reference') }}
@@ -334,12 +449,12 @@ const sendEmail = () => {
                         <tr
                             v-for="referral in referrals"
                             :key="referral.id"
-                            class="border-b border-slate-100 last:border-0"
+                            class="border-b border-border last:border-0"
                         >
-                            <td class="py-4 font-bold text-slate-800">
+                            <td class="py-4 font-bold text-foreground">
                                 #REF-{{ referral.id }}
                             </td>
-                            <td class="py-4 text-slate-500">
+                            <td class="py-4 text-muted-foreground">
                                 {{
                                     referralDate(referral)
                                         ? formatDate(
@@ -354,7 +469,7 @@ const sendEmail = () => {
                                     :tone="statusTone(referral.status)"
                                 />
                             </td>
-                            <td class="py-4 text-slate-500">
+                            <td class="py-4 text-muted-foreground">
                                 {{
                                     referral.hold_until
                                         ? formatDate(referral.hold_until)
@@ -362,7 +477,7 @@ const sendEmail = () => {
                                 }}
                             </td>
                             <td
-                                class="py-4 text-right font-bold text-slate-800"
+                                class="py-4 text-right font-bold text-foreground"
                             >
                                 {{
                                     referral.commission_cents

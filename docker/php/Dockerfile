@@ -1,4 +1,4 @@
-ARG PHP_VERSION=8.4
+ARG PHP_VERSION=8.5
 ARG PHP_VARIANT=cli
 
 FROM php:${PHP_VERSION}-${PHP_VARIANT}-bookworm
@@ -17,7 +17,6 @@ RUN apt-get update \
         libfreetype6-dev \
         libicu-dev \
         libjpeg62-turbo-dev \
-        libonig-dev \
         libpng-dev \
         libzip-dev \
         unzip \
@@ -27,8 +26,6 @@ RUN apt-get update \
         exif \
         gd \
         intl \
-        mbstring \
-        opcache \
         pcntl \
         pdo_mysql \
         sockets \

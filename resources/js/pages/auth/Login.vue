@@ -85,7 +85,10 @@ const insertDemoCredentials = (account: DemoAccount, demoPassword: string) => {
             />
 
             <div class="grid gap-2">
-                <Label for="email" class="text-sm font-semibold text-slate-700">
+                <Label
+                    for="email"
+                    class="text-sm font-semibold text-muted-foreground"
+                >
                     {{ t('auth.email') }}
                 </Label>
                 <Input
@@ -106,7 +109,7 @@ const insertDemoCredentials = (account: DemoAccount, demoPassword: string) => {
                 <div class="flex items-center justify-between">
                     <Label
                         for="password"
-                        class="text-sm font-semibold text-slate-700"
+                        class="text-sm font-semibold text-muted-foreground"
                     >
                         {{ t('auth.password') }}
                     </Label>
@@ -134,7 +137,7 @@ const insertDemoCredentials = (account: DemoAccount, demoPassword: string) => {
             <div class="flex items-center justify-between">
                 <Label for="remember" class="flex items-center space-x-3">
                     <Checkbox id="remember" name="remember" :tabindex="3" />
-                    <span class="text-sm text-slate-600">
+                    <span class="text-sm text-muted-foreground">
                         {{ t('auth.remember') }}
                     </span>
                 </Label>
@@ -162,7 +165,7 @@ const insertDemoCredentials = (account: DemoAccount, demoPassword: string) => {
             <TextLink
                 :href="register()"
                 :tabindex="5"
-                class="font-bold text-[var(--erin-primary,#2563EB)]"
+                class="font-bold text-[var(--erin-primary-text)]"
             >
                 {{ t('auth.registerNow') }}
             </TextLink>

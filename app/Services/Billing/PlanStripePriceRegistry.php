@@ -79,23 +79,23 @@ class PlanStripePriceRegistry
                         )
                         ->lockForUpdate()
                         ->first();
+                    $immutableMismatches = $existing === null ? [] : array_keys(array_filter([
+                        'plan_id' => $existing->plan_id !== $lockedPlan->getKey(),
+                        'stripe_product_id' => $existing->stripe_product_id !== $lockedPlan->stripe_product_id,
+                        'price_cents' => $existing->price_cents !== $lockedPlan->price_cents,
+                        'currency' => $existing->currency !== strtoupper($lockedPlan->currency),
+                        'term_months' => $existing->term_months !== $lockedPlan->term_months,
+                        'tax_behavior' => $existing->tax_behavior !== $this->taxBehavior($lockedPlan),
+                        'tax_code' => $existing->tax_code !== $this->taxCode($lockedPlan),
+                        'plan_snapshot' => $this->canonicalJson($existing->plan_snapshot) !== $this->canonicalJson($this->snapshot($lockedPlan)),
+                        'version_hash' => $existing->version_hash !== $versionHash,
+                    ]));
                     if (
                         $existing !== null
-                        && (
-                            $existing->plan_id !== $lockedPlan->getKey()
-                            || $existing->stripe_product_id
-                                !== $lockedPlan->stripe_product_id
-                            || $existing->price_cents
-                                !== $lockedPlan->price_cents
-                            || $existing->currency
-                                !== strtoupper($lockedPlan->currency)
-                            || $existing->term_months
-                                !== $lockedPlan->term_months
-                            || $existing->version_hash !== $versionHash
-                        )
+                        && $immutableMismatches !== []
                     ) {
                         throw new LogicException(
-                            'Eine Stripe-Price-Version ist unveränderlich und darf keinem anderen Paket oder Betrag zugeordnet werden.',
+                            'Eine Stripe-Price-Version ist unveränderlich und darf keinem anderen Paket oder Betrag zugeordnet werden. Abweichende Felder: '.implode(', ', $immutableMismatches).'.',
                         );
                     }
 
@@ -130,6 +130,9 @@ class PlanStripePriceRegistry
                         'price_cents' => $lockedPlan->price_cents,
                         'currency' => strtoupper($lockedPlan->currency),
                         'term_months' => $lockedPlan->term_months,
+                        'tax_behavior' => $this->taxBehavior($lockedPlan),
+                        'tax_code' => $this->taxCode($lockedPlan),
+                        'plan_snapshot' => $this->snapshot($lockedPlan),
                         'version_hash' => $versionHash,
                         'source' => $source,
                         'is_current' => true,
@@ -156,7 +159,60 @@ class PlanStripePriceRegistry
             $plan->price_cents,
             strtoupper($plan->currency),
             $plan->term_months,
+            $this->taxBehavior($plan),
+            $this->taxCode($plan) ?? '',
+            json_encode($this->snapshot($plan), JSON_THROW_ON_ERROR),
         ]));
+    }
+
+    private function taxBehavior(Plan $plan): string
+    {
+        $value = data_get($plan->features, 'billing.tax_behavior');
+
+        return in_array($value, ['inclusive', 'exclusive', 'unspecified'], true)
+            ? $value
+            : 'unspecified';
+    }
+
+    private function taxCode(Plan $plan): ?string
+    {
+        $value = data_get($plan->features, 'billing.tax_code');
+
+        return is_string($value) && $value !== '' && mb_strlen($value) <= 80
+            ? $value
+            : null;
+    }
+
+    /** @return array<string, mixed> */
+    private function snapshot(Plan $plan): array
+    {
+        return [
+            'slug' => $plan->slug,
+            'name' => $plan->name,
+            'description' => $plan->description,
+            'active_jobs_limit' => $plan->active_jobs_limit,
+            'seat_limit' => $plan->seat_limit,
+            'ai_credits_monthly' => $plan->ai_credits_monthly,
+            'job_boosts_per_term' => $plan->job_boosts_per_term,
+            'visa_credits_per_term' => $plan->visa_credits_per_term,
+            'features' => $plan->features,
+        ];
+    }
+
+    private function canonicalJson(mixed $value): string
+    {
+        if (is_array($value)) {
+            if (! array_is_list($value)) {
+                ksort($value);
+            }
+            foreach ($value as $key => $item) {
+                $value[$key] = is_array($item)
+                    ? json_decode($this->canonicalJson($item), true, 512, JSON_THROW_ON_ERROR)
+                    : $item;
+            }
+        }
+
+        return json_encode($value, JSON_THROW_ON_ERROR);
     }
 
     private function roleLockKey(string $priceId): string

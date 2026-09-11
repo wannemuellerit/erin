@@ -91,7 +91,7 @@ done < "${runtime_env}"
 unset token
 
 docker compose --project-directory "${ERIN_ROOT}" exec -T laravel php artisan optimize:clear
-docker compose --project-directory "${ERIN_ROOT}" restart laravel queue
+docker compose --project-directory "${ERIN_ROOT}" restart laravel horizon
 
 if ! docker compose --project-directory "${ERIN_ROOT}" exec -T \
     laravel php artisan erin:zammad:smoke; then

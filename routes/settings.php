@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Settings\NotificationPhoneChannelController;
 use App\Http\Controllers\Settings\NotificationPreferencesController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\PushSubscriptionController;
@@ -44,6 +45,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('settings/push-subscriptions/test', [PushSubscriptionController::class, 'test'])
         ->middleware('throttle:3,1')
         ->name('push-subscriptions.test');
+    Route::post('settings/notification-phone-channels', [NotificationPhoneChannelController::class, 'store'])
+        ->middleware('throttle:3,10')->name('notification-phone-channels.store');
+    Route::post('settings/notification-phone-channels/{channel}/verify', [NotificationPhoneChannelController::class, 'verify'])
+        ->middleware('throttle:6,10')->name('notification-phone-channels.verify');
+    Route::delete('settings/notification-phone-channels/{channel}', [NotificationPhoneChannelController::class, 'destroy'])
+        ->name('notification-phone-channels.destroy');
 });
 
 /* @chisel-passkeys */

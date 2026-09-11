@@ -1,55 +1,29 @@
 <script setup lang="ts">
 import { usePage } from '@inertiajs/vue3';
-import { ChevronsUpDown } from '@lucide/vue';
 import { computed } from 'vue';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-    SidebarMenu,
-    SidebarMenuButton,
-    SidebarMenuItem,
-    useSidebar,
-} from '@/components/ui/sidebar';
+import { useI18n } from 'vue-i18n';
+import { SidebarMenu, SidebarMenuItem } from '@/components/ui/sidebar';
 import UserInfo from '@/components/UserInfo.vue';
-import UserMenuContent from '@/components/UserMenuContent.vue';
 
 const page = usePage();
 const user = computed(() => page.props.auth.user);
-const { isMobile, state } = useSidebar();
+const { t } = useI18n();
 </script>
 
 <template>
+    <p
+        class="mb-1.5 px-2 text-[10px] font-extrabold tracking-[0.12em] text-amber-800 uppercase group-data-[collapsible=icon]:hidden"
+    >
+        {{ t('shell.loggedInAs') }}
+    </p>
     <SidebarMenu>
         <SidebarMenuItem>
-            <DropdownMenu>
-                <DropdownMenuTrigger as-child>
-                    <SidebarMenuButton
-                        size="lg"
-                        class="h-11 rounded-xl border border-slate-200 bg-white px-2 hover:bg-slate-50 data-[state=open]:bg-slate-50 data-[state=open]:text-slate-900"
-                        data-test="sidebar-menu-button"
-                    >
-                        <UserInfo :user="user" />
-                        <ChevronsUpDown class="ml-auto size-4" />
-                    </SidebarMenuButton>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                    class="w-(--reka-dropdown-menu-trigger-width) min-w-56 rounded-lg"
-                    :side="
-                        isMobile
-                            ? 'bottom'
-                            : state === 'collapsed'
-                              ? 'left'
-                              : 'bottom'
-                    "
-                    align="end"
-                    :side-offset="4"
-                >
-                    <UserMenuContent :user="user" />
-                </DropdownMenuContent>
-            </DropdownMenu>
+            <div
+                data-test="sidebar-impersonated-user"
+                class="flex h-11 items-center gap-2 rounded-xl border border-amber-200 bg-card px-2 text-amber-950 shadow-sm group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:shadow-none group-data-[collapsible=icon]:[&>div:last-child]:hidden"
+            >
+                <UserInfo :user="user" />
+            </div>
         </SidebarMenuItem>
     </SidebarMenu>
 </template>

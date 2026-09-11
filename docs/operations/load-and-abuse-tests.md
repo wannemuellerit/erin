@@ -31,7 +31,7 @@ Der Command liefert Exit-Code `1`, sobald ein Grenzwert überschritten ist oder 
 
 Für einen realistischen Belastungstest müssen in einer isolierten Stagingumgebung zusätzlich mehrere parallele Importe eingestellt werden. Dabei sind mindestens Queue-Tiefe, ältester Job, Laufzeit pro 500er-Import, Datenbank-Locks, Redis-Speicher, Worker-Neustarts und fehlgeschlagene Jobs zu beobachten.
 
-## ClamAV und MinIO/S3
+## ClamAV und S3-Objektspeicher
 
 Die aktive technische Probe lautet:
 
@@ -45,7 +45,7 @@ Vor einem öffentlichen Start ist in Staging außerdem die offizielle EICAR-Test
 
 Folgende Storage-Randfälle bleiben Teil des manuellen Staging-Laufs:
 
-- MinIO während Upload, Scan und Queue-Verarbeitung kurzzeitig stoppen;
+- Objektspeicher während Upload, Scan und Queue-Verarbeitung kurzzeitig stoppen;
 - Objekt zwischen Upload und Worker-Ausführung entfernen;
 - ungültige Zugangsdaten und abgelaufene Schlüssel testen;
 - Schreibrecht erlauben, Löschrecht entziehen und den Alarmweg prüfen;

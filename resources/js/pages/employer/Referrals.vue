@@ -30,11 +30,30 @@ type Referral = {
     commission_cents?: number;
     currency?: string;
 };
+type PayoutAccount = {
+    id: number;
+    provider: string;
+    country_code: string;
+    currency_code: string;
+    status: string;
+    kyc_status: string;
+};
+type PayoutIntent = {
+    public_id: string;
+    amount_cents: number;
+    currency_code: string;
+    status: string;
+    submitted_at?: string | null;
+    paid_at?: string | null;
+    failure_code?: string | null;
+};
 
 defineProps<{
     code?: ReferralCode | null;
     metrics?: ReferralMetrics;
     referrals?: Referral[];
+    payoutAccount?: PayoutAccount | null;
+    payoutIntents?: PayoutIntent[];
 }>();
 const { t } = useI18n();
 </script>
@@ -46,5 +65,7 @@ const { t } = useI18n();
         :code="code"
         :metrics="metrics"
         :referrals="referrals"
+        :payout-account="payoutAccount"
+        :payout-intents="payoutIntents"
     />
 </template>

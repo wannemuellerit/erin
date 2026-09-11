@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { X } from '@lucide/vue';
 import { useI18n } from 'vue-i18n';
-import de from '@/i18n/messages/product-components-de';
-import en from '@/i18n/messages/product-components-en';
+import { productMessages } from '@/i18n/product-locales';
 
 withDefaults(
     defineProps<{
@@ -22,14 +21,14 @@ defineEmits<{
 
 const { t } = useI18n({
     useScope: 'local',
-    messages: { de, en },
+    messages: productMessages,
 });
 
 const tones = {
-    blue: 'bg-blue-50 text-blue-700',
+    blue: 'bg-blue-50 text-[var(--erin-primary-text-hover)]',
     teal: 'bg-teal-50 text-teal-700',
     orange: 'bg-orange-50 text-orange-700',
-    slate: 'bg-slate-100 text-slate-600',
+    slate: 'bg-muted text-muted-foreground',
 };
 </script>
 

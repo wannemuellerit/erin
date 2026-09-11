@@ -26,7 +26,10 @@ class ImportZammadAttachment implements ShouldBeUnique, ShouldQueue
     /** @var list<int> */
     public array $backoff = [30, 120, 300, 900];
 
-    public function __construct(public readonly int $attachmentId) {}
+    public function __construct(public readonly int $attachmentId)
+    {
+        $this->onQueue('webhooks');
+    }
 
     public function uniqueId(): string
     {

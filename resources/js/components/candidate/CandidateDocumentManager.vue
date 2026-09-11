@@ -64,7 +64,7 @@ const replaceForm = useForm({
     file: null as File | null,
 });
 const fieldClass =
-    'erin-focus mt-1.5 h-11 w-full rounded-xl border border-slate-200 px-3.5 text-sm';
+    'erin-focus mt-1.5 h-11 w-full rounded-xl border border-border bg-card px-3.5 text-sm text-foreground';
 
 const typeLabel = (type: string) => {
     const key = `candidate.profile.documents.types.${type}`;
@@ -161,7 +161,7 @@ function revoke(document: CandidateDocumentItem, applicationId: number): void {
                 <article
                     v-for="document in documents"
                     :key="document.id"
-                    class="rounded-xl border border-slate-200 p-4"
+                    class="rounded-xl border border-border p-4"
                 >
                     <div class="flex flex-wrap items-center gap-3">
                         <span
@@ -172,7 +172,7 @@ function revoke(document: CandidateDocumentItem, applicationId: number): void {
                             <p class="text-sm font-bold">
                                 {{ document.title }}
                             </p>
-                            <p class="truncate text-xs text-slate-400">
+                            <p class="truncate text-xs text-muted-foreground">
                                 {{ document.original_name }} ·
                                 {{ sizeLabel(document.size_bytes) }} ·
                                 {{
@@ -183,7 +183,7 @@ function revoke(document: CandidateDocumentItem, applicationId: number): void {
                             </p>
                             <p
                                 v-if="document.expires_at"
-                                class="mt-1 text-xs text-slate-500"
+                                class="mt-1 text-xs text-muted-foreground"
                             >
                                 {{
                                     t('candidate.profile.documents.expiresAt', {
@@ -216,7 +216,7 @@ function revoke(document: CandidateDocumentItem, applicationId: number): void {
                         <a
                             v-if="document.download_url"
                             :href="document.download_url"
-                            class="grid size-9 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"
+                            class="grid size-9 place-items-center rounded-lg text-muted-foreground hover:bg-muted"
                             :aria-label="
                                 t('candidate.profile.documents.download', {
                                     title: document.title,
@@ -253,7 +253,7 @@ function revoke(document: CandidateDocumentItem, applicationId: number): void {
                     </div>
                     <div
                         v-if="document.active_grants?.length"
-                        class="mt-4 space-y-2 border-t border-slate-100 pt-4"
+                        class="mt-4 space-y-2 border-t border-border pt-4"
                     >
                         <div
                             v-for="grant in document.active_grants"
@@ -281,10 +281,10 @@ function revoke(document: CandidateDocumentItem, applicationId: number): void {
                     </div>
                     <form
                         v-if="editing === document.id"
-                        class="mt-4 grid gap-3 border-t border-slate-100 pt-4 sm:grid-cols-3"
+                        class="mt-4 grid gap-3 border-t border-border pt-4 sm:grid-cols-3"
                         @submit.prevent="saveEdit(document)"
                     >
-                        <label class="text-xs font-bold text-slate-600"
+                        <label class="text-xs font-bold text-muted-foreground"
                             >{{ t('candidate.profile.documents.type')
                             }}<select
                                 v-model="editForm.type"
@@ -299,14 +299,14 @@ function revoke(document: CandidateDocumentItem, applicationId: number): void {
                                 </option>
                             </select></label
                         >
-                        <label class="text-xs font-bold text-slate-600"
+                        <label class="text-xs font-bold text-muted-foreground"
                             >{{ t('candidate.profile.documents.documentTitle')
                             }}<input
                                 v-model="editForm.title"
                                 required
                                 :class="fieldClass"
                         /></label>
-                        <label class="text-xs font-bold text-slate-600"
+                        <label class="text-xs font-bold text-muted-foreground"
                             >{{ t('candidate.profile.documents.expiryDate')
                             }}<input
                                 v-model="editForm.expires_at"
@@ -332,10 +332,10 @@ function revoke(document: CandidateDocumentItem, applicationId: number): void {
                     </form>
                     <form
                         v-if="replacing === document.id"
-                        class="mt-4 grid gap-3 border-t border-slate-100 pt-4 sm:grid-cols-3"
+                        class="mt-4 grid gap-3 border-t border-border pt-4 sm:grid-cols-3"
                         @submit.prevent="replace(document)"
                     >
-                        <label class="text-xs font-bold text-slate-600"
+                        <label class="text-xs font-bold text-muted-foreground"
                             >{{ t('candidate.profile.documents.type')
                             }}<select
                                 v-model="replaceForm.type"
@@ -350,14 +350,14 @@ function revoke(document: CandidateDocumentItem, applicationId: number): void {
                                 </option>
                             </select></label
                         >
-                        <label class="text-xs font-bold text-slate-600"
+                        <label class="text-xs font-bold text-muted-foreground"
                             >{{ t('candidate.profile.documents.documentTitle')
                             }}<input
                                 v-model="replaceForm.title"
                                 required
                                 :class="fieldClass"
                         /></label>
-                        <label class="text-xs font-bold text-slate-600"
+                        <label class="text-xs font-bold text-muted-foreground"
                             >{{ t('candidate.profile.documents.expiryDate')
                             }}<input
                                 v-model="replaceForm.expires_at"
@@ -403,7 +403,7 @@ function revoke(document: CandidateDocumentItem, applicationId: number): void {
                     </form>
                 </article>
             </div>
-            <p v-else class="py-6 text-center text-sm text-slate-400">
+            <p v-else class="py-6 text-center text-sm text-muted-foreground">
                 {{ t('candidate.profile.documents.empty') }}
             </p>
         </SectionCard>
@@ -412,7 +412,7 @@ function revoke(document: CandidateDocumentItem, applicationId: number): void {
                 class="grid gap-4 sm:grid-cols-2"
                 @submit.prevent="submitUpload"
             >
-                <label class="text-xs font-bold text-slate-600"
+                <label class="text-xs font-bold text-muted-foreground"
                     >{{ t('candidate.profile.documents.type')
                     }}<select
                         v-model="uploadForm.type"
@@ -428,14 +428,14 @@ function revoke(document: CandidateDocumentItem, applicationId: number): void {
                         </option>
                     </select></label
                 >
-                <label class="text-xs font-bold text-slate-600"
+                <label class="text-xs font-bold text-muted-foreground"
                     >{{ t('candidate.profile.documents.documentTitle')
                     }}<input
                         v-model="uploadForm.title"
                         required
                         :class="fieldClass"
                 /></label>
-                <label class="text-xs font-bold text-slate-600"
+                <label class="text-xs font-bold text-muted-foreground"
                     >{{ t('candidate.profile.documents.expiryDate')
                     }}<input
                         v-model="uploadForm.expires_at"

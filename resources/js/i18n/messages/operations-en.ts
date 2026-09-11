@@ -14,6 +14,12 @@ export default {
         category: 'Category',
         categoryPlaceholder: 'e.g. application, billing or technology',
         priority: 'Priority',
+        recurrence: 'Recurrence',
+        recurrenceNone: 'None',
+        recurrenceDaily: 'Daily',
+        recurrenceWeekly: 'Weekly',
+        recurrenceMonthly: 'Monthly',
+        snoozeDay: 'Snooze 1 day',
         priorities: {
             low: 'Low',
             normal: 'Normal',
@@ -29,6 +35,7 @@ export default {
         replyPlaceholder: 'Write a reply …',
         send: 'Send',
         sending: 'Sending …',
+        retry: 'Send again',
         attachments: 'Attach files',
         removeAttachment: 'Remove file',
         attachmentHint:
@@ -58,6 +65,34 @@ export default {
             waiting_for_customer: 'Waiting for reply',
             resolved: 'Resolved',
             closed: 'Closed',
+        },
+        chatbot: {
+            title: 'Faden support assistant',
+            aiLabel: 'AI-assisted · answers only from approved Faden sources',
+            language: 'Language',
+            german: 'German',
+            english: 'English',
+            sourceVersion: '{title} (version {version})',
+            welcome:
+                'How can I help? If no approved source matches, I will hand your request over to the support team.',
+            input: 'Question for the support assistant',
+            placeholder: 'Ask a question about Faden …',
+            send: 'Send question',
+            thinking: 'Checking approved sources …',
+            sources: 'Approved sources',
+            helpful: 'Answer was helpful',
+            unhelpful: 'Answer was not helpful',
+            handoff: 'Contact a support agent',
+            handoffConsent:
+                'I consent to sending the redacted conversation, current Faden page, my user/company context and technical browser data to Zammad. Secrets, payment data and private documents are excluded.',
+            handedOff:
+                'The chat was handed over to support. Replies will appear in the linked ticket chat.',
+            export: 'Export chat',
+            delete: 'Delete chat',
+            deleteConfirm:
+                'Permanently delete this support chat and its history?',
+            genericError:
+                'The support assistant is currently unavailable. You can still create a ticket directly.',
         },
     },
     productivity: {
@@ -92,6 +127,7 @@ export default {
         sourceColumn: 'Source column',
         notMapped: 'Do not map',
         startImport: 'Start import',
+        cancelImport: 'Cancel import',
         importRows: '{imported} imported, {failed} invalid',
         errorRow: 'Row {row}: {error}',
         noImports: 'No imports yet',
@@ -116,6 +152,7 @@ export default {
             completed: 'Completed',
             completed_with_errors: 'Completed with errors',
             failed: 'Failed',
+            cancelled: 'Cancelled',
         },
         activities: {
             reminder: {
@@ -161,6 +198,7 @@ export default {
         from: 'From',
         to: 'To',
         apply: 'Apply period',
+        export: 'Export CSV',
         applications: 'Applications',
         interviews: 'Interviews',
         hires: 'Hires',

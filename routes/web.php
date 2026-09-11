@@ -19,21 +19,31 @@ use App\Http\Controllers\Employer\CandidateController as EmployerCandidateContro
 use App\Http\Controllers\Employer\CandidateImportController as EmployerCandidateImportController;
 use App\Http\Controllers\Employer\JobController as EmployerJobController;
 use App\Http\Controllers\Employer\PortalController as EmployerPortalController;
-use App\Http\Controllers\Employer\ProductivityController as EmployerProductivityController;
 use App\Http\Controllers\Employer\ReminderController as EmployerReminderController;
+use App\Http\Controllers\GlobalSearchController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\HealthMetricsController;
+use App\Http\Controllers\Integrations\ExternalNotificationWebhookController;
+use App\Http\Controllers\Integrations\LiveKitWebhookController;
+use App\Http\Controllers\Integrations\MailDeliveryWebhookController;
+use App\Http\Controllers\Integrations\PartnerWebhookController;
+use App\Http\Controllers\Integrations\PayoutWebhookController;
 use App\Http\Controllers\Integrations\ZammadWebhookController;
 use App\Http\Controllers\InterviewController;
 use App\Http\Controllers\JobMediaController;
 use App\Http\Controllers\OnboardingController;
+use App\Http\Controllers\PartnerServiceController;
+use App\Http\Controllers\PayoutAccountController;
 use App\Http\Controllers\PublicPageController;
 use App\Http\Controllers\ReferralController;
+use App\Http\Controllers\StatusController;
 use App\Http\Controllers\SupportActionController;
 use App\Http\Controllers\SupportAttachmentController;
+use App\Http\Controllers\SupportChatController;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
+Route::get('status', StatusController::class)->name('status');
 Route::get('health/ready', HealthController::class)
     ->middleware('throttle:30,1')
     ->name('health.ready');
@@ -60,6 +70,19 @@ Route::get('join/{token}', [EmployerPortalController::class, 'trackInvitation'])
 Route::post('integrations/zammad/webhook', ZammadWebhookController::class)
     ->middleware('throttle:120,1')
     ->name('integrations.zammad.webhook');
+Route::post('integrations/mail/{provider}/webhook', MailDeliveryWebhookController::class)
+    ->whereIn('provider', ['postmark', 'resend'])
+    ->middleware('throttle:240,1')
+    ->name('integrations.mail.webhook');
+Route::post('integrations/external-notifications/{provider}/webhook', ExternalNotificationWebhookController::class)
+    ->middleware('throttle:120,1')
+    ->name('integrations.external-notifications.webhook');
+Route::post('integrations/partners/{organization:slug}/webhook', PartnerWebhookController::class)
+    ->middleware('throttle:120,1')->name('integrations.partners.webhook');
+Route::post('integrations/payouts/{provider}/webhook', PayoutWebhookController::class)
+    ->middleware('throttle:120,1')->name('integrations.payouts.webhook');
+Route::post('integrations/livekit/webhook', LiveKitWebhookController::class)
+    ->middleware('throttle:240,1')->name('integrations.livekit.webhook');
 
 Route::middleware(['auth', 'verified', 'staff.2fa'])->group(function (): void {
     Route::get('onboarding', [OnboardingController::class, 'show'])->name('onboarding.show');
@@ -81,6 +104,9 @@ Route::middleware(['auth', 'verified', 'staff.2fa'])->group(function (): void {
         ->name('onboarding.company.step');
 
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+    Route::get('search', GlobalSearchController::class)
+        ->middleware('throttle:60,1')
+        ->name('search');
 
     Route::post('companies/{company}/activate', [AccountController::class, 'activateCompany'])
         ->name('companies.activate');
@@ -98,36 +124,40 @@ Route::middleware(['auth', 'verified', 'staff.2fa'])->group(function (): void {
         ->middleware(['signed', 'throttle:120,1'])
         ->name('ads.media');
 
-    Route::get('messages', [CommunicationController::class, 'index'])->name('messages.index');
-    Route::post('messages/applications/{application}', [CommunicationController::class, 'start'])
-        ->middleware('capability:messages.manage')
-        ->name('messages.start');
-    Route::post('messages/{conversation}', [CommunicationController::class, 'send'])
-        ->middleware('capability:messages.manage')
-        ->name('messages.send');
-    Route::post('messages/{conversation}/read', [CommunicationController::class, 'read'])
-        ->middleware('capability:messages.view')
-        ->name('messages.read');
-    Route::get('messages/attachments/{attachment}', [CommunicationController::class, 'downloadAttachment'])
-        ->middleware(['signed', 'throttle:60,1'])
-        ->name('messages.attachments.download');
+    Route::middleware('feature:messaging')->group(function (): void {
+        Route::get('messages', [CommunicationController::class, 'index'])->name('messages.index');
+        Route::post('messages/applications/{application}', [CommunicationController::class, 'start'])
+            ->middleware('capability:messages.manage')
+            ->name('messages.start');
+        Route::post('messages/{conversation}', [CommunicationController::class, 'send'])
+            ->middleware('capability:messages.manage')
+            ->name('messages.send');
+        Route::post('messages/{conversation}/read', [CommunicationController::class, 'read'])
+            ->middleware('capability:messages.view')
+            ->name('messages.read');
+        Route::get('messages/attachments/{attachment}', [CommunicationController::class, 'downloadAttachment'])
+            ->middleware(['signed', 'throttle:60,1'])
+            ->name('messages.attachments.download');
+    });
 
-    Route::get('interviews', [InterviewController::class, 'index'])->name('interviews.index');
-    Route::post('interviews/applications/{application}', [InterviewController::class, 'propose'])
-        ->middleware('capability:interviews.manage')
-        ->name('interviews.propose');
-    Route::post('interviews/{interview}/respond', [InterviewController::class, 'respond'])
-        ->middleware('capability:interviews.manage')
-        ->name('interviews.respond');
-    Route::post('interviews/{interview}/token', [InterviewController::class, 'token'])
-        ->middleware('throttle:30,1')
-        ->name('interviews.token');
-    Route::get('interviews/{interview}/calendar.ics', [InterviewController::class, 'ics'])
-        ->middleware('signed')
-        ->name('interviews.ics');
-    Route::put('availability', [InterviewController::class, 'updateAvailability'])
-        ->middleware('capability:interviews.manage')
-        ->name('availability.update');
+    Route::middleware('feature:interviews')->group(function (): void {
+        Route::get('interviews', [InterviewController::class, 'index'])->name('interviews.index');
+        Route::post('interviews/applications/{application}', [InterviewController::class, 'propose'])
+            ->middleware('capability:interviews.manage')
+            ->name('interviews.propose');
+        Route::post('interviews/{interview}/respond', [InterviewController::class, 'respond'])
+            ->middleware('capability:interviews.manage')
+            ->name('interviews.respond');
+        Route::post('interviews/{interview}/token', [InterviewController::class, 'token'])
+            ->middleware('throttle:30,1')
+            ->name('interviews.token');
+        Route::get('interviews/{interview}/calendar.ics', [InterviewController::class, 'ics'])
+            ->middleware('signed')
+            ->name('interviews.ics');
+        Route::put('availability', [InterviewController::class, 'updateAvailability'])
+            ->middleware('capability:interviews.manage')
+            ->name('availability.update');
+    });
 
     Route::get('documents/{document}/download', [DocumentController::class, 'download'])
         ->middleware(['signed', 'throttle:60,1'])
@@ -143,16 +173,32 @@ Route::middleware(['auth', 'verified', 'staff.2fa'])->group(function (): void {
     Route::delete('documents/{document}/applications/{application}/grant', [DocumentController::class, 'revoke'])
         ->name('documents.grant.revoke');
 
-    Route::get('support', [SupportActionController::class, 'index'])->name('support.index');
-    Route::post('support/tickets', [SupportActionController::class, 'createTicket'])
-        ->middleware('capability:support.use')
-        ->name('support.tickets.store');
-    Route::post('support/tickets/{ticket}/reply', [SupportActionController::class, 'replyTicket'])
-        ->middleware('capability:support.use')
-        ->name('support.tickets.reply');
-    Route::get('support/attachments/{attachment}', SupportAttachmentController::class)
-        ->middleware(['signed', 'throttle:60,1'])
-        ->name('support.attachments.download');
+    Route::middleware('feature:support')->group(function (): void {
+        Route::get('support', [SupportActionController::class, 'index'])->name('support.index');
+        Route::post('support/tickets', [SupportActionController::class, 'createTicket'])
+            ->middleware('capability:support.use')
+            ->name('support.tickets.store');
+        Route::post('support/tickets/{ticket}/reply', [SupportActionController::class, 'replyTicket'])
+            ->middleware('capability:support.use')
+            ->name('support.tickets.reply');
+        Route::get('support/attachments/{attachment}', SupportAttachmentController::class)
+            ->middleware(['signed', 'throttle:60,1'])
+            ->name('support.attachments.download');
+        Route::middleware(['feature:support_chatbot', 'capability:support.use'])->group(function (): void {
+            Route::post('support/chat/sessions', [SupportChatController::class, 'store'])
+                ->middleware('throttle:10,1')->name('support.chat.sessions.store');
+            Route::post('support/chat/sessions/{session}/messages', [SupportChatController::class, 'message'])
+                ->middleware('throttle:20,1')->name('support.chat.messages.store');
+            Route::patch('support/chat/sessions/{session}/messages/{message}/feedback', [SupportChatController::class, 'feedback'])
+                ->name('support.chat.messages.feedback');
+            Route::post('support/chat/sessions/{session}/handoff', [SupportChatController::class, 'handoff'])
+                ->middleware('throttle:5,1')->name('support.chat.handoff');
+            Route::get('support/chat/sessions/{session}/export', [SupportChatController::class, 'export'])
+                ->middleware('throttle:10,1')->name('support.chat.export');
+            Route::delete('support/chat/sessions/{session}', [SupportChatController::class, 'destroy'])
+                ->name('support.chat.destroy');
+        });
+    });
     Route::post('applications/{application}/feedback', [SupportActionController::class, 'feedback'])
         ->name('feedback.store');
 
@@ -161,13 +207,22 @@ Route::middleware(['auth', 'verified', 'staff.2fa'])->group(function (): void {
         ->middleware('capability:referrals.manage')->name('referrals.create');
     Route::post('referrals/email', [ReferralController::class, 'email'])
         ->middleware('capability:referrals.manage')->name('referrals.email');
+    Route::post('referrals/payout-account', [PayoutAccountController::class, 'store'])
+        ->middleware(['capability:referrals.manage', 'throttle:5,1'])->name('referrals.payout-account.store');
+    Route::delete('referrals/payout-account/{account}', [PayoutAccountController::class, 'destroy'])
+        ->middleware('capability:referrals.manage')->name('referrals.payout-account.destroy');
 
     Route::post('ai/run', [AiController::class, 'run'])
-        ->middleware(['capability:candidate.ai.use,recruiting.ai.use', 'throttle:20,1'])->name('ai.run');
+        ->middleware(['feature:ai', 'capability:candidate.ai.use,recruiting.ai.use', 'throttle:20,1'])->name('ai.run');
+    Route::post('ai/runs/{run}/review', [AiController::class, 'review'])
+        ->middleware(['feature:ai', 'capability:candidate.ai.use,recruiting.ai.use'])->name('ai.runs.review');
     Route::post('ai/consents', [AiController::class, 'grantConsent'])
-        ->middleware('capability:candidate.ai.use,recruiting.ai.use')->name('ai.consents.store');
+        ->middleware(['feature:ai', 'capability:candidate.ai.use,recruiting.ai.use'])->name('ai.consents.store');
     Route::delete('ai/consents/{consent}', [AiController::class, 'withdrawConsent'])
-        ->middleware('capability:candidate.ai.use,recruiting.ai.use')->name('ai.consents.destroy');
+        ->middleware(['feature:ai', 'capability:candidate.ai.use,recruiting.ai.use'])->name('ai.consents.destroy');
+    Route::post('messages/items/{message}/translations', [CommunicationController::class, 'translate'])
+        ->middleware(['feature:messaging', 'feature:ai', 'capability:candidate.ai.use,recruiting.ai.use', 'throttle:20,1'])
+        ->name('messages.translate');
 
     Route::get('company-invitations/{token}/accept', [EmployerPortalController::class, 'acceptInvitation'])
         ->name('company-invitations.accept');
@@ -178,27 +233,28 @@ Route::middleware(['auth', 'verified', 'role:company', 'company.member', 'onboar
     ->name('employer.')
     ->group(function (): void {
         Route::get('billing', [BillingController::class, 'show'])
-            ->middleware('capability:billing.view')->name('billing');
+            ->middleware(['feature:billing', 'capability:billing.view'])->name('billing');
         Route::patch('billing/details', [BillingController::class, 'updateDetails'])
-            ->middleware('capability:billing.manage')->name('billing.details');
+            ->middleware(['feature:billing', 'capability:billing.manage'])->name('billing.details');
         Route::post('billing/checkout/{plan}', [BillingController::class, 'checkout'])
-            ->middleware(['capability:billing.manage', 'throttle:10,1'])
+            ->middleware(['feature:billing', 'capability:billing.manage', 'throttle:10,1'])
             ->name('billing.checkout');
-        Route::get('billing/success', [BillingController::class, 'success'])->name('billing.success');
+        Route::get('billing/success', [BillingController::class, 'success'])
+            ->middleware('feature:billing')->name('billing.success');
         Route::post('billing/portal', [BillingController::class, 'portal'])
-            ->middleware(['capability:billing.manage', 'throttle:10,1'])
+            ->middleware(['feature:billing', 'capability:billing.manage', 'throttle:10,1'])
             ->name('billing.portal');
         Route::post('billing/change/{plan}', [BillingController::class, 'changePlan'])
-            ->middleware(['capability:billing.manage', 'throttle:10,1'])
+            ->middleware(['feature:billing', 'capability:billing.manage', 'throttle:10,1'])
             ->name('billing.change');
         Route::post('billing/cancel', [BillingController::class, 'cancel'])
-            ->middleware(['capability:billing.manage', 'throttle:10,1'])
+            ->middleware(['feature:billing', 'capability:billing.manage', 'throttle:10,1'])
             ->name('billing.cancel');
         Route::post('billing/visa-credits', [BillingController::class, 'buyVisaCredits'])
-            ->middleware(['capability:billing.manage', 'throttle:5,1'])
+            ->middleware(['feature:billing', 'capability:billing.manage', 'throttle:5,1'])
             ->name('billing.visa-credits');
         Route::post('billing/seats', [BillingController::class, 'addSeats'])
-            ->middleware(['capability:billing.manage', 'throttle:5,1'])
+            ->middleware(['feature:billing', 'capability:billing.manage', 'throttle:5,1'])
             ->name('billing.seats');
 
         Route::middleware('company.subscribed')->group(function (): void {
@@ -210,6 +266,10 @@ Route::middleware(['auth', 'verified', 'role:company', 'company.member', 'onboar
             Route::post('candidates/bulk/message', [EmployerBulkCandidateController::class, 'message'])
                 ->middleware('capability:candidates.manage')
                 ->name('candidates.bulk.message');
+            Route::post('candidate-bulk-batches/{batch}/cancel', [EmployerBulkCandidateController::class, 'cancel'])
+                ->middleware('capability:candidates.manage')->name('candidate-bulk-batches.cancel');
+            Route::get('candidate-bulk-batches/{batch}/report', [EmployerBulkCandidateController::class, 'report'])
+                ->middleware('capability:candidates.manage')->name('candidate-bulk-batches.report');
             Route::get('candidates/{candidate}', [EmployerCandidateController::class, 'show'])
                 ->middleware('capability:candidates.view')->name('candidates.show');
             Route::post('candidates/{candidate}/invite', [EmployerCandidateController::class, 'invite'])
@@ -237,8 +297,9 @@ Route::middleware(['auth', 'verified', 'role:company', 'company.member', 'onboar
                 ->middleware('capability:candidates.manage')
                 ->name('talent-lists.destroy');
 
-            Route::get('productivity', EmployerProductivityController::class)
-                ->middleware('capability:applications.view')->name('productivity');
+            Route::get('productivity', function (): never {
+                abort(404);
+            })->name('productivity');
             Route::post('reminders', [EmployerReminderController::class, 'store'])
                 ->middleware('capability:productivity.manage')->name('reminders.store');
             Route::patch('reminders/{reminder}', [EmployerReminderController::class, 'update'])
@@ -253,13 +314,19 @@ Route::middleware(['auth', 'verified', 'role:company', 'company.member', 'onboar
             Route::patch('candidate-imports/{candidateImport}/mapping', [EmployerCandidateImportController::class, 'map'])
                 ->middleware('capability:candidates.manage')
                 ->name('candidate-imports.map');
+            Route::post('candidate-imports/{candidateImport}/cancel', [EmployerCandidateImportController::class, 'cancel'])
+                ->middleware('capability:candidates.manage')
+                ->name('candidate-imports.cancel');
             Route::delete('candidate-imports/{candidateImport}', [EmployerCandidateImportController::class, 'destroy'])
                 ->middleware('capability:candidates.manage')
                 ->name('candidate-imports.destroy');
             Route::get('candidate-imports/template.csv', [EmployerCandidateImportController::class, 'template'])
                 ->name('candidate-imports.template');
             Route::get('analytics', EmployerAnalyticsController::class)
-                ->middleware('capability:analytics.view')->name('analytics');
+                ->middleware(['feature:analytics', 'capability:analytics.view'])->name('analytics');
+            Route::get('analytics/export', [EmployerAnalyticsController::class, 'export'])
+                ->middleware(['feature:analytics', 'capability:analytics.view', 'throttle:10,1'])
+                ->name('analytics.export');
 
             Route::get('jobs', [EmployerJobController::class, 'index'])->middleware('capability:jobs.view')->name('jobs.index');
             Route::get('jobs/create', [EmployerJobController::class, 'create'])->middleware('capability:jobs.manage')->name('jobs.create');
@@ -280,20 +347,40 @@ Route::middleware(['auth', 'verified', 'role:company', 'company.member', 'onboar
                 ->middleware('capability:applications.manage')
                 ->name('applications.candidate-review');
 
-            Route::get('messages', [CommunicationController::class, 'index'])->name('messages');
-            Route::get('interviews', [InterviewController::class, 'index'])->name('interviews');
+            Route::get('messages', [CommunicationController::class, 'index'])
+                ->middleware('feature:messaging')->name('messages');
+            Route::get('interviews', [InterviewController::class, 'index'])
+                ->middleware('feature:interviews')->name('interviews');
             Route::get('visa', [EmployerPortalController::class, 'visa'])->middleware('capability:visa.view')->name('visa');
             Route::patch('visa/steps/{step}', [EmployerPortalController::class, 'updateVisaStep'])->middleware('capability:visa.manage')->name('visa.steps');
             Route::get('referrals', [ReferralController::class, 'index'])->name('referrals');
+            Route::get('services', [PartnerServiceController::class, 'index'])->name('services.index');
+            Route::post('services', [PartnerServiceController::class, 'store'])->name('services.store');
             Route::get('company', [EmployerPortalController::class, 'companyProfile'])->middleware('capability:company.view')->name('company');
             Route::put('company', [EmployerPortalController::class, 'updateCompanyProfile'])->middleware('capability:company.manage')->name('company.update');
             Route::get('team', [EmployerPortalController::class, 'team'])->middleware('capability:team.view')->name('team');
             Route::post('team/invitations', [EmployerPortalController::class, 'inviteTeamMember'])->middleware('capability:team.manage')->name('team.invite');
+            Route::post('team/invitations/{invitation}/resend', [EmployerPortalController::class, 'resendTeamInvitation'])
+                ->middleware('capability:team.manage')->name('team.invitations.resend');
+            Route::delete('team/invitations/{invitation}', [EmployerPortalController::class, 'revokeTeamInvitation'])
+                ->middleware('capability:team.manage')->name('team.invitations.revoke');
+            Route::patch('team/members/{membership}', [EmployerPortalController::class, 'updateTeamMember'])
+                ->middleware('capability:team.manage')->name('team.members.update');
             Route::delete('team/members/{membership}', [EmployerPortalController::class, 'removeTeamMember'])
                 ->middleware('capability:team.manage')
                 ->name('team.remove');
+            Route::post('team/teams', [EmployerPortalController::class, 'storeTeam'])
+                ->middleware('capability:team.manage')->name('team.teams.store');
+            Route::put('team/teams/{team}', [EmployerPortalController::class, 'updateTeam'])
+                ->middleware('capability:team.manage')->name('team.teams.update');
+            Route::delete('team/teams/{team}', [EmployerPortalController::class, 'destroyTeam'])
+                ->middleware('capability:team.manage')->name('team.teams.destroy');
+            Route::patch('team/jobs/{job}/organization', [EmployerPortalController::class, 'assignJobOrganization'])
+                ->middleware('capability:team.manage')->name('team.jobs.organization');
+            Route::patch('team/applications/{application}/organization', [EmployerPortalController::class, 'assignApplicationOrganization'])
+                ->middleware('capability:team.manage')->name('team.applications.organization');
             Route::post('team/members/{membership}/transfer-ownership', [EmployerPortalController::class, 'transferOwnership'])
-                ->middleware('capability:team.ownership.transfer')
+                ->middleware(['capability:team.ownership.transfer', 'password.confirm'])
                 ->name('team.transfer-ownership');
         });
     });
@@ -336,11 +423,37 @@ Route::middleware(['auth', 'verified', 'role:candidate', 'onboarding.complete'])
             ->middleware('capability:candidate.profile.manage')
             ->name('profile.documents.destroy');
         Route::post('profile/publish', [CandidateProfileController::class, 'publish'])->middleware('capability:candidate.profile.manage')->name('profile.publish');
-        Route::get('messages', [CommunicationController::class, 'index'])->name('messages');
-        Route::get('interviews', [InterviewController::class, 'index'])->name('interviews');
-        Route::get('ai-studio', [AiController::class, 'studio'])->name('ai-studio');
+        Route::get('messages', [CommunicationController::class, 'index'])
+            ->middleware('feature:messaging')->name('messages');
+        Route::get('interviews', [InterviewController::class, 'index'])
+            ->middleware('feature:interviews')->name('interviews');
+        Route::get('ai-studio', [AiController::class, 'studio'])
+            ->middleware('feature:ai')->name('ai-studio');
         Route::get('referrals', [ReferralController::class, 'index'])->name('referrals');
+        Route::get('services', [PartnerServiceController::class, 'index'])->name('services.index');
+        Route::post('services', [PartnerServiceController::class, 'store'])->name('services.store');
+        Route::post('services/{case}/transfer', [PartnerServiceController::class, 'transfer'])->name('services.transfer');
+        Route::post('services/{case}/withdraw', [PartnerServiceController::class, 'withdraw'])->name('services.withdraw');
+        Route::post('services/{case}/switch', [PartnerServiceController::class, 'switchOffering'])->name('services.switch');
+        Route::post('services/{case}/artifacts', [PartnerServiceController::class, 'storeArtifact'])->name('services.artifacts.store');
+        Route::post('services/{case}/grants', [PartnerServiceController::class, 'grantDocument'])->name('services.grants.store');
+        Route::get('services/{case}/export', [PartnerServiceController::class, 'export'])->middleware('throttle:10,1')->name('services.export');
+        Route::delete('services/{case}', [PartnerServiceController::class, 'destroy'])->name('services.destroy');
+    });
+
+Route::middleware(['auth', 'verified', 'role:partner'])
+    ->prefix('partner')->name('partner.')->group(function (): void {
+        Route::get('cases', [PartnerServiceController::class, 'index'])->middleware('capability:partner.cases.view')->name('cases.index');
+        Route::patch('cases/{case}', [PartnerServiceController::class, 'update'])->middleware('capability:partner.cases.manage')->name('cases.update');
+        Route::post('cases/{case}/artifacts', [PartnerServiceController::class, 'storeArtifact'])->middleware('capability:partner.cases.manage')->name('cases.artifacts.store');
     });
 
 require __DIR__.'/settings.php';
 require __DIR__.'/admin.php';
+
+// Browser GETs use the web stack so an Inertia navigation can retain the
+// current session, locale and application shell. API misses are still
+// identified by the exception handler and keep a machine-readable response.
+Route::fallback(function (): never {
+    abort(404);
+});

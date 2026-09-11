@@ -16,6 +16,7 @@ use Illuminate\Support\Carbon;
  * @property string $token
  * @property Carbon $expires_at
  * @property Carbon|null $accepted_at
+ * @property Carbon|null $revoked_at
  * @property-read Company $company
  */
 class CompanyInvitation extends Model
@@ -28,7 +29,22 @@ class CompanyInvitation extends Model
             'role' => CompanyMemberRole::class,
             'expires_at' => 'datetime',
             'accepted_at' => 'datetime',
+            'revoked_at' => 'datetime',
         ];
+    }
+
+    protected $appends = ['status'];
+
+    public function getStatusAttribute(): string
+    {
+        if ($this->accepted_at !== null) {
+            return 'accepted';
+        }
+        if ($this->revoked_at !== null) {
+            return 'revoked';
+        }
+
+        return $this->expires_at->isPast() ? 'expired' : 'pending';
     }
 
     /**
