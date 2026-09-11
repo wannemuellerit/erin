@@ -208,6 +208,13 @@ jobs:
       SCOUT_DRIVER: collection
       TELESCOPE_ENABLED: 'false'
       PLAYWRIGHT_BASE_URL: http://127.0.0.1:8000
+      BROADCAST_CONNECTION: reverb
+      REVERB_HOST: 127.0.0.1
+      REVERB_PORT: 8080
+      REVERB_SCHEME: http
+      VITE_REVERB_HOST: 127.0.0.1
+      VITE_REVERB_PORT: 8080
+      VITE_REVERB_SCHEME: http
 
     steps:
       - name: Checkout code
@@ -235,11 +242,26 @@ jobs:
       - name: Install Node dependencies
         run: npm ci --no-audit --no-fund
 
-      - name: Prepare deterministic browser data
+      - name: Prepare browser application
         run: |
           cp .env.example .env
           php artisan key:generate --no-interaction
           php artisan migrate --force --no-interaction
+
+      - name: Start browser-test broadcasting server
+        run: |
+          php artisan reverb:start --host=127.0.0.1 --port=8080 > storage/logs/e2e-reverb.log 2>&1 &
+          for attempt in {1..30}; do
+            if php -r 'exit((int) ! @fsockopen("127.0.0.1", 8080));'; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat storage/logs/e2e-reverb.log
+          exit 1
+
+      - name: Prepare deterministic browser data
+        run: |
           php artisan db:seed --class='Database\Seeders\DomainCatalogSeeder' --force --no-interaction
           php artisan db:seed --class='Database\Seeders\DemoDataSeeder' --force --no-interaction
           php artisan db:seed --class='Database\Seeders\BrowserTestSeeder' --force --no-interaction
@@ -277,3 +299,4 @@ jobs:
             storage/framework/testing/playwright
             storage/framework/testing/playwright-report
             storage/logs/e2e-server.log
+            storage/logs/e2e-reverb.log
