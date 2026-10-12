@@ -115,7 +115,7 @@ USER www-data
 ENTRYPOINT ["erin-entrypoint"]
 CMD ["php-fpm", "--nodaemonize"]
 
-FROM nginx:1.30-alpine@sha256:97d490c12ba55b4946b01546d1c3ed324e8d41ab1c9fcb2a616aa470620e5b46 AS nginx
+FROM nginx:1.31-alpine@sha256:df221db836e1754089190208cee7eeda94f233197056426eda74a43ab1abeac2 AS nginx
 
 ARG ERIN_BUILD_SHA
 ARG ERIN_BUILD_ENV=production
