@@ -31,3 +31,9 @@ tests are `tests/ci/test_runner_event_guard.py` and run in regular CI. On the VP
 it is installed as root-owned `/usr/local/lib/github-runner/erin-runner-guard.py`,
 called by the registration's configured pre-job hook. Editing the repository
 copy does not replace that host-owned guard automatically.
+
+A rejected event skips shared credential cleanup. Completion also verifies that
+the current worker owns the shared CI slot, so a cancelled job that was still
+waiting cannot clear credentials used by a different active job. The setup-php
+action is pinned to the same Ubuntu-compatible revision validated on the other
+VPS projects.
