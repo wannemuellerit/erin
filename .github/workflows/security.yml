@@ -19,8 +19,13 @@ concurrency:
 jobs:
   dependency-audit:
     name: Dependency audit
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    runs-on: >-
+      ${{
+        (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+        vars.CI_RUNNER_LABELS != '' && fromJSON(vars.CI_RUNNER_LABELS) ||
+        'ubuntu-latest'
+      }}
+    timeout-minutes: 120
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -57,8 +62,13 @@ jobs:
 
   codeql:
     name: CodeQL JavaScript and TypeScript
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    runs-on: >-
+      ${{
+        (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+        vars.CI_RUNNER_LABELS != '' && fromJSON(vars.CI_RUNNER_LABELS) ||
+        'ubuntu-latest'
+      }}
+    timeout-minutes: 120
     permissions:
       contents: read
       security-events: write
@@ -79,8 +89,13 @@ jobs:
 
   secret-scan:
     name: Secret scan
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+    runs-on: >-
+      ${{
+        (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+        vars.CI_RUNNER_LABELS != '' && fromJSON(vars.CI_RUNNER_LABELS) ||
+        'ubuntu-latest'
+      }}
+    timeout-minutes: 120
     permissions:
       contents: read
       pull-requests: read
@@ -98,8 +113,13 @@ jobs:
 
   production-image:
     name: Container, SBOM and provenance inputs
-    runs-on: ubuntu-latest
-    timeout-minutes: 35
+    runs-on: >-
+      ${{
+        (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+        vars.CI_RUNNER_LABELS != '' && fromJSON(vars.CI_RUNNER_LABELS) ||
+        'ubuntu-latest'
+      }}
+    timeout-minutes: 120
     permissions:
       contents: read
       security-events: write
