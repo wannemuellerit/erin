@@ -40,9 +40,16 @@ class InstallFeaturesCommand extends Command
         /** @var Script $script */
         $script = require base_path('chisel.php');
 
-        $providedAnswers = $this->option('answers') === null
+        $answersInput = $this->option('answers');
+        if ($answersInput !== null && ! is_string($answersInput)) {
+            $this->error('The --answers option must be a JSON string.');
+
+            return self::INVALID;
+        }
+
+        $providedAnswers = $answersInput === null
             ? []
-            : json_decode((string) $this->option('answers'), true, 512, JSON_THROW_ON_ERROR);
+            : json_decode($answersInput, true, 512, JSON_THROW_ON_ERROR);
 
         $answers = $script
             ->collectAnswers()

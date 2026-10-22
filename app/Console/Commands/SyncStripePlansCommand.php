@@ -29,7 +29,14 @@ class SyncStripePlansCommand extends Command
             return self::FAILURE;
         }
 
-        $slugs = collect($this->option('plan'))
+        $selectedPlans = $this->option('plan');
+        if (! is_array($selectedPlans)) {
+            $this->error('Die Option --plan muss eine Liste von Paket-Slugs enthalten.');
+
+            return self::INVALID;
+        }
+
+        $slugs = collect($selectedPlans)
             ->filter(fn (mixed $slug): bool => is_string($slug) && $slug !== '')
             ->values();
         $plans = Plan::query()
