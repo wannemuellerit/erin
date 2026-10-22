@@ -15,7 +15,14 @@ class VerifyLocalRestoreEvidenceCommand extends Command
 
     public function handle(LocalRestoreEvidenceValidator $validator): int
     {
-        $result = $validator->validateFile((string) $this->argument('path'));
+        $path = $this->argument('path');
+        if (! is_string($path)) {
+            $this->error('Der Evidenzpfad muss eine Zeichenfolge sein.');
+
+            return self::INVALID;
+        }
+
+        $result = $validator->validateFile($path);
         $exitCode = $result['status'] === 'passed' ? self::SUCCESS : self::FAILURE;
 
         if ((bool) $this->option('json')) {

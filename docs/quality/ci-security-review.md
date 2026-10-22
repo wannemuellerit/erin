@@ -23,3 +23,10 @@ After these updates, `composer audit --locked` reports no advisories, the full
 vulnerabilities. The existing Composer/npm audit gates and container scan remain
 enabled. Their live CI results must be checked on the updated commit before
 merging.
+
+The framework update adds the HTTP QUERY verb. Wayfinder is updated to 0.1.23,
+whose generated Method type supports it; Vue/TypeScript checks pass after fresh
+generation. Four CLI commands narrow console arguments/options before using them
+as strings or arrays, preserving the existing operational guards under stricter
+framework types. PHPStan and Pint pass; the 50 focused Stripe-plan, local-restore
+and synthetic-pilot regression tests pass with 285 assertions.
