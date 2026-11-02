@@ -19,7 +19,7 @@ class RunSyntheticPilotDrillCommand extends Command
 
     public function handle(SyntheticPilotDrill $drill): int
     {
-        if ((string) $this->option('confirm') !== 'SYNTHETIC_LOCAL_ONLY') {
+        if ($this->option('confirm') !== 'SYNTHETIC_LOCAL_ONLY') {
             $this->error('Bestätigung fehlt: --confirm=SYNTHETIC_LOCAL_ONLY');
 
             return self::INVALID;
@@ -30,7 +30,13 @@ class RunSyntheticPilotDrillCommand extends Command
             return self::FAILURE;
         }
 
-        $scenario = (string) $this->option('scenario');
+        $scenario = $this->option('scenario');
+        if (! is_string($scenario)) {
+            $this->error('Das Szenario muss als Zeichenkette angegeben werden.');
+
+            return self::INVALID;
+        }
+
         if (! in_array($scenario, $drill->scenarios(), true)) {
             $this->error('Unbekanntes Szenario. Erlaubt: '.implode(', ', $drill->scenarios()));
 
@@ -86,7 +92,11 @@ class RunSyntheticPilotDrillCommand extends Command
             );
         }
 
-        $relativePath = (string) $configured;
+        if (! is_string($configured)) {
+            throw new RuntimeException('Unsicherer Evidenzpfad.');
+        }
+
+        $relativePath = $configured;
         if (
             str_starts_with($relativePath, '/')
             || str_contains($relativePath, '..')
