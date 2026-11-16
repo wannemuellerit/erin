@@ -18,6 +18,7 @@ jobs:
     runs-on: >-
       ${{
         (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+        vars.ERIN_USE_CONTABO_CI == 'true' &&
         vars.CI_RUNNER_LABELS != '' && fromJSON(vars.CI_RUNNER_LABELS) ||
         'ubuntu-latest'
       }}
@@ -137,6 +138,7 @@ jobs:
     runs-on: >-
       ${{
         (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+        vars.ERIN_USE_CONTABO_CI == 'true' &&
         vars.CI_RUNNER_LABELS != '' && fromJSON(vars.CI_RUNNER_LABELS) ||
         'ubuntu-latest'
       }}
@@ -174,6 +176,7 @@ jobs:
     runs-on: >-
       ${{
         (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+        vars.ERIN_USE_CONTABO_CI == 'true' &&
         vars.CI_RUNNER_LABELS != '' && fromJSON(vars.CI_RUNNER_LABELS) ||
         'ubuntu-latest'
       }}

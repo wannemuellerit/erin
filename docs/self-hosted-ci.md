@@ -1,9 +1,10 @@
 # Contabo CI runner
 
-Regular Linux checks use `CI_RUNNER_LABELS` when the event is trusted. Its value is
-`["self-hosted","Linux","X64","ci-vps"]`. Deleting the repository variable restores
-GitHub-hosted runners for future regular jobs. Fork pull requests keep their
-GitHub-hosted runners; the explicit VPS smoke test is skipped for forks.
+Regular Linux checks use GitHub-hosted runners by default. After manually
+running the `VPS runner smoke test` successfully on `main`, set the repository
+variables `CI_RUNNER_LABELS` to `["self-hosted","Linux","X64","ci-vps"]` and
+`ERIN_USE_CONTABO_CI` to `true`. Fork pull requests always run on GitHub-hosted
+runners. Clear `ERIN_USE_CONTABO_CI` if the VPS stops accepting jobs.
 
 Jobs share the VPS with other repositories. A host-side pre-job lock serializes
 jobs before service containers start, avoiding port and tool-install conflicts.
