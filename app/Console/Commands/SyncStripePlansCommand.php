@@ -29,7 +29,7 @@ class SyncStripePlansCommand extends Command
             return self::FAILURE;
         }
 
-        $selectedPlans = $this->option('plan');
+        $selectedPlans = $this->input->getOption('plan');
         $slugs = collect(is_iterable($selectedPlans) ? $selectedPlans : [])
             ->filter(fn (mixed $slug): bool => is_string($slug) && $slug !== '')
             ->values();

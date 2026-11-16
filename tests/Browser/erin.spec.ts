@@ -1077,7 +1077,7 @@ test.describe('Login und Rollenbereiche', () => {
         const companyCase = page.getByTestId(companyCaseTestId!);
         await expect(companyCase).toBeVisible();
         const companyToggle = companyCase.getByRole('button', {
-            name: /Visa-Fall für Anna Kowalska/,
+            name: /Anna Kowalska/,
         });
         await expect(companyToggle).toHaveAttribute('aria-expanded', 'true');
         await companyToggle.click();
@@ -1930,7 +1930,7 @@ test.describe('Englische Oberfläche', () => {
             }),
         ).toBeVisible();
         await page
-            .getByRole('button', { name: 'English', exact: true })
+            .getByRole('button', { name: 'EN English', exact: true })
             .click();
 
         await expect(
@@ -1957,7 +1957,7 @@ test.describe('Englische Oberfläche', () => {
         await page.goto('/');
 
         await page
-            .getByRole('button', { name: 'English', exact: true })
+            .getByRole('button', { name: 'EN English', exact: true })
             .click();
         await expect(
             page.getByRole('heading', {
@@ -1968,7 +1968,7 @@ test.describe('Englische Oberfläche', () => {
 
         await page.goto('/login');
         await page
-            .getByRole('button', { name: 'Deutsch', exact: true })
+            .getByRole('button', { name: 'DE Deutsch', exact: true })
             .click();
 
         await expect(
@@ -1989,7 +1989,7 @@ test.describe('Englische Oberfläche', () => {
     }) => {
         await page.goto('/login');
         await page
-            .getByRole('button', { name: 'English', exact: true })
+            .getByRole('button', { name: 'EN English', exact: true })
             .click();
         await page
             .getByLabel('Email address', { exact: true })
@@ -2016,7 +2016,7 @@ test.describe('Englische Oberfläche', () => {
     }) => {
         await page.goto('/login');
         await page
-            .getByRole('button', { name: 'English', exact: true })
+            .getByRole('button', { name: 'EN English', exact: true })
             .click();
         await page
             .getByLabel('Email address', { exact: true })
@@ -2055,7 +2055,7 @@ test.describe('Mobile Abnahme', () => {
             page.getByRole('group', { name: 'Sprache', exact: true }),
         ).toBeVisible();
         await page
-            .getByRole('button', { name: 'English', exact: true })
+            .getByRole('button', { name: 'EN English', exact: true })
             .click();
         await expect(
             page.getByRole('heading', {
@@ -2075,7 +2075,7 @@ test.describe('Mobile Abnahme', () => {
             page.getByRole('group', { name: 'Sprache', exact: true }),
         ).toBeVisible();
         await page
-            .getByRole('button', { name: 'English', exact: true })
+            .getByRole('button', { name: 'EN English', exact: true })
             .click();
 
         await expect(
