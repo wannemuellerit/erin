@@ -20,6 +20,7 @@ use Illuminate\Support\Carbon;
  * @property string $target_country_code
  * @property string $status
  * @property string $public_status
+ * @property string|null $external_reference
  * @property string $purpose
  * @property Carbon|null $consented_at
  * @property Carbon|null $consent_expires_at
