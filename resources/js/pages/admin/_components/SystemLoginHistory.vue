@@ -1,8 +1,8 @@
 <script setup lang="ts">
+import { useAdminI18n } from '../_i18n';
 import EmptyState from '@/components/product/EmptyState.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
-import { useAdminI18n } from '../_i18n';
 
 defineProps<{
     loginHistory: Array<{
@@ -33,10 +33,10 @@ const { t, formatDate, humanize } = useAdminI18n();
         flush
     >
         <div v-if="loginHistory.length > 0" class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-slate-100 text-left">
-                <thead class="bg-slate-50/80">
+            <table class="min-w-full divide-y divide-border text-left">
+                <thead class="bg-muted/80">
                     <tr
-                        class="text-[11px] font-bold tracking-wide text-slate-600 uppercase"
+                        class="text-[11px] font-bold tracking-wide text-muted-foreground uppercase"
                     >
                         <th class="px-5 py-3">
                             {{ t('system.login.columns.account') }}
@@ -55,24 +55,24 @@ const { t, formatDate, humanize } = useAdminI18n();
                         </th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100">
+                <tbody class="divide-y divide-border">
                     <tr
                         v-for="entry in loginHistory"
                         :key="entry.id"
                         class="align-top"
                     >
                         <td class="px-5 py-4">
-                            <p class="text-sm font-semibold text-slate-800">
+                            <p class="text-sm font-semibold text-foreground">
                                 {{ entry.user?.name ?? entry.email }}
                             </p>
                             <p
                                 v-if="entry.user"
-                                class="mt-0.5 text-xs text-slate-500"
+                                class="mt-0.5 text-xs text-muted-foreground"
                             >
                                 {{ entry.email }}
                             </p>
                         </td>
-                        <td class="px-5 py-4 text-xs text-slate-600">
+                        <td class="px-5 py-4 text-xs text-muted-foreground">
                             {{ humanize(entry.event) }}
                         </td>
                         <td class="px-5 py-4">
@@ -86,18 +86,18 @@ const { t, formatDate, humanize } = useAdminI18n();
                                 :tone="entry.successful ? 'green' : 'red'"
                             />
                         </td>
-                        <td class="px-5 py-4 text-xs text-slate-600">
+                        <td class="px-5 py-4 text-xs text-muted-foreground">
                             <p>{{ entry.ip_address ?? '—' }}</p>
                             <p
                                 v-if="entry.user_agent"
-                                class="mt-1 max-w-64 truncate text-slate-600"
+                                class="mt-1 max-w-64 truncate text-muted-foreground"
                                 :title="entry.user_agent"
                             >
                                 {{ entry.user_agent }}
                             </p>
                         </td>
                         <td
-                            class="px-5 py-4 text-right text-xs whitespace-nowrap text-slate-500"
+                            class="px-5 py-4 text-right text-xs whitespace-nowrap text-muted-foreground"
                         >
                             {{ formatDate(entry.created_at) }}
                         </td>

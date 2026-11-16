@@ -7,16 +7,16 @@ prüft deren Struktur.
 
 ## Gemeinsames Evidenzschema
 
-| Feld | Anforderung |
-|---|---|
-| Release-ID | Eindeutige, versionierte Kennung; in jedem Gate identisch |
-| Commit | Vollständiger 40-stelliger Git-SHA; für Release und Security identisch |
-| Build | Im Image eingebauter SHA und unveränderliches Image-Tag entsprechen dem Commit |
-| Identität | `Vorname Nachname <person@organisation.tld>` |
-| Zeitpunkt | UTC, Format `YYYY-MM-DDTHH:MM:SSZ`, nicht zukünftig oder veraltet |
-| Referenz | Credential-freie HTTPS-URL ohne Query/Fragment auf unveränderlichen Nachweis |
-| Status | Exakt `approved`; Entwurf, offen oder bedingt bleibt rot |
-| Rollentrennung | Vorbereitende und freigebende Person sind verschieden |
+| Feld           | Anforderung                                                                    |
+| -------------- | ------------------------------------------------------------------------------ |
+| Release-ID     | Eindeutige, versionierte Kennung; in jedem Gate identisch                      |
+| Commit         | Vollständiger 40-stelliger Git-SHA; für Release und Security identisch         |
+| Build          | Im Image eingebauter SHA und unveränderliches Image-Tag entsprechen dem Commit |
+| Identität      | `Vorname Nachname <person@organisation.tld>`                                   |
+| Zeitpunkt      | UTC, Format `YYYY-MM-DDTHH:MM:SSZ`, nicht zukünftig oder veraltet              |
+| Referenz       | Credential-freie HTTPS-URL ohne Query/Fragment auf unveränderlichen Nachweis   |
+| Status         | Exakt `approved`; Entwurf, offen oder bedingt bleibt rot                       |
+| Rollentrennung | Vorbereitende und freigebende Person sind verschieden                          |
 
 Die vorbereitende Person setzt:
 
@@ -85,17 +85,17 @@ Die Attestierung verwendet dieses Schema:
 
 ```json
 {
-  "schema_version": 1,
-  "type": "erin_launch_governance_attestation",
-  "algorithm": "Ed25519",
-  "issuer": "erin-release-authority",
-  "key_id": "release-2026-01",
-  "release_id": "release-2026-07-18.1",
-  "commit_sha": "<40-stelliger-git-sha>",
-  "evidence_sha256": "<sha256-der-kanonischen-governance-evidenz>",
-  "issued_at": "2026-07-18T08:00:00Z",
-  "expires_at": "2026-07-19T08:00:00Z",
-  "signature": "<base64-ed25519-signatur>"
+    "schema_version": 1,
+    "type": "erin_launch_governance_attestation",
+    "algorithm": "Ed25519",
+    "issuer": "erin-release-authority",
+    "key_id": "release-2026-01",
+    "release_id": "release-2026-07-18.1",
+    "commit_sha": "<40-stelliger-git-sha>",
+    "evidence_sha256": "<sha256-der-kanonischen-governance-evidenz>",
+    "issued_at": "2026-07-18T08:00:00Z",
+    "expires_at": "2026-07-19T08:00:00Z",
+    "signature": "<base64-ed25519-signatur>"
 }
 ```
 
@@ -103,18 +103,18 @@ Der Trust-Root enthält ausschließlich öffentliche Schlüssel:
 
 ```json
 {
-  "schema_version": 1,
-  "issuer": "erin-release-authority",
-  "keys": [
-    {
-      "key_id": "release-2026-01",
-      "algorithm": "Ed25519",
-      "status": "active",
-      "public_key": "<base64-ed25519-public-key>",
-      "not_before": "2026-01-01T00:00:00Z",
-      "not_after": "2027-01-01T00:00:00Z"
-    }
-  ]
+    "schema_version": 1,
+    "issuer": "erin-release-authority",
+    "keys": [
+        {
+            "key_id": "release-2026-01",
+            "algorithm": "Ed25519",
+            "status": "active",
+            "public_key": "<base64-ed25519-public-key>",
+            "not_before": "2026-01-01T00:00:00Z",
+            "not_after": "2027-01-01T00:00:00Z"
+        }
+    ]
 }
 ```
 
@@ -174,7 +174,8 @@ Die freigebende Datenschutzrolle prüft mindestens:
   Dokumentfreigaben;
 - Einwilligungs- und Widerrufsabläufe für sensible Dokument-KI;
 - Auftragsverarbeitungsverträge und TOMs für Hosting, Stripe, Zammad, OpenAI,
-  LiveKit, Mail und weitere Auftragsverarbeiter;
+  Mail und weitere Auftragsverarbeiter sowie TOMs für die selbst gehostete
+  LiveKit-Medieninfrastruktur;
 - Drittlandtransfer, EU-Region-Pinning, Unterauftragnehmer und
   Transfer-Folgenabschätzungen;
 - Lösch-, Sperr-, Aufbewahrungs- und Pseudonymisierungsplan je Datenklasse;

@@ -57,24 +57,24 @@ function backendTranslationPlaceholders(string $value): array
     return $placeholders;
 }
 
-it('covers every static backend translation key in matching German and English catalogs', function () {
+it('covers every static backend translation key in every supported locale catalog', function () {
     $literalKeys = backendTranslationLiteralKeys();
-    $german = backendTranslationJson('de');
     $english = backendTranslationJson('en');
-    expect(array_keys($german))
-        ->toEqualCanonicalizing(array_keys($english))
-        ->and(array_diff($literalKeys, array_keys($german)))
-        ->toBeEmpty()
-        ->and(array_diff($literalKeys, array_keys($english)))
-        ->toBeEmpty()
-        ->and($german)
-        ->each->toBeString()->not->toBeEmpty()
-        ->and($english)
-        ->each->toBeString()->not->toBeEmpty();
+
+    foreach (config('app.supported_locales') as $locale) {
+        $catalog = backendTranslationJson($locale);
+
+        expect(array_keys($catalog))
+            ->toEqualCanonicalizing(array_keys($english))
+            ->and(array_diff($literalKeys, array_keys($catalog)))
+            ->toBeEmpty()
+            ->and($catalog)
+            ->each->toBeString()->not->toBeEmpty();
+    }
 });
 
 it('preserves replacement placeholders in every backend translation', function () {
-    foreach (['de', 'en'] as $locale) {
+    foreach (config('app.supported_locales') as $locale) {
         foreach (backendTranslationJson($locale) as $key => $translation) {
             expect(backendTranslationPlaceholders($translation))
                 ->toEqualCanonicalizing(backendTranslationPlaceholders($key));
@@ -84,11 +84,25 @@ it('preserves replacement placeholders in every backend translation', function (
 
 it('provides matching framework authentication and validation catalogs', function () {
     foreach (['auth', 'passwords', 'pagination', 'validation'] as $catalog) {
-        $german = require lang_path("de/{$catalog}.php");
         $english = require lang_path("en/{$catalog}.php");
 
-        expect(array_keys(Arr::dot($german)))
-            ->toEqualCanonicalizing(array_keys(Arr::dot($english)));
+        foreach (config('app.supported_locales') as $locale) {
+            $localized = require lang_path("{$locale}/{$catalog}.php");
+            $englishFlat = Arr::dot($english);
+            $localizedFlat = Arr::dot($localized);
+
+            expect(array_keys($localizedFlat))
+                ->toEqualCanonicalizing(array_keys($englishFlat));
+
+            foreach ($englishFlat as $key => $value) {
+                if (! is_string($value)) {
+                    continue;
+                }
+
+                expect(backendTranslationPlaceholders((string) $localizedFlat[$key]))
+                    ->toEqualCanonicalizing(backendTranslationPlaceholders($value));
+            }
+        }
     }
 
     expect(__('auth.failed', locale: 'de'))
@@ -99,4 +113,18 @@ it('provides matching framework authentication and validation catalogs', functio
         ->toBe(':attribute ist erforderlich.')
         ->and(__('validation.required', locale: 'en'))
         ->toBe('The :attribute field is required.');
+});
+
+it('ships actual draft translations instead of English catalog copies', function () {
+    $english = backendTranslationJson('en');
+
+    foreach (['pl', 'ro', 'hr', 'es', 'pt'] as $locale) {
+        expect(backendTranslationJson($locale))
+            ->not->toBe($english);
+
+        foreach (['auth', 'passwords', 'pagination', 'validation'] as $catalog) {
+            expect(require lang_path("{$locale}/{$catalog}.php"))
+                ->not->toBe(require lang_path("en/{$catalog}.php"));
+        }
+    }
 });

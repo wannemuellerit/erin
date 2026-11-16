@@ -42,7 +42,30 @@ type Application = {
         id: number;
         status: string;
         progress?: number;
-        steps?: unknown[];
+        steps?: Array<{
+            id: number;
+            title: string;
+            status: string;
+            due_at?: string | null;
+            tasks?: Array<{
+                id: number;
+                title: string;
+                status: string;
+                due_at?: string | null;
+            }>;
+        }>;
+        documents?: Array<{
+            id: number;
+            review_status: string;
+            translation_status: string;
+            document?: {
+                id: number;
+                type: string;
+                status: string;
+                scan_result?: string | null;
+                expires_at?: string | null;
+            };
+        }>;
     } | null;
 };
 type Invitation = {
@@ -135,13 +158,13 @@ const tone = (status: string): StatusTone => {
                     </p>
                     <p
                         v-if="invitation.message"
-                        class="mt-3 text-xs leading-5 text-slate-600"
+                        class="mt-3 text-xs leading-5 text-muted-foreground"
                     >
                         {{ invitation.message }}
                     </p>
                     <div class="mt-4 flex gap-2">
                         <button
-                            class="h-9 rounded-lg bg-[var(--erin-primary)] px-3 text-xs font-bold text-white"
+                            class="h-9 rounded-lg bg-[var(--erin-primary)] px-3 text-xs font-bold text-[var(--erin-primary-foreground)]"
                             @click="
                                 router.post(
                                     respond.url(invitation.id),
@@ -153,7 +176,7 @@ const tone = (status: string): StatusTone => {
                             {{ t('candidate.applications.invitations.accept') }}
                         </button>
                         <button
-                            class="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-600"
+                            class="h-9 rounded-lg border border-border bg-card px-3 text-xs font-bold text-muted-foreground"
                             @click="
                                 router.post(
                                     respond.url(invitation.id),
@@ -172,12 +195,12 @@ const tone = (status: string): StatusTone => {
         <div class="erin-panel p-4">
             <div class="relative">
                 <Search
-                    class="absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-slate-400"
+                    class="absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
                 /><input
                     v-model="search"
                     type="search"
                     :placeholder="t('candidate.applications.searchPlaceholder')"
-                    class="h-10 w-full rounded-xl border border-slate-200 pl-10 text-sm"
+                    class="h-10 w-full rounded-xl border border-border pl-10 text-sm"
                 />
             </div>
         </div>
@@ -200,7 +223,7 @@ const tone = (status: string): StatusTone => {
             >
                 <div class="flex flex-col gap-5 lg:flex-row lg:items-center">
                     <span
-                        class="grid size-12 shrink-0 place-items-center rounded-xl bg-blue-50 text-xs font-extrabold text-[var(--erin-primary)]"
+                        class="grid size-12 shrink-0 place-items-center rounded-xl bg-blue-50 text-xs font-extrabold text-[var(--erin-primary-text)]"
                         >{{
                             application.job_posting?.company?.name?.slice(
                                 0,
@@ -215,7 +238,7 @@ const tone = (status: string): StatusTone => {
                                 t('candidate.common.jobUnavailable')
                             }}
                         </h2>
-                        <p class="mt-1 text-xs text-slate-500">
+                        <p class="mt-1 text-xs text-muted-foreground">
                             {{
                                 application.job_posting?.company?.name ??
                                 t('candidate.common.companyUnavailable')
@@ -223,7 +246,7 @@ const tone = (status: string): StatusTone => {
                         </p>
                         <p
                             v-if="application.applied_at"
-                            class="mt-2 flex items-center gap-1.5 text-[10px] text-slate-400"
+                            class="mt-2 flex items-center gap-1.5 text-[10px] text-muted-foreground"
                         >
                             <CalendarDays class="size-3" />
                             {{
@@ -241,16 +264,60 @@ const tone = (status: string): StatusTone => {
                     />
                     <div
                         v-if="application.visa_case"
-                        class="min-w-44 rounded-xl bg-slate-50 p-3"
+                        :data-test="`candidate-visa-case-${application.visa_case.id}`"
+                        class="min-w-44 rounded-xl bg-muted p-3"
                     >
                         <p
-                            class="text-[9px] font-bold tracking-wider text-slate-400 uppercase"
+                            class="text-[9px] font-bold tracking-wider text-muted-foreground uppercase"
                         >
                             {{ t('candidate.applications.visaProcess') }}
                         </p>
-                        <p class="mt-1 text-xs font-bold text-slate-700">
+                        <p class="mt-1 text-xs font-bold text-muted-foreground">
                             {{ application.visa_case.progress ?? 0 }} % ·
                             {{ visaStatusLabel(application.visa_case.status) }}
+                        </p>
+                        <template
+                            v-for="step in application.visa_case.steps
+                                ?.filter(
+                                    (item) =>
+                                        !['completed', 'not_required'].includes(
+                                            item.status,
+                                        ),
+                                )
+                                .slice(0, 1) ?? []"
+                            :key="step.id"
+                        >
+                            <p
+                                class="mt-2 text-[10px] font-bold text-muted-foreground"
+                            >
+                                {{
+                                    t('candidate.applications.nextVisaAction')
+                                }}:
+                                {{ step.title }}
+                            </p>
+                            <p
+                                v-for="task in step.tasks?.filter(
+                                    (item) => item.status !== 'completed',
+                                ) ?? []"
+                                :key="task.id"
+                                class="mt-1 text-[10px] text-muted-foreground"
+                            >
+                                {{ task.title }} ·
+                                {{
+                                    task.due_at ? formatDate(task.due_at) : '—'
+                                }}
+                            </p>
+                        </template>
+                        <p
+                            v-if="application.visa_case.documents?.length"
+                            class="mt-2 text-[10px] text-muted-foreground"
+                        >
+                            {{
+                                t('candidate.applications.visaDocuments', {
+                                    count: application.visa_case.documents
+                                        .length,
+                                })
+                            }}
                         </p>
                     </div>
                     <button
@@ -285,7 +352,7 @@ const tone = (status: string): StatusTone => {
                                 class="mx-auto block size-2.5 rounded-full bg-[var(--erin-primary)]"
                             />
                             <p
-                                class="mt-1.5 text-[8px] font-semibold text-slate-500"
+                                class="mt-1.5 text-[8px] font-semibold text-muted-foreground"
                             >
                                 {{ statusLabel(history.to_status) }}
                             </p>
@@ -303,11 +370,11 @@ const tone = (status: string): StatusTone => {
             class="erin-panel grid min-h-80 place-items-center p-8 text-center"
         >
             <div>
-                <Inbox class="mx-auto size-9 text-slate-300" />
+                <Inbox class="mx-auto size-9 text-muted-foreground" />
                 <h2 class="mt-4 font-bold">
                     {{ t('candidate.applications.emptyTitle') }}
                 </h2>
-                <p class="mt-2 max-w-md text-sm text-slate-500">
+                <p class="mt-2 max-w-md text-sm text-muted-foreground">
                     {{ t('candidate.applications.emptyDescription') }}
                 </p>
             </div>

@@ -14,6 +14,8 @@ export default {
         searchPlaceholder: 'Search applications …',
         appliedOn: 'Applied on {date}',
         visaProcess: 'Visa process',
+        nextVisaAction: 'Next action',
+        visaDocuments: '{count} shared documents',
         withdraw: 'Withdraw',
         emptyTitle: 'No applications yet',
         emptyDescription:
@@ -162,6 +164,8 @@ export default {
         proposalReview:
             'Review the content and subject matter before every use.',
         humanReview: 'Notes for human review',
+        markAccepted: 'Accept after review',
+        markRejected: 'Discard suggestion',
         activityTitle: 'Recent AI activity',
         activityDescription: 'Auditable history of your processing runs',
         noActivity: 'No AI activity yet.',

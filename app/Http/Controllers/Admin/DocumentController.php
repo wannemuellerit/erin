@@ -6,6 +6,7 @@ use App\Enums\CandidateDocumentStatus;
 use App\Enums\CandidateDocumentType;
 use App\Http\Requests\Admin\ReviewCandidateDocumentRequest;
 use App\Models\CandidateDocument;
+use App\Services\Platform\ProductNotificationDispatcher;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -141,6 +142,25 @@ class DocumentController extends AdminController
                 'verified_by' => $document->verified_by,
                 'verified_at' => $this->auditDate($document->verified_at),
                 'shared_with_employers' => $document->shared_with_employers,
+            ],
+        );
+
+        $document->loadMissing('candidateProfile.user');
+        $candidate = $document->candidateProfile->user;
+        app(ProductNotificationDispatcher::class)->dispatch(
+            $candidate,
+            'document.reviewed',
+            "document:{$document->getKey()}:status:{$status->value}",
+            [
+                'title' => __('Dokumentprüfung abgeschlossen'),
+                'message' => __('Der Prüfstatus eines Dokuments wurde auf „:status“ geändert.', ['status' => $status->value]),
+                'translations' => [
+                    'de' => ['title' => 'Dokumentprüfung abgeschlossen', 'message' => "Der Prüfstatus eines Dokuments wurde auf „{$status->value}“ geändert."],
+                    'en' => ['title' => 'Document review completed', 'message' => "A document review status changed to “{$status->value}”."],
+                ],
+                'url' => route('candidate.profile'),
+                'document_id' => $document->getKey(),
+                'status' => $status->value,
             ],
         );
 

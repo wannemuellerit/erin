@@ -3,7 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\RecruiterReminder;
-use App\Notifications\ActivityNotification;
+use App\Services\Platform\ProductNotificationDispatcher;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -41,21 +41,26 @@ class SendDueRecruiterReminders extends Command
                         return;
                     }
 
-                    $reminder->assignee->notify(new ActivityNotification([
-                        'event' => 'reminder.due',
-                        'translations' => [
-                            'de' => [
-                                'title' => 'Erinnerung ist fällig',
-                                'message' => $reminder->title,
+                    app(ProductNotificationDispatcher::class)->dispatch(
+                        $reminder->assignee,
+                        'reminder.due',
+                        'reminder:'.$reminder->getKey().':due',
+                        [
+                            'event' => 'reminder.due',
+                            'translations' => [
+                                'de' => [
+                                    'title' => 'Erinnerung ist fällig',
+                                    'message' => $reminder->title,
+                                ],
+                                'en' => [
+                                    'title' => 'Reminder is due',
+                                    'message' => $reminder->title,
+                                ],
                             ],
-                            'en' => [
-                                'title' => 'Reminder is due',
-                                'message' => $reminder->title,
-                            ],
+                            'url' => route('dashboard'),
+                            'reminder_id' => $reminder->getKey(),
                         ],
-                        'url' => route('employer.productivity'),
-                        'reminder_id' => $reminder->getKey(),
-                    ]));
+                    );
                     $reminder->update(['notified_at' => now()]);
                     $sent++;
                 }, 3);

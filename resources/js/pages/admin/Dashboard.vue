@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
 import {
+    Activity,
     BriefcaseBusiness,
     Building2,
     CircleDollarSign,
@@ -10,11 +11,11 @@ import {
     Tickets,
     Users,
 } from '@lucide/vue';
+import { useAdminI18n } from './_i18n';
 import MetricCard from '@/components/product/MetricCard.vue';
 import PageHeader from '@/components/product/PageHeader.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import EmptyState from '@/components/product/EmptyState.vue';
-import { useAdminI18n } from './_i18n';
 
 type AuditEntry = {
     id: number;
@@ -55,7 +56,17 @@ defineProps<{
             tickets_open: number;
             referrals_payable: number;
             referrals_payable_cents: number;
+            failed_webhooks_24h: number;
+            pending_webhooks: number;
+            oldest_pending_webhook_minutes: number;
+            event_lag_minutes: number;
         };
+        growth: {
+            activated_30d: number;
+            retained_90d: number;
+            active_subscriptions: number;
+        };
+        financial: { mrr_cents: number; currency: string } | null;
     };
     recent_audit: AuditEntry[];
 }>();
@@ -87,7 +98,7 @@ function targetLabel(entry: AuditEntry): string {
 
         <section>
             <h2
-                class="mb-3 text-xs font-bold tracking-wider text-slate-600 uppercase"
+                class="mb-3 text-xs font-bold tracking-wider text-muted-foreground uppercase"
             >
                 {{ t('dashboard.platform') }}
             </h2>
@@ -138,7 +149,50 @@ function targetLabel(entry: AuditEntry): string {
 
         <section>
             <h2
-                class="mb-3 text-xs font-bold tracking-wider text-slate-600 uppercase"
+                class="mb-3 text-xs font-bold tracking-wider text-muted-foreground uppercase"
+            >
+                {{ t('dashboard.analyticsQuality') }}
+            </h2>
+            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <MetricCard
+                    :label="t('dashboard.metrics.activations')"
+                    :value="metrics.growth.activated_30d"
+                    :hint="`${metrics.growth.retained_90d} ${t('dashboard.metrics.retained')}`"
+                    :icon="Building2"
+                    tone="teal"
+                />
+                <MetricCard
+                    :label="t('dashboard.metrics.activeSubscriptions')"
+                    :value="metrics.growth.active_subscriptions"
+                    :icon="CircleDollarSign"
+                    tone="violet"
+                />
+                <MetricCard
+                    :label="t('dashboard.metrics.webhookQuality')"
+                    :value="metrics.operations.failed_webhooks_24h"
+                    :hint="`${metrics.operations.pending_webhooks} ${t('dashboard.metrics.pending')} · ${metrics.operations.oldest_pending_webhook_minutes} min`"
+                    :icon="Activity"
+                    tone="orange"
+                />
+                <MetricCard
+                    v-if="metrics.financial"
+                    :label="t('dashboard.metrics.mrr')"
+                    :value="
+                        formatCurrency(
+                            metrics.financial.mrr_cents,
+                            metrics.financial.currency,
+                        )
+                    "
+                    :hint="t('dashboard.metrics.mrrHint')"
+                    :icon="CircleDollarSign"
+                    tone="teal"
+                />
+            </div>
+        </section>
+
+        <section>
+            <h2
+                class="mb-3 text-xs font-bold tracking-wider text-muted-foreground uppercase"
             >
                 {{ t('dashboard.openProcesses') }}
             </h2>
@@ -183,10 +237,10 @@ function targetLabel(entry: AuditEntry): string {
             flush
         >
             <div v-if="recent_audit.length > 0" class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-slate-100 text-left">
-                    <thead class="bg-slate-50/80">
+                <table class="min-w-full divide-y divide-border text-left">
+                    <thead class="bg-muted/80">
                         <tr
-                            class="text-[11px] font-bold tracking-wide text-slate-500 uppercase"
+                            class="text-[11px] font-bold tracking-wide text-muted-foreground uppercase"
                         >
                             <th class="px-5 py-3">
                                 {{ t('dashboard.columns.event') }}
@@ -202,28 +256,28 @@ function targetLabel(entry: AuditEntry): string {
                             </th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-100">
+                    <tbody class="divide-y divide-border">
                         <tr
                             v-for="entry in recent_audit"
                             :key="entry.id"
-                            class="text-sm text-slate-600"
+                            class="text-sm text-muted-foreground"
                         >
                             <td class="px-5 py-4">
                                 <p
-                                    class="font-mono text-xs font-semibold text-slate-800"
+                                    class="font-mono text-xs font-semibold text-foreground"
                                 >
                                     {{ entry.event }}
                                 </p>
                             </td>
                             <td class="px-5 py-4">
-                                <p class="font-semibold text-slate-800">
+                                <p class="font-semibold text-foreground">
                                     {{
                                         entry.actor?.name ?? t('common.system')
                                     }}
                                 </p>
                                 <p
                                     v-if="entry.actor"
-                                    class="mt-0.5 text-xs text-slate-600"
+                                    class="mt-0.5 text-xs text-muted-foreground"
                                 >
                                     {{ entry.actor.email }}
                                 </p>

@@ -56,7 +56,7 @@ onMounted(() => record('impression'));
 <template>
     <aside
         v-if="ad"
-        class="erin-panel overflow-hidden border-orange-200 bg-gradient-to-r from-orange-50 via-white to-teal-50 p-6"
+        class="erin-panel overflow-hidden border-orange-200 bg-gradient-to-r from-orange-50 via-background to-teal-50 p-6"
         :aria-label="t('label')"
     >
         <div class="flex items-start gap-4">
@@ -77,10 +77,10 @@ onMounted(() => record('impression'));
                 >
                     {{ t('label') }}
                 </p>
-                <h2 class="mt-1 text-lg font-extrabold text-slate-900">
+                <h2 class="mt-1 text-lg font-extrabold text-foreground">
                     {{ ad.title }}
                 </h2>
-                <p class="mt-1 text-sm leading-6 text-slate-600">
+                <p class="mt-1 text-sm leading-6 text-muted-foreground">
                     {{ ad.body }}
                 </p>
                 <a
@@ -88,7 +88,7 @@ onMounted(() => record('impression'));
                     :href="ad.url"
                     @click="record('click')"
                     rel="noopener noreferrer"
-                    class="erin-focus mt-4 inline-flex h-10 items-center rounded-xl bg-orange-500 px-4 text-sm font-bold text-white hover:bg-orange-600"
+                    class="erin-focus mt-4 inline-flex h-10 items-center rounded-xl bg-orange-500 px-4 text-sm font-bold text-[#0f172a] hover:bg-orange-600"
                 >
                     {{ ad.cta_label }}
                 </a>

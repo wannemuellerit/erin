@@ -14,6 +14,12 @@ export default {
         category: 'Kategorie',
         categoryPlaceholder: 'z. B. Bewerbung, Abrechnung oder Technik',
         priority: 'Priorität',
+        recurrence: 'Wiederholung',
+        recurrenceNone: 'Keine',
+        recurrenceDaily: 'Täglich',
+        recurrenceWeekly: 'Wöchentlich',
+        recurrenceMonthly: 'Monatlich',
+        snoozeDay: '1 Tag verschieben',
         priorities: {
             low: 'Niedrig',
             normal: 'Normal',
@@ -28,6 +34,7 @@ export default {
         replyPlaceholder: 'Antwort schreiben …',
         send: 'Senden',
         sending: 'Wird gesendet …',
+        retry: 'Erneut senden',
         attachments: 'Dateien anhängen',
         removeAttachment: 'Datei entfernen',
         attachmentHint:
@@ -57,6 +64,35 @@ export default {
             waiting_for_customer: 'Wartet auf Antwort',
             resolved: 'Gelöst',
             closed: 'Geschlossen',
+        },
+        chatbot: {
+            title: 'Faden Support-Assistent',
+            aiLabel:
+                'KI-gestützt · antwortet nur aus freigegebenen Faden-Quellen',
+            language: 'Sprache',
+            german: 'Deutsch',
+            english: 'Englisch',
+            sourceVersion: '{title} (Version {version})',
+            welcome:
+                'Wie kann ich helfen? Wenn keine freigegebene Quelle passt, übergebe ich dein Anliegen an das Support-Team.',
+            input: 'Frage an den Support-Assistenten',
+            placeholder: 'Frage zu Faden stellen …',
+            send: 'Frage senden',
+            thinking: 'Die freigegebenen Quellen werden geprüft …',
+            sources: 'Freigegebene Quellen',
+            helpful: 'Antwort hilfreich',
+            unhelpful: 'Antwort nicht hilfreich',
+            handoff: 'Support-Mitarbeiter kontaktieren',
+            handoffConsent:
+                'Ich stimme zu, dass der redigierte Chatverlauf, die aktuelle Faden-Seite, mein Nutzer-/Firmenkontext und technische Browserdaten an Zammad übertragen werden. Geheimnisse, Zahlungsdaten und private Dokumente werden nicht übertragen.',
+            handedOff:
+                'Der Chat wurde an das Support-Team übergeben. Antworten erscheinen im verknüpften Ticket-Chat.',
+            export: 'Chat exportieren',
+            delete: 'Chat löschen',
+            deleteConfirm:
+                'Diesen Supportchat und seinen Verlauf endgültig löschen?',
+            genericError:
+                'Der Support-Assistent ist gerade nicht erreichbar. Du kannst weiterhin direkt ein Ticket erstellen.',
         },
     },
     productivity: {
@@ -91,6 +127,7 @@ export default {
         sourceColumn: 'Quellspalte',
         notMapped: 'Nicht zuordnen',
         startImport: 'Import starten',
+        cancelImport: 'Import abbrechen',
         importRows: '{imported} übernommen, {failed} fehlerhaft',
         errorRow: 'Zeile {row}: {error}',
         noImports: 'Noch keine Importe',
@@ -115,6 +152,7 @@ export default {
             completed: 'Abgeschlossen',
             completed_with_errors: 'Mit Fehlern abgeschlossen',
             failed: 'Fehlgeschlagen',
+            cancelled: 'Abgebrochen',
         },
         activities: {
             reminder: {
@@ -167,6 +205,7 @@ export default {
         from: 'Von',
         to: 'Bis',
         apply: 'Zeitraum anwenden',
+        export: 'CSV exportieren',
         applications: 'Bewerbungen',
         interviews: 'Interviews',
         hires: 'Einstellungen',

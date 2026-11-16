@@ -11,6 +11,10 @@ import {
     X,
 } from '@lucide/vue';
 import { computed, reactive, ref, watch } from 'vue';
+import { useAdminI18n } from './_i18n';
+import AdminPagination from './_components/AdminPagination.vue';
+import { cleanFilters, statusTone } from './_shared';
+import type { AdminPaginator } from './_shared';
 import EmptyState from '@/components/product/EmptyState.vue';
 import FormField from '@/components/product/FormField.vue';
 import MetricCard from '@/components/product/MetricCard.vue';
@@ -22,10 +26,6 @@ import Textarea from '@/components/product/Textarea.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import adminBilling from '@/routes/admin/billing';
-import { useAdminI18n } from './_i18n';
-import AdminPagination from './_components/AdminPagination.vue';
-import { cleanFilters, statusTone } from './_shared';
-import type { AdminPaginator } from './_shared';
 
 type UsagePeriod = {
     id: number;
@@ -371,7 +371,7 @@ const configurationItems = computed(() => [
                     <li
                         v-for="intent in billing_manual_reviews"
                         :key="intent.public_id"
-                        class="rounded-xl border border-orange-200 bg-white/80 p-3"
+                        class="rounded-xl border border-orange-200 bg-card/80 p-3"
                     >
                         <p class="font-medium">
                             {{
@@ -395,7 +395,7 @@ const configurationItems = computed(() => [
                         <Textarea
                             :id="`billing-review-reason-${intent.public_id}`"
                             v-model="manualReviewReasons[intent.public_id]"
-                            class="mt-1 min-h-20 bg-white"
+                            class="mt-1 min-h-20 bg-card"
                             :placeholder="
                                 t('billing.manualReview.reasonPlaceholder')
                             "
@@ -462,7 +462,7 @@ const configurationItems = computed(() => [
                     </div>
                     <div>
                         <div class="flex flex-wrap items-center gap-2">
-                            <h3 class="font-bold text-slate-950">
+                            <h3 class="font-bold text-foreground">
                                 {{
                                     stripe_configuration.ready
                                         ? t('billing.stripe.ready')
@@ -484,7 +484,7 @@ const configurationItems = computed(() => [
                                 "
                             />
                         </div>
-                        <p class="mt-1 text-sm text-slate-500">
+                        <p class="mt-1 text-sm text-muted-foreground">
                             {{
                                 t('billing.stripe.planCoverage', {
                                     configured:
@@ -496,7 +496,7 @@ const configurationItems = computed(() => [
                     </div>
                 </div>
                 <p
-                    class="max-w-xl rounded-xl bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-500"
+                    class="max-w-xl rounded-xl bg-muted px-4 py-3 text-xs leading-5 text-muted-foreground"
                 >
                     {{ t('billing.stripe.noSecrets') }}
                 </p>
@@ -506,7 +506,7 @@ const configurationItems = computed(() => [
                 <div
                     v-for="item in configurationItems"
                     :key="item.label"
-                    class="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-3 text-xs font-semibold"
+                    class="flex items-center gap-2 rounded-xl border border-border px-3 py-3 text-xs font-semibold"
                     :class="
                         item.configured ? 'text-emerald-700' : 'text-orange-700'
                     "
@@ -517,13 +517,11 @@ const configurationItems = computed(() => [
                 </div>
             </div>
 
-            <div
-                class="mt-5 overflow-x-auto rounded-xl border border-slate-200"
-            >
-                <table class="min-w-full divide-y divide-slate-100 text-left">
-                    <thead class="bg-slate-50">
+            <div class="mt-5 overflow-x-auto rounded-xl border border-border">
+                <table class="min-w-full divide-y divide-border text-left">
+                    <thead class="bg-muted">
                         <tr
-                            class="text-[11px] font-bold tracking-wide text-slate-500 uppercase"
+                            class="text-[11px] font-bold tracking-wide text-muted-foreground uppercase"
                         >
                             <th class="px-4 py-3">
                                 {{ t('billing.stripe.plan') }}
@@ -536,7 +534,7 @@ const configurationItems = computed(() => [
                             </th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-100">
+                    <tbody class="divide-y divide-border">
                         <tr
                             v-for="plan in stripe_configuration.plans"
                             :key="plan.slug"
@@ -572,7 +570,9 @@ const configurationItems = computed(() => [
             <div
                 class="mt-5 flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50/70 p-4"
             >
-                <Webhook class="mt-0.5 size-4 shrink-0 text-blue-600" />
+                <Webhook
+                    class="mt-0.5 size-4 shrink-0 text-[var(--erin-primary-text)]"
+                />
                 <p class="text-xs leading-5 text-blue-900">
                     {{ t('billing.stripe.commandHint') }}
                 </p>
@@ -585,7 +585,7 @@ const configurationItems = computed(() => [
             flush
         >
             <form
-                class="grid gap-3 border-b border-slate-100 p-4 lg:grid-cols-[minmax(16rem,1fr)_13rem_13rem_auto]"
+                class="grid gap-3 border-b border-border p-4 lg:grid-cols-[minmax(16rem,1fr)_13rem_13rem_auto]"
                 @submit.prevent="applyFilters"
             >
                 <SearchField
@@ -598,12 +598,12 @@ const configurationItems = computed(() => [
                     type="text"
                     :placeholder="t('billing.companies.subscriptionStatus')"
                     :aria-label="t('billing.companies.subscriptionStatus')"
-                    class="erin-focus h-11 rounded-xl border border-slate-200 px-3 text-sm"
+                    class="erin-focus h-11 rounded-xl border border-border px-3 text-sm"
                 />
                 <select
                     v-model="filters.plan_id"
                     :aria-label="t('billing.companies.plan')"
-                    class="erin-focus h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                    class="erin-focus h-11 rounded-xl border border-border bg-card px-3 text-sm"
                 >
                     <option value="">
                         {{ t('billing.companies.allPlans') }}
@@ -626,7 +626,7 @@ const configurationItems = computed(() => [
                     <button
                         type="button"
                         :aria-label="t('common.resetFilters')"
-                        class="erin-focus grid size-11 place-items-center rounded-xl border border-slate-200 text-slate-500"
+                        class="erin-focus grid size-11 place-items-center rounded-xl border border-border text-muted-foreground"
                         @click="resetFilters"
                     >
                         <X class="size-4" />
@@ -635,10 +635,10 @@ const configurationItems = computed(() => [
             </form>
 
             <div v-if="companies.data.length > 0" class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-slate-100 text-left">
-                    <thead class="bg-slate-50/80">
+                <table class="min-w-full divide-y divide-border text-left">
+                    <thead class="bg-muted/80">
                         <tr
-                            class="text-[11px] font-bold tracking-wide text-slate-500 uppercase"
+                            class="text-[11px] font-bold tracking-wide text-muted-foreground uppercase"
                         >
                             <th class="px-5 py-3">
                                 {{ t('billing.companies.columns.company') }}
@@ -659,18 +659,18 @@ const configurationItems = computed(() => [
                             </th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-100">
+                    <tbody class="divide-y divide-border">
                         <tr
                             v-for="company in companies.data"
                             :key="company.id"
                             class="align-top"
                         >
                             <td class="px-5 py-4">
-                                <p class="text-sm font-bold text-slate-900">
+                                <p class="text-sm font-bold text-foreground">
                                     {{ company.name }}
                                 </p>
                                 <p
-                                    class="mt-1 font-mono text-[11px] text-slate-600"
+                                    class="mt-1 font-mono text-[11px] text-muted-foreground"
                                 >
                                     {{
                                         company.stripe_id ??
@@ -679,7 +679,9 @@ const configurationItems = computed(() => [
                                 </p>
                             </td>
                             <td class="px-5 py-4">
-                                <p class="text-sm font-semibold text-slate-800">
+                                <p
+                                    class="text-sm font-semibold text-foreground"
+                                >
                                     {{
                                         company.plan?.name ??
                                         t('billing.companies.noPlan')
@@ -687,7 +689,7 @@ const configurationItems = computed(() => [
                                 </p>
                                 <p
                                     v-if="company.plan"
-                                    class="mt-1 text-xs text-slate-500"
+                                    class="mt-1 text-xs text-muted-foreground"
                                 >
                                     {{
                                         company.plan.price_cents === null
@@ -724,7 +726,7 @@ const configurationItems = computed(() => [
                                     {{ t('billing.companies.cancelScheduled') }}
                                 </p>
                             </td>
-                            <td class="px-5 py-4 text-xs text-slate-600">
+                            <td class="px-5 py-4 text-xs text-muted-foreground">
                                 <template v-if="company.usage_periods[0]">
                                     <p>
                                         {{ t('billing.companies.usage.ai') }}:
@@ -750,12 +752,12 @@ const configurationItems = computed(() => [
                                         }}
                                     </p>
                                 </template>
-                                <span v-else class="text-slate-600">
+                                <span v-else class="text-muted-foreground">
                                     {{ t('billing.companies.noUsagePeriod') }}
                                 </span>
                             </td>
                             <td
-                                class="px-5 py-4 text-xs whitespace-nowrap text-slate-500"
+                                class="px-5 py-4 text-xs whitespace-nowrap text-muted-foreground"
                             >
                                 <p>
                                     {{
@@ -811,7 +813,7 @@ const configurationItems = computed(() => [
                 class="grid xl:grid-cols-[20rem_minmax(0,1fr)]"
             >
                 <aside
-                    class="border-b border-slate-200 p-3 xl:border-r xl:border-b-0"
+                    class="border-b border-border p-3 xl:border-r xl:border-b-0"
                 >
                     <button
                         v-for="plan in plans"
@@ -821,16 +823,16 @@ const configurationItems = computed(() => [
                         :class="
                             selectedPlan?.id === plan.id
                                 ? 'border-blue-200 bg-blue-50'
-                                : 'border-slate-200 hover:bg-slate-50'
+                                : 'border-border hover:bg-muted'
                         "
                         @click="selectedPlanId = plan.id"
                     >
                         <div class="flex items-start justify-between gap-3">
                             <div>
-                                <p class="text-sm font-bold text-slate-900">
+                                <p class="text-sm font-bold text-foreground">
                                     {{ plan.name }}
                                 </p>
-                                <p class="mt-1 text-xs text-slate-700">
+                                <p class="mt-1 text-xs text-muted-foreground">
                                     {{
                                         plan.price_cents === null
                                             ? t('common.onRequest')
@@ -850,7 +852,7 @@ const configurationItems = computed(() => [
                                 :tone="plan.is_active ? 'green' : 'slate'"
                             />
                         </div>
-                        <p class="mt-3 text-[11px] text-slate-600">
+                        <p class="mt-3 text-[11px] text-muted-foreground">
                             {{
                                 t('billing.plans.companyCount', {
                                     count: plan.companies_count,
@@ -870,7 +872,9 @@ const configurationItems = computed(() => [
                         class="flex flex-col gap-3 sm:flex-row sm:justify-between"
                     >
                         <div>
-                            <p class="text-xs font-bold text-blue-600">
+                            <p
+                                class="text-xs font-bold text-[var(--erin-primary-text)]"
+                            >
                                 {{
                                     t('billing.plans.reference', {
                                         id: selectedPlan.id,
@@ -878,7 +882,7 @@ const configurationItems = computed(() => [
                                     })
                                 }}
                             </p>
-                            <h3 class="mt-1 text-lg font-bold text-slate-950">
+                            <h3 class="mt-1 text-lg font-bold text-foreground">
                                 {{
                                     t('billing.plans.edit', {
                                         name: selectedPlan.name,
@@ -887,7 +891,7 @@ const configurationItems = computed(() => [
                             </h3>
                         </div>
                         <div
-                            class="flex items-center gap-2 text-xs font-semibold text-slate-500"
+                            class="flex items-center gap-2 text-xs font-semibold text-muted-foreground"
                         >
                             <PencilLine class="size-4" />
                             {{
@@ -908,7 +912,7 @@ const configurationItems = computed(() => [
                             <input
                                 id="plan-name"
                                 v-model="planForm.name"
-                                class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                                class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                             />
                         </FormField>
                         <FormField
@@ -920,7 +924,7 @@ const configurationItems = computed(() => [
                                 id="plan-currency"
                                 v-model="planForm.currency"
                                 maxlength="3"
-                                class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm uppercase"
+                                class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm uppercase"
                             />
                         </FormField>
                         <FormField
@@ -949,7 +953,7 @@ const configurationItems = computed(() => [
                                 :placeholder="
                                     t('billing.plans.fields.pricePlaceholder')
                                 "
-                                class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                                class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                             />
                         </FormField>
                         <FormField
@@ -963,7 +967,7 @@ const configurationItems = computed(() => [
                                 type="number"
                                 min="1"
                                 :placeholder="t('billing.unlimited')"
-                                class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                                class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                             />
                         </FormField>
                         <FormField
@@ -977,7 +981,7 @@ const configurationItems = computed(() => [
                                 type="number"
                                 min="0"
                                 :placeholder="quota(null)"
-                                class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                                class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                             />
                         </FormField>
                         <FormField
@@ -991,7 +995,7 @@ const configurationItems = computed(() => [
                                 type="number"
                                 min="1"
                                 :placeholder="quota(null)"
-                                class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                                class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                             />
                         </FormField>
                         <FormField
@@ -1005,7 +1009,7 @@ const configurationItems = computed(() => [
                                 type="number"
                                 min="0"
                                 :placeholder="quota(null)"
-                                class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                                class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                             />
                         </FormField>
                         <FormField
@@ -1019,7 +1023,7 @@ const configurationItems = computed(() => [
                                 type="number"
                                 min="0"
                                 :placeholder="quota(null)"
-                                class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                                class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                             />
                         </FormField>
                         <FormField
@@ -1033,7 +1037,7 @@ const configurationItems = computed(() => [
                                 type="number"
                                 min="0"
                                 :placeholder="quota(null)"
-                                class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                                class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                             />
                         </FormField>
                         <FormField
@@ -1044,7 +1048,7 @@ const configurationItems = computed(() => [
                             <input
                                 id="plan-stripe-product"
                                 v-model="planForm.stripe_product_id"
-                                class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 font-mono text-xs"
+                                class="erin-focus h-10 w-full rounded-xl border border-border px-3 font-mono text-xs"
                             />
                         </FormField>
                         <FormField
@@ -1055,7 +1059,7 @@ const configurationItems = computed(() => [
                             <input
                                 id="plan-stripe-price"
                                 v-model="planForm.stripe_price_id"
-                                class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 font-mono text-xs"
+                                class="erin-focus h-10 w-full rounded-xl border border-border px-3 font-mono text-xs"
                             />
                         </FormField>
                         <FormField
@@ -1073,15 +1077,15 @@ const configurationItems = computed(() => [
                     </div>
 
                     <div
-                        class="mt-5 flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between"
+                        class="mt-5 flex flex-col gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between"
                     >
                         <label
-                            class="flex items-center gap-2 text-sm font-semibold text-slate-700"
+                            class="flex items-center gap-2 text-sm font-semibold text-muted-foreground"
                         >
                             <input
                                 v-model="planForm.is_active"
                                 type="checkbox"
-                                class="size-4 rounded border-slate-300 text-blue-600"
+                                class="size-4 rounded border-border text-[var(--erin-primary-text)]"
                             />
                             {{ t('billing.plans.active') }}
                         </label>

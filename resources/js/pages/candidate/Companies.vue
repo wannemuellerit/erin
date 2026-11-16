@@ -86,7 +86,7 @@ const benefitLabel = (benefit: string) => {
             >
                 <div class="flex items-start gap-4">
                     <span
-                        class="grid size-14 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-blue-100 to-teal-50 text-sm font-extrabold text-[var(--erin-primary)]"
+                        class="grid size-14 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-blue-100 to-teal-50 text-sm font-extrabold text-[var(--erin-primary-text)]"
                     >
                         <img
                             v-if="company.logo_url"
@@ -105,14 +105,14 @@ const benefitLabel = (benefit: string) => {
                                 class="size-4 text-[var(--erin-secondary)]"
                             />
                         </div>
-                        <p class="mt-1 text-xs text-slate-500">
+                        <p class="mt-1 text-xs text-muted-foreground">
                             {{
                                 company.industry ||
                                 t('candidate.companies.industryMissing')
                             }}
                         </p>
                         <div
-                            class="mt-2 flex flex-wrap gap-3 text-[10px] text-slate-400"
+                            class="mt-2 flex flex-wrap gap-3 text-[10px] text-muted-foreground"
                         >
                             <span class="flex items-center gap-1"
                                 ><MapPin class="size-3" />{{
@@ -145,17 +145,17 @@ const benefitLabel = (benefit: string) => {
                 </div>
                 <p
                     v-if="company.description"
-                    class="mt-4 line-clamp-3 text-sm leading-6 text-slate-600"
+                    class="mt-4 line-clamp-3 text-sm leading-6 text-muted-foreground"
                 >
                     {{ company.description }}
                 </p>
-                <div class="mt-5 rounded-xl bg-slate-50 p-3 text-center">
+                <div class="mt-5 rounded-xl bg-muted p-3 text-center">
                     <p
-                        class="text-lg font-extrabold text-[var(--erin-primary)]"
+                        class="text-lg font-extrabold text-[var(--erin-primary-text)]"
                     >
                         {{ company.relevant_jobs_count ?? 0 }}
                     </p>
-                    <p class="text-[9px] text-slate-400">
+                    <p class="text-[9px] text-muted-foreground">
                         {{ t('candidate.companies.relevantJobs') }}
                     </p>
                 </div>
@@ -172,7 +172,7 @@ const benefitLabel = (benefit: string) => {
                 </div>
                 <Link
                     :href="show.url(company.id)"
-                    class="mt-4 inline-flex h-10 items-center rounded-xl border border-slate-200 px-4 text-xs font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700"
+                    class="mt-4 inline-flex h-10 items-center rounded-xl border border-border px-4 text-xs font-bold text-muted-foreground hover:border-blue-300 hover:text-[var(--erin-primary-text-hover)]"
                 >
                     {{ t('candidate.jobDetail.companyProfile') }}
                 </Link>
@@ -183,11 +183,11 @@ const benefitLabel = (benefit: string) => {
             class="erin-panel grid min-h-80 place-items-center p-8 text-center"
         >
             <div>
-                <Building2 class="mx-auto size-9 text-slate-300" />
+                <Building2 class="mx-auto size-9 text-muted-foreground" />
                 <h2 class="mt-4 font-bold">
                     {{ t('candidate.companies.emptyTitle') }}
                 </h2>
-                <p class="mt-2 max-w-md text-sm text-slate-500">
+                <p class="mt-2 max-w-md text-sm text-muted-foreground">
                     {{ t('candidate.companies.emptyDescription') }}
                 </p>
             </div>

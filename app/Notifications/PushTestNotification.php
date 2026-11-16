@@ -25,17 +25,14 @@ class PushTestNotification extends Notification implements ShouldQueue
         object $notifiable,
         ?Notification $notification = null,
     ): WebPushMessage {
-        $locale = $notifiable instanceof User && $notifiable->locale === 'en'
-            ? 'en'
-            : 'de';
+        $locale = $notifiable instanceof User
+            && in_array($notifiable->locale, config('app.supported_locales'), true)
+                ? $notifiable->locale
+                : 'de';
 
         return (new WebPushMessage)
-            ->title($locale === 'en'
-                ? 'Faden test notification'
-                : 'Faden-Testbenachrichtigung')
-            ->body($locale === 'en'
-                ? 'Browser push is ready.'
-                : 'Browser-Push ist einsatzbereit.')
+            ->title(__('Faden-Testbenachrichtigung', [], $locale))
+            ->body(__('Browser-Push ist einsatzbereit.', [], $locale))
             ->icon('/favicon.svg')
             ->lang($locale)
             ->tag('erin-push-test')
@@ -43,7 +40,7 @@ class PushTestNotification extends Notification implements ShouldQueue
                 'event' => 'system.push_test',
                 'url' => route('notification-preferences.edit'),
             ])
-            ->action($locale === 'en' ? 'Open' : 'Öffnen', 'open')
+            ->action(__('Öffnen', [], $locale), 'open')
             ->options(['TTL' => 300]);
     }
 }

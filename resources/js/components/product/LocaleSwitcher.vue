@@ -3,7 +3,7 @@ import { router, usePage } from '@inertiajs/vue3';
 import { Languages } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { normalizeLocale } from '@/i18n';
+import { localeNames, normalizeLocale, supportedLocales } from '@/i18n';
 import { update as updateLocale } from '@/routes/locale';
 import type { SupportedLocale } from '@/i18n';
 
@@ -42,16 +42,9 @@ const serverLocale = normalizeLocale(
 
 locale.value = serverLocale;
 
-const languages = computed(() => [
-    {
-        code: 'de' as const,
-        label: t('public.common.german'),
-    },
-    {
-        code: 'en' as const,
-        label: t('public.common.english'),
-    },
-]);
+const languages = computed(() =>
+    supportedLocales.map((code) => ({ code, label: localeNames[code] })),
+);
 
 function chooseLocale(nextLocale: SupportedLocale): void {
     if (locale.value === nextLocale || pendingLocale.value !== null) {
@@ -79,19 +72,19 @@ function chooseLocale(nextLocale: SupportedLocale): void {
 
 <template>
     <div
-        class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-1"
+        class="inline-flex max-w-full items-center gap-2 overflow-x-auto rounded-xl border border-border bg-muted p-1"
         data-test="locale-switcher"
     >
         <span
             v-if="showLabel"
-            class="inline-flex items-center gap-1.5 pl-2 text-xs font-bold text-slate-500"
+            class="inline-flex items-center gap-1.5 pl-2 text-xs font-bold text-muted-foreground"
         >
             <Languages class="size-3.5" aria-hidden="true" />
             {{ t('public.common.language') }}
         </span>
 
         <div
-            class="inline-flex items-center gap-1"
+            class="inline-flex shrink-0 items-center gap-1"
             role="group"
             :aria-label="t('public.common.language')"
         >
@@ -102,8 +95,8 @@ function chooseLocale(nextLocale: SupportedLocale): void {
                 class="erin-focus inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg px-2.5 text-xs font-black"
                 :class="
                     locale === language.code
-                        ? 'bg-white text-blue-700 shadow-sm'
-                        : 'text-slate-500 hover:bg-white/70 hover:text-slate-900'
+                        ? 'bg-card text-[var(--erin-primary-text-hover)] shadow-sm'
+                        : 'text-muted-foreground hover:bg-card/70 hover:text-foreground'
                 "
                 :aria-label="language.label"
                 :aria-pressed="locale === language.code"
