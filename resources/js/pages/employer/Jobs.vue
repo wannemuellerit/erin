@@ -111,6 +111,15 @@ const employmentTypeLabel = (value: unknown) => {
 
     return te(key) ? t(key) : status.replaceAll('_', ' ');
 };
+const duplicateJob = (id: number) =>
+    router.post(`/employer/jobs/${id}/duplicate`);
+const deleteJob = (row: ProductTableRow) => {
+    if (
+        window.confirm(t('employer.jobs.deleteConfirm', { title: row.title }))
+    ) {
+        router.delete(`/employer/jobs/${Number(row.id)}`);
+    }
+};
 </script>
 
 <template>
@@ -237,6 +246,24 @@ const employmentTypeLabel = (value: unknown) => {
                             "
                         >
                             {{ t('employer.jobs.pause') }}
+                        </button>
+                        <button
+                            type="button"
+                            class="rounded-lg border border-slate-200 px-2.5 py-1.5 text-[10px] font-bold text-slate-600"
+                            @click="duplicateJob(Number(row.id))"
+                        >
+                            {{ t('employer.jobs.duplicate') }}
+                        </button>
+                        <button
+                            v-if="
+                                row.status === 'draft' ||
+                                row.status === 'archived'
+                            "
+                            type="button"
+                            class="rounded-lg bg-red-50 px-2.5 py-1.5 text-[10px] font-bold text-red-700"
+                            @click="deleteJob(row)"
+                        >
+                            {{ t('employer.jobs.delete') }}
                         </button>
                     </div>
                 </template>

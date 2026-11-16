@@ -4,7 +4,6 @@ import {
     BadgeCheck,
     BriefcaseBusiness,
     CalendarDays,
-    Download,
     FileText,
     GraduationCap,
     GripVertical,
@@ -21,14 +20,14 @@ import {
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import PageHeader from '@/components/product/PageHeader.vue';
+import CandidateDocumentManager from '@/components/candidate/CandidateDocumentManager.vue';
+import type { CandidateDocumentItem } from '@/components/candidate/CandidateDocumentManager.vue';
 import ProgressBar from '@/components/product/ProgressBar.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
 import { Button } from '@/components/ui/button';
 import { useLocalizedField } from '@/composables/useLocalizedField';
-import { useStatusLabels } from '@/composables/useStatusLabels';
-import { documents, publish, update } from '@/routes/candidate/profile';
-import type { StatusTone } from '@/types';
+import { publish, update } from '@/routes/candidate/profile';
 
 type NamedOption = {
     id: number;
@@ -158,18 +157,7 @@ type Profile = {
     languages?: Array<NamedOption & { pivot?: { level?: string } }>;
     experiences?: CandidateExperience[];
     educations?: CandidateEducation[];
-    documents?: Array<{
-        id: number;
-        type: string;
-        title: string;
-        original_name: string;
-        mime_type?: string;
-        size_bytes?: number;
-        status: string;
-        scan_result?: string | null;
-        rejection_reason?: string | null;
-        download_url?: string | null;
-    }>;
+    documents?: CandidateDocumentItem[];
 };
 type ProfileStatus = {
     percentage: number;
@@ -214,7 +202,6 @@ const props = withDefaults(
 );
 const { t, te } = useI18n();
 const { localizedField } = useLocalizedField();
-const { statusLabel } = useStatusLabels();
 const active = ref('personal');
 const tabs = computed(() => [
     {
@@ -322,12 +309,6 @@ const form = useForm<ProfileFormData>({
         timezone: slot.timezone,
     })),
 });
-const documentForm = useForm({
-    type: props.document_types[0] ?? '',
-    title: '',
-    file: null as File | null,
-    expires_at: '',
-});
 const photoForm = useForm({
     photo: null as File | null,
 });
@@ -359,29 +340,10 @@ const updateLanguageLevel = (id: number, level: string) => {
         language.id === id ? { ...language, level } : language,
     );
 };
-const documentTone = (status: string): StatusTone =>
-    status === 'verified'
-        ? 'green'
-        : status === 'rejected'
-          ? 'red'
-          : status === 'in_review'
-            ? 'blue'
-            : 'yellow';
-const submitDocument = () =>
-    documentForm.post(documents.url(), {
-        forceFormData: true,
-        preserveScroll: true,
-        onSuccess: () => documentForm.reset(),
-    });
 const missingLabel = (missing: string) => {
     const key = `candidate.profile.missing.${missing}`;
 
     return te(key) ? t(key) : missing.replaceAll('_', ' ');
-};
-const documentTypeLabel = (type: string) => {
-    const key = `candidate.profile.documents.types.${type}`;
-
-    return te(key) ? t(key) : type.replaceAll('_', ' ');
 };
 const submitPhoto = () => {
     if (!photoForm.photo) {
@@ -1485,120 +1447,11 @@ onBeforeUnmount(() => {
                 </Button>
             </SectionCard>
 
-            <div v-else class="space-y-6">
-                <SectionCard
-                    :title="t('candidate.profile.documents.title')"
-                    :description="t('candidate.profile.documents.description')"
-                >
-                    <div
-                        v-if="profile.documents?.length"
-                        class="grid gap-3 md:grid-cols-2"
-                    >
-                        <article
-                            v-for="document in profile.documents"
-                            :key="document.id"
-                            class="flex items-center gap-3 rounded-xl border border-slate-200 p-4"
-                        >
-                            <span
-                                class="grid size-10 place-items-center rounded-xl bg-blue-50 text-[var(--erin-primary)]"
-                                ><FileText class="size-4"
-                            /></span>
-                            <div class="min-w-0 flex-1">
-                                <p class="text-sm font-bold">
-                                    {{ document.title }}
-                                </p>
-                                <p class="truncate text-xs text-slate-400">
-                                    {{ document.original_name }}
-                                </p>
-                                <p
-                                    v-if="document.rejection_reason"
-                                    class="mt-1 text-xs text-red-600"
-                                >
-                                    {{ document.rejection_reason }}
-                                </p>
-                            </div>
-                            <StatusBadge
-                                :label="
-                                    statusLabel('document', document.status)
-                                "
-                                :tone="documentTone(document.status)"
-                            />
-                            <a
-                                v-if="document.download_url"
-                                :href="document.download_url"
-                                :aria-label="
-                                    t('candidate.profile.documents.download', {
-                                        title: document.title,
-                                    })
-                                "
-                                class="grid size-8 place-items-center rounded-lg text-slate-400 hover:bg-slate-100"
-                                ><Download class="size-4"
-                            /></a>
-                        </article>
-                    </div>
-                    <p v-else class="py-6 text-center text-sm text-slate-400">
-                        {{ t('candidate.profile.documents.empty') }}
-                    </p>
-                </SectionCard>
-                <SectionCard
-                    :title="t('candidate.profile.documents.uploadTitle')"
-                >
-                    <form
-                        class="grid gap-4 sm:grid-cols-2"
-                        @submit.prevent="submitDocument"
-                    >
-                        <label
-                            ><span class="text-xs font-bold text-slate-600">{{
-                                t('candidate.profile.documents.type')
-                            }}</span
-                            ><select
-                                v-model="documentForm.type"
-                                required
-                                :class="input"
-                            >
-                                <option
-                                    v-for="type in document_types"
-                                    :key="type"
-                                    :value="type"
-                                >
-                                    {{ documentTypeLabel(type) }}
-                                </option>
-                            </select></label
-                        >
-                        <label
-                            ><span class="text-xs font-bold text-slate-600">{{
-                                t('candidate.profile.documents.documentTitle')
-                            }}</span
-                            ><input
-                                v-model="documentForm.title"
-                                required
-                                :class="input"
-                        /></label>
-                        <label class="sm:col-span-2"
-                            ><span class="text-xs font-bold text-slate-600">{{
-                                t('candidate.profile.documents.file')
-                            }}</span
-                            ><input
-                                required
-                                type="file"
-                                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                                class="mt-2 block w-full text-sm"
-                                @change="
-                                    documentForm.file =
-                                        ($event.target as HTMLInputElement)
-                                            .files?.[0] ?? null
-                                "
-                        /></label>
-                        <button
-                            :disabled="documentForm.processing"
-                            class="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[var(--erin-primary)] text-xs font-bold text-white disabled:opacity-50 sm:col-span-2"
-                        >
-                            <Upload class="size-4" />
-                            {{ t('candidate.profile.documents.upload') }}
-                        </button>
-                    </form>
-                </SectionCard>
-            </div>
+            <CandidateDocumentManager
+                v-else
+                :documents="profile.documents ?? []"
+                :document-types="document_types"
+            />
         </template>
     </div>
 </template>

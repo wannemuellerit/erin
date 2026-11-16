@@ -390,7 +390,7 @@ services:
         condition: service_completed_successfully
 
   playwright:
-    image: mcr.microsoft.com/playwright:v1.61.1-noble
+    image: mcr.microsoft.com/playwright:v1.62.1-noble
     profiles: ["tools"]
     working_dir: /var/www/html
     user: "${UID:-1000}:${GID:-1000}"

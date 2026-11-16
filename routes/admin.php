@@ -49,6 +49,8 @@ Route::middleware(['auth', 'verified', 'role:super_admin,support', 'staff.2fa'])
         });
 
         Route::middleware(['role:super_admin', 'capability:platform.manage'])->group(function (): void {
+            Route::post('users/candidates', [UserController::class, 'storeCandidate'])
+                ->name('users.candidates.store');
             Route::get('audit/export', [AuditController::class, 'export'])
                 ->middleware('throttle:5,1')
                 ->name('audit.export');

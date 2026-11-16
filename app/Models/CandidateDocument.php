@@ -6,6 +6,7 @@ use App\Enums\CandidateDocumentStatus;
 use App\Enums\CandidateDocumentType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
@@ -20,6 +21,8 @@ use Illuminate\Support\Carbon;
  * @property string|null $sha256
  * @property string|null $scan_result
  * @property Carbon|null $expires_at
+ * @property Carbon|null $replaced_at
+ * @property int $version
  */
 class CandidateDocument extends Model
 {
@@ -34,6 +37,7 @@ class CandidateDocument extends Model
             'status' => CandidateDocumentStatus::class,
             'expires_at' => 'datetime',
             'verified_at' => 'datetime',
+            'replaced_at' => 'datetime',
             'scan_completed_at' => 'datetime',
             'shared_with_employers' => 'boolean',
         ];
@@ -53,6 +57,12 @@ class CandidateDocument extends Model
     public function verifier(): BelongsTo
     {
         return $this->belongsTo(User::class, 'verified_by');
+    }
+
+    /** @return HasMany<DocumentAccessGrant, $this> */
+    public function grants(): HasMany
+    {
+        return $this->hasMany(DocumentAccessGrant::class);
     }
 
     public function isAvailableForSharing(): bool

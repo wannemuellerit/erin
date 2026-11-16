@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\ApplicationStatus;
 use App\Enums\CandidateDocumentStatus;
 use App\Models\CandidateDocument;
 use App\Models\JobApplication;
@@ -26,6 +27,8 @@ class DocumentController extends Controller
         abort_unless($document->candidateProfile->user_id === $user->getKey(), 403);
         abort_unless($application->candidate_profile_id === $document->candidate_profile_id, 422);
         abort_unless($document->status === CandidateDocumentStatus::Verified && $document->scan_result === 'clean', 422);
+        abort_if($document->expires_at?->isPast(), 422, __('Ein abgelaufenes Dokument kann nicht freigegeben werden.'));
+        abort_if(in_array($application->status, [ApplicationStatus::Rejected, ApplicationStatus::Withdrawn], true), 422, __('Für eine abgeschlossene Bewerbung können keine Dokumente freigegeben werden.'));
         $expiresAt = now()->addDays(7);
 
         DB::table('document_access_grants')->updateOrInsert(
@@ -42,6 +45,7 @@ class DocumentController extends Controller
                 'updated_at' => now(),
             ],
         );
+        $document->update(['shared_with_employers' => true]);
         $application->update(['documents_shared_at' => now()]);
         $audit->record('candidate.document_access_granted', $document, after: [
             'company_id' => $application->jobPosting->company_id,
@@ -50,6 +54,35 @@ class DocumentController extends Controller
         ], companyId: $application->jobPosting->company_id);
 
         return back()->with('success', __('Das Dokument ist sieben Tage für dieses Unternehmen freigegeben.'));
+    }
+
+    public function revoke(
+        Request $request,
+        CandidateDocument $document,
+        JobApplication $application,
+        AuditLogger $audit,
+    ): RedirectResponse {
+        $user = $request->user();
+        abort_if($user === null, 401);
+        abort_unless($document->candidateProfile->user_id === $user->getKey(), 403);
+        abort_unless($application->candidate_profile_id === $document->candidate_profile_id, 422);
+        $updated = DB::table('document_access_grants')
+            ->where('candidate_document_id', $document->getKey())
+            ->where('application_id', $application->getKey())
+            ->whereNull('revoked_at')
+            ->update(['revoked_at' => now(), 'updated_at' => now()]);
+        abort_if($updated === 0, 404);
+        $hasActiveGrants = DB::table('document_access_grants')
+            ->where('candidate_document_id', $document->getKey())
+            ->whereNull('revoked_at')
+            ->where('expires_at', '>', now())
+            ->exists();
+        $document->update(['shared_with_employers' => $hasActiveGrants]);
+        $audit->record('candidate.document_access_revoked', $document, after: [
+            'application_id' => $application->getKey(),
+        ], companyId: $application->jobPosting->company_id);
+
+        return back()->with('success', __('Die Dokumentfreigabe wurde widerrufen.'));
     }
 
     public function download(

@@ -947,7 +947,7 @@ test.describe('Mobile Abnahme', () => {
     test('bleibt im Firmen-Dashboard und in der Stellenliste ohne horizontalen Overflow', async ({
         page,
     }) => {
-        await logIn(page, accounts.company.email);
+        await logIn(page, accounts.recruiter.email);
         await expectAccessibleAppChrome(page);
         await expectNoHorizontalOverflow(page);
         await expectNoSeriousAccessibilityViolations(page);

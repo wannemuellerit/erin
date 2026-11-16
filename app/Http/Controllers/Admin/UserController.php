@@ -4,15 +4,18 @@ namespace App\Http\Controllers\Admin;
 
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
+use App\Http\Requests\Admin\StoreCandidateRequest;
 use App\Http\Requests\Admin\UpdateUserRoleRequest;
 use App\Http\Requests\Admin\UpdateUserStatusRequest;
 use App\Http\Requests\Admin\UpdateUserStorageQuotaRequest;
+use App\Models\Occupation;
 use App\Models\PlatformRole;
 use App\Models\User;
 use App\Services\Documents\UploadPolicy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -93,7 +96,54 @@ class UserController extends AdminController
             ),
             'platform_roles' => PlatformRole::query()->where('is_active', true)
                 ->orderBy('name')->get(['id', 'name']),
+            'occupations' => Occupation::query()->where('is_active', true)
+                ->orderBy('name_de')->get(['id', 'name_de', 'name_en']),
         ]);
+    }
+
+    public function storeCandidate(StoreCandidateRequest $request): RedirectResponse
+    {
+        $validated = $request->validated();
+        $user = DB::transaction(function () use ($validated): User {
+            $user = User::query()->create([
+                'name' => trim($validated['first_name'].' '.$validated['last_name']),
+                'email' => mb_strtolower($validated['email']),
+                'password' => $validated['temporary_password'],
+                'role' => UserRole::Candidate,
+                'status' => UserStatus::Active,
+                'locale' => $validated['locale'],
+                'timezone' => 'Europe/Berlin',
+                'password_change_required_at' => now(),
+            ]);
+            if ($validated['email_verified'] ?? false) {
+                $user->forceFill(['email_verified_at' => now()])->save();
+            }
+            $user->candidateProfile()->create([
+                'first_name' => $validated['first_name'],
+                'last_name' => $validated['last_name'],
+                'current_country_code' => isset($validated['current_country_code'])
+                    ? mb_strtoupper($validated['current_country_code'])
+                    : null,
+                'current_city' => $validated['current_city'] ?? null,
+                'phone' => $validated['phone'] ?? null,
+                'occupation_id' => $validated['occupation_id'] ?? null,
+                'current_position' => $validated['current_position'] ?? null,
+                'desired_position' => $validated['desired_position'] ?? null,
+                'summary' => $validated['summary'] ?? null,
+                'salary_currency' => 'EUR',
+                'experience_years' => 0,
+            ]);
+
+            return $user;
+        });
+
+        $this->audit($request, 'admin.candidate_created', $user, after: [
+            'role' => UserRole::Candidate->value,
+            'email_verified' => $user->email_verified_at !== null,
+            'requires_password_change' => true,
+        ]);
+
+        return back()->with('success', __('Die Fachkraft wurde angelegt und muss beim ersten Login das Passwort ändern.'));
     }
 
     public function updateStatus(UpdateUserStatusRequest $request, User $user): RedirectResponse

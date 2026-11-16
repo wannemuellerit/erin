@@ -2,6 +2,7 @@
 
 namespace App\Services\Documents;
 
+use App\Enums\ApplicationStatus;
 use App\Enums\CandidateDocumentStatus;
 use App\Models\CandidateDocument;
 use App\Models\User;
@@ -25,6 +26,7 @@ class CandidateDocumentAccess
 
         if (
             $document->status !== CandidateDocumentStatus::Verified
+            || $document->expires_at?->isPast()
             || $user->role->value !== 'company'
         ) {
             return false;
@@ -52,6 +54,10 @@ class CandidateDocumentAccess
             ->where('grants.candidate_document_id', $document->getKey())
             ->whereColumn('job_postings.company_id', 'grants.company_id')
             ->where('applications.candidate_profile_id', $document->candidate_profile_id)
+            ->whereNotIn('applications.status', [
+                ApplicationStatus::Rejected->value,
+                ApplicationStatus::Withdrawn->value,
+            ])
             ->whereNull('grants.revoked_at')
             ->where('grants.expires_at', '>', now())
             ->value('grants.company_id');
