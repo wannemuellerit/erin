@@ -1077,7 +1077,7 @@ test.describe('Login und Rollenbereiche', () => {
         const companyCase = page.getByTestId(companyCaseTestId!);
         await expect(companyCase).toBeVisible();
         const companyToggle = companyCase.getByRole('button', {
-            name: /Visa-Fall für Anna Kowalska/,
+            name: /Anna Kowalska/,
         });
         await expect(companyToggle).toHaveAttribute('aria-expanded', 'true');
         await companyToggle.click();
