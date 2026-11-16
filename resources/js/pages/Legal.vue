@@ -29,13 +29,13 @@ const title = computed(() => t(titleKeys[props.document]));
         <meta v-if="!published" name="robots" content="noindex,nofollow" />
     </Head>
 
-    <div class="min-h-screen bg-slate-50 text-slate-950">
+    <div class="min-h-screen bg-muted text-foreground">
         <PublicHeader />
 
         <main class="mx-auto max-w-4xl px-5 py-14 sm:px-6 lg:px-8 lg:py-20">
             <div>
                 <p
-                    class="text-xs font-bold tracking-[0.15em] text-blue-600 uppercase"
+                    class="text-xs font-bold tracking-[0.15em] text-[var(--erin-primary-text)] uppercase"
                 >
                     {{ t('public.legal.eyebrow') }}
                 </p>
@@ -48,7 +48,7 @@ const title = computed(() => t(titleKeys[props.document]));
 
             <article
                 v-if="published && content"
-                class="mt-10 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-10"
+                class="mt-10 rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-10"
             >
                 <div
                     class="mb-6 flex items-center gap-2 text-xs font-bold text-teal-700"
@@ -57,7 +57,7 @@ const title = computed(() => t(titleKeys[props.document]));
                     {{ t('public.legal.publishedLabel') }}
                 </div>
                 <div
-                    class="text-sm leading-7 whitespace-pre-wrap text-slate-700 sm:text-base sm:leading-8"
+                    class="text-sm leading-7 whitespace-pre-wrap text-muted-foreground sm:text-base sm:leading-8"
                 >
                     {{ content }}
                 </div>
@@ -68,7 +68,7 @@ const title = computed(() => t(titleKeys[props.document]));
                 class="mt-10 rounded-2xl border border-amber-200 bg-amber-50 p-6 sm:p-10"
             >
                 <div
-                    class="grid size-12 place-items-center rounded-2xl bg-white text-amber-600 shadow-sm"
+                    class="grid size-12 place-items-center rounded-2xl bg-card text-amber-600 shadow-sm"
                 >
                     <FileWarning class="size-6" />
                 </div>
@@ -85,16 +85,16 @@ const title = computed(() => t(titleKeys[props.document]));
 
             <Link
                 :href="home()"
-                class="erin-focus mt-8 inline-flex items-center gap-2 rounded-lg text-sm font-bold text-blue-700 hover:text-blue-800"
+                class="erin-focus mt-8 inline-flex items-center gap-2 rounded-lg text-sm font-bold text-[var(--erin-primary-text-hover)] hover:text-blue-800"
             >
                 <ArrowLeft class="size-4" />
                 {{ t('public.legal.backHome') }}
             </Link>
         </main>
 
-        <footer class="border-t border-slate-200 bg-white">
+        <footer class="border-t border-border bg-card">
             <div
-                class="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-8 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8"
+                class="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-8 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8"
             >
                 <p>
                     {{
@@ -109,25 +109,25 @@ const title = computed(() => t(titleKeys[props.document]));
                 >
                     <Link
                         :href="legal.privacy()"
-                        class="erin-focus rounded hover:text-blue-600"
+                        class="erin-focus rounded hover:text-[var(--erin-primary-text)]"
                     >
                         {{ t('public.common.privacy') }}
                     </Link>
                     <Link
                         :href="legal.imprint()"
-                        class="erin-focus rounded hover:text-blue-600"
+                        class="erin-focus rounded hover:text-[var(--erin-primary-text)]"
                     >
                         {{ t('public.common.imprint') }}
                     </Link>
                     <Link
                         :href="legal.terms()"
-                        class="erin-focus rounded hover:text-blue-600"
+                        class="erin-focus rounded hover:text-[var(--erin-primary-text)]"
                     >
                         {{ t('public.common.terms') }}
                     </Link>
                     <Link
                         :href="contact()"
-                        class="erin-focus rounded hover:text-blue-600"
+                        class="erin-focus rounded hover:text-[var(--erin-primary-text)]"
                     >
                         {{ t('public.common.contact') }}
                     </Link>

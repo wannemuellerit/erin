@@ -45,6 +45,8 @@ createInertiaApp({
         switch (true) {
             case ['Welcome', 'Pricing', 'Legal', 'Contact'].includes(name):
                 return null;
+            case name.startsWith('errors/'):
+                return null;
             case name.startsWith('auth/'):
                 return AuthLayout;
             case name.startsWith('settings/'):

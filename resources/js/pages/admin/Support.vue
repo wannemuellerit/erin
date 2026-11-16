@@ -1,7 +1,18 @@
 <script setup lang="ts">
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
-import { Eye, MessageSquareReply, ShieldAlert, Tickets, X } from '@lucide/vue';
+import {
+    Bot,
+    Eye,
+    MessageSquareReply,
+    ShieldAlert,
+    Tickets,
+    X,
+} from '@lucide/vue';
 import { computed, reactive, ref, watch } from 'vue';
+import AdminPagination from './_components/AdminPagination.vue';
+import { useAdminI18n } from './_i18n';
+import { cleanFilters, statusTone } from './_shared';
+import type { AdminPaginator } from './_shared';
 import EmptyState from '@/components/product/EmptyState.vue';
 import MetricCard from '@/components/product/MetricCard.vue';
 import PageHeader from '@/components/product/PageHeader.vue';
@@ -12,10 +23,6 @@ import SupportConversation from '@/components/product/SupportConversation.vue';
 import Textarea from '@/components/product/Textarea.vue';
 import adminSupport from '@/routes/admin/support';
 import type { SupportTicketMessage } from '@/types';
-import AdminPagination from './_components/AdminPagination.vue';
-import { useAdminI18n } from './_i18n';
-import { cleanFilters, statusTone } from './_shared';
-import type { AdminPaginator } from './_shared';
 
 type SupportTicketRow = {
     id: number;
@@ -93,6 +100,37 @@ type ModerationCaseRow = {
     assignee: { id: number; name: string; email: string } | null;
 };
 
+type ChatbotGovernance = {
+    metrics: {
+        sessions: number;
+        handoff_rate: number;
+        helpful_rate: number;
+        average_latency_ms: number;
+        escalations: number;
+        expired_sources: number;
+    };
+    articles: Array<{
+        id: number;
+        stable_key: string;
+        version: number;
+        locale: string;
+        title: string;
+        source_url: string | null;
+        status: string;
+        target_roles: string[] | null;
+        published_at: string | null;
+        expires_at: string | null;
+    }>;
+    prompts: Array<{
+        id: number;
+        version: number;
+        model: string | null;
+        active: boolean;
+        allowed_tools: string[] | null;
+        created_at: string;
+    }>;
+};
+
 const props = defineProps<{
     tickets: AdminPaginator<SupportTicketRow>;
     filters: SupportFilters;
@@ -109,6 +147,7 @@ const props = defineProps<{
         maxFileMegabytes: number;
         maxTotalMegabytes: number;
     };
+    chatbotGovernance: ChatbotGovernance;
 }>();
 const page = usePage();
 const currentUserId = computed(() => Number(page.props.auth?.user?.id ?? 0));
@@ -144,6 +183,27 @@ const ticketForm = useForm({
 
 const impersonationForm = useForm({
     reason: '',
+});
+
+const knowledgeForm = useForm({
+    stable_key: '',
+    locale: 'de',
+    title: '',
+    body: '',
+    source_url: '',
+    target_roles: ['candidate', 'company'] as string[],
+    expires_at: '',
+});
+const promptForm = useForm({
+    instructions: '',
+    allowed_tools: ['knowledge_search', 'support_handoff'] as string[],
+    safety_rules: [
+        'source_only',
+        'no_state_mutations',
+        'prompt_injection_guard',
+        'pii_redaction',
+    ] as string[],
+    model: '',
 });
 
 const { t, formatDate, humanize } = useAdminI18n();
@@ -238,6 +298,21 @@ function updateModerationCase(
         { preserveScroll: true },
     );
 }
+
+function storeKnowledge(): void {
+    knowledgeForm.post('/admin/support/knowledge', {
+        preserveScroll: true,
+        onSuccess: () =>
+            knowledgeForm.reset('title', 'body', 'source_url', 'expires_at'),
+    });
+}
+
+function storePrompt(): void {
+    promptForm.post('/admin/support/prompts', {
+        preserveScroll: true,
+        onSuccess: () => promptForm.reset('instructions', 'model'),
+    });
+}
 </script>
 
 <template>
@@ -269,12 +344,246 @@ function updateModerationCase(
         </div>
 
         <SectionCard
+            :title="t('support.chatbot.title')"
+            :description="t('support.chatbot.description')"
+        >
+            <div class="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
+                <MetricCard
+                    :label="t('support.chatbot.sessions')"
+                    :value="chatbotGovernance.metrics.sessions"
+                    :icon="Bot"
+                    tone="blue"
+                />
+                <MetricCard
+                    :label="t('support.chatbot.handoffRate')"
+                    :value="`${chatbotGovernance.metrics.handoff_rate}%`"
+                    :icon="MessageSquareReply"
+                    tone="orange"
+                />
+                <MetricCard
+                    :label="t('support.chatbot.helpfulRate')"
+                    :value="`${chatbotGovernance.metrics.helpful_rate}%`"
+                    :icon="MessageSquareReply"
+                    tone="teal"
+                />
+                <MetricCard
+                    :label="t('support.chatbot.latency')"
+                    :value="`${chatbotGovernance.metrics.average_latency_ms} ms`"
+                    :icon="Bot"
+                    tone="violet"
+                />
+                <MetricCard
+                    :label="t('support.chatbot.escalations')"
+                    :value="chatbotGovernance.metrics.escalations"
+                    :icon="ShieldAlert"
+                    tone="orange"
+                />
+                <MetricCard
+                    :label="t('support.chatbot.expiredSources')"
+                    :value="chatbotGovernance.metrics.expired_sources"
+                    :icon="ShieldAlert"
+                    tone="orange"
+                />
+            </div>
+
+            <div v-if="isSuperAdmin" class="mt-6 grid gap-6 xl:grid-cols-2">
+                <form
+                    class="space-y-3 rounded-2xl border border-border p-4"
+                    @submit.prevent="storeKnowledge"
+                >
+                    <h3 class="font-bold text-foreground">
+                        {{ t('support.chatbot.newSource') }}
+                    </h3>
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        <input
+                            v-model="knowledgeForm.stable_key"
+                            required
+                            pattern="[a-z0-9._-]+"
+                            class="erin-focus h-10 rounded-xl border border-border px-3 text-sm"
+                            :placeholder="t('support.chatbot.sourceKey')"
+                        />
+                        <select
+                            v-model="knowledgeForm.locale"
+                            :aria-label="t('support.chatbot.sourceLocale')"
+                            class="erin-focus h-10 rounded-xl border border-border bg-card px-3 text-sm"
+                        >
+                            <option value="de">
+                                {{ t('support.chatbot.german') }}
+                            </option>
+                            <option value="en">
+                                {{ t('support.chatbot.english') }}
+                            </option>
+                        </select>
+                    </div>
+                    <input
+                        v-model="knowledgeForm.title"
+                        required
+                        maxlength="180"
+                        class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
+                        :placeholder="t('support.chatbot.sourceTitle')"
+                    />
+                    <Textarea
+                        v-model="knowledgeForm.body"
+                        required
+                        rows="5"
+                        :placeholder="t('support.chatbot.sourceBody')"
+                    />
+                    <input
+                        v-model="knowledgeForm.source_url"
+                        type="url"
+                        class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
+                        :placeholder="t('support.chatbot.sourceUrl')"
+                    />
+                    <input
+                        v-model="knowledgeForm.expires_at"
+                        type="datetime-local"
+                        :aria-label="t('support.chatbot.sourceExpiresAt')"
+                        class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
+                    />
+                    <button
+                        type="submit"
+                        :disabled="knowledgeForm.processing"
+                        class="erin-focus rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white"
+                    >
+                        {{ t('support.chatbot.saveDraft') }}
+                    </button>
+                </form>
+
+                <form
+                    class="space-y-3 rounded-2xl border border-border p-4"
+                    @submit.prevent="storePrompt"
+                >
+                    <h3 class="font-bold text-foreground">
+                        {{ t('support.chatbot.newPrompt') }}
+                    </h3>
+                    <Textarea
+                        v-model="promptForm.instructions"
+                        required
+                        rows="7"
+                        :placeholder="t('support.chatbot.promptInstructions')"
+                    />
+                    <input
+                        v-model="promptForm.model"
+                        class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
+                        :placeholder="t('support.chatbot.model')"
+                    />
+                    <button
+                        type="submit"
+                        :disabled="promptForm.processing"
+                        class="erin-focus rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white"
+                    >
+                        {{ t('support.chatbot.savePrompt') }}
+                    </button>
+                </form>
+            </div>
+
+            <div class="mt-6 grid gap-6 xl:grid-cols-2">
+                <section>
+                    <h3 class="text-sm font-bold text-foreground">
+                        {{ t('support.chatbot.sources') }}
+                    </h3>
+                    <div class="mt-2 space-y-2">
+                        <article
+                            v-for="article in chatbotGovernance.articles"
+                            :key="article.id"
+                            class="flex items-center justify-between gap-3 rounded-xl border border-border p-3 text-sm"
+                        >
+                            <div>
+                                <strong>{{ article.title }}</strong>
+                                <p class="text-xs text-muted-foreground">
+                                    {{
+                                        t('support.chatbot.sourceMeta', {
+                                            key: article.stable_key,
+                                            version: article.version,
+                                            locale: article.locale,
+                                            status: article.status,
+                                        })
+                                    }}
+                                </p>
+                            </div>
+                            <div v-if="isSuperAdmin" class="flex gap-2">
+                                <button
+                                    v-if="article.status === 'draft'"
+                                    type="button"
+                                    class="erin-focus rounded-lg bg-green-600 px-2 py-1 text-xs font-bold text-white"
+                                    @click="
+                                        router.post(
+                                            `/admin/support/knowledge/${article.id}/publish`,
+                                            {},
+                                            { preserveScroll: true },
+                                        )
+                                    "
+                                >
+                                    {{ t('support.chatbot.publish') }}
+                                </button>
+                                <button
+                                    v-if="article.status === 'published'"
+                                    type="button"
+                                    class="erin-focus rounded-lg border border-red-200 px-2 py-1 text-xs font-bold text-red-700"
+                                    @click="
+                                        router.post(
+                                            `/admin/support/knowledge/${article.id}/retire`,
+                                            {},
+                                            { preserveScroll: true },
+                                        )
+                                    "
+                                >
+                                    {{ t('support.chatbot.retire') }}
+                                </button>
+                            </div>
+                        </article>
+                    </div>
+                </section>
+                <section>
+                    <h3 class="text-sm font-bold text-foreground">
+                        {{ t('support.chatbot.prompts') }}
+                    </h3>
+                    <div class="mt-2 space-y-2">
+                        <article
+                            v-for="prompt in chatbotGovernance.prompts"
+                            :key="prompt.id"
+                            class="flex items-center justify-between rounded-xl border border-border p-3 text-sm"
+                        >
+                            <span
+                                >{{
+                                    t('support.chatbot.promptMeta', {
+                                        version: prompt.version,
+                                        model:
+                                            prompt.model ||
+                                            t('support.chatbot.defaultModel'),
+                                    })
+                                }}
+                                <strong v-if="prompt.active"
+                                    >({{ t('support.chatbot.active') }})</strong
+                                ></span
+                            >
+                            <button
+                                v-if="isSuperAdmin && !prompt.active"
+                                type="button"
+                                class="erin-focus rounded-lg bg-violet-600 px-2 py-1 text-xs font-bold text-white"
+                                @click="
+                                    router.post(
+                                        `/admin/support/prompts/${prompt.id}/activate`,
+                                        {},
+                                        { preserveScroll: true },
+                                    )
+                                "
+                            >
+                                {{ t('support.chatbot.activate') }}
+                            </button>
+                        </article>
+                    </div>
+                </section>
+            </div>
+        </SectionCard>
+
+        <SectionCard
             :title="t('support.moderationTitle')"
             :description="t('support.moderationDescription')"
         >
             <div class="grid gap-6 xl:grid-cols-2">
                 <section>
-                    <h3 class="text-sm font-bold text-slate-900">
+                    <h3 class="text-sm font-bold text-foreground">
                         {{ t('support.pendingFeedbackTitle') }}
                     </h3>
                     <div
@@ -284,20 +593,24 @@ function updateModerationCase(
                         <article
                             v-for="feedback in moderation.feedback"
                             :key="feedback.id"
-                            class="rounded-2xl border border-slate-200 p-4"
+                            class="rounded-2xl border border-border p-4"
                         >
                             <div
                                 class="flex flex-wrap items-center justify-between gap-2"
                             >
                                 <div>
-                                    <p class="text-sm font-bold text-slate-900">
+                                    <p
+                                        class="text-sm font-bold text-foreground"
+                                    >
                                         {{ feedback.author.name }} →
                                         {{
                                             feedback.subject_user?.name ??
                                             feedback.subject_company?.name
                                         }}
                                     </p>
-                                    <p class="mt-1 text-xs text-slate-500">
+                                    <p
+                                        class="mt-1 text-xs text-muted-foreground"
+                                    >
                                         {{
                                             feedback.application?.job_posting
                                                 .title
@@ -314,7 +627,7 @@ function updateModerationCase(
                                     "
                                 />
                             </div>
-                            <p class="mt-3 text-sm text-slate-700">
+                            <p class="mt-3 text-sm text-muted-foreground">
                                 {{ humanize(feedback.reason_code) }}
                                 <span v-if="feedback.comment">
                                     · {{ feedback.comment }}
@@ -352,32 +665,36 @@ function updateModerationCase(
                             </template>
                         </article>
                     </div>
-                    <p v-else class="mt-3 text-sm text-slate-500">
+                    <p v-else class="mt-3 text-sm text-muted-foreground">
                         {{ t('support.noPendingFeedback') }}
                     </p>
                 </section>
 
                 <section>
-                    <h3 class="text-sm font-bold text-slate-900">
+                    <h3 class="text-sm font-bold text-foreground">
                         {{ t('support.moderationCasesTitle') }}
                     </h3>
                     <div v-if="moderation.cases.length" class="mt-3 space-y-3">
                         <article
                             v-for="moderationCase in moderation.cases"
                             :key="moderationCase.id"
-                            class="rounded-2xl border border-slate-200 p-4"
+                            class="rounded-2xl border border-border p-4"
                         >
                             <div
                                 class="flex flex-wrap items-center justify-between gap-2"
                             >
                                 <div>
-                                    <p class="text-sm font-bold text-slate-900">
+                                    <p
+                                        class="text-sm font-bold text-foreground"
+                                    >
                                         {{
                                             moderationCase.subject_user?.name ??
                                             moderationCase.subject_company?.name
                                         }}
                                     </p>
-                                    <p class="mt-1 text-xs text-slate-500">
+                                    <p
+                                        class="mt-1 text-xs text-muted-foreground"
+                                    >
                                         {{ humanize(moderationCase.reason) }} ·
                                         {{
                                             formatDate(
@@ -391,7 +708,7 @@ function updateModerationCase(
                                     :tone="statusTone(moderationCase.status)"
                                 />
                             </div>
-                            <p class="mt-2 text-xs text-slate-600">
+                            <p class="mt-2 text-xs text-muted-foreground">
                                 {{
                                     t('support.caseAssignment', {
                                         name:
@@ -406,7 +723,7 @@ function updateModerationCase(
                                         v-model="
                                             casePriorities[moderationCase.id]
                                         "
-                                        class="erin-focus h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs"
+                                        class="erin-focus h-10 rounded-xl border border-border bg-card px-3 text-xs"
                                     >
                                         <option value="">
                                             {{
@@ -427,7 +744,7 @@ function updateModerationCase(
                                     </select>
                                     <button
                                         type="button"
-                                        class="erin-focus rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700"
+                                        class="erin-focus rounded-xl border border-border px-3 py-2 text-xs font-bold text-muted-foreground"
                                         @click="
                                             updateModerationCase(
                                                 moderationCase,
@@ -473,7 +790,7 @@ function updateModerationCase(
                                     </button>
                                     <button
                                         type="button"
-                                        class="erin-focus rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700"
+                                        class="erin-focus rounded-xl border border-border px-3 py-2 text-xs font-bold text-muted-foreground"
                                         @click="
                                             updateModerationCase(
                                                 moderationCase,
@@ -499,7 +816,7 @@ function updateModerationCase(
                             </template>
                         </article>
                     </div>
-                    <p v-else class="mt-3 text-sm text-slate-500">
+                    <p v-else class="mt-3 text-sm text-muted-foreground">
                         {{ t('support.noModerationCases') }}
                     </p>
                 </section>
@@ -508,7 +825,7 @@ function updateModerationCase(
 
         <SectionCard flush>
             <form
-                class="grid gap-3 border-b border-slate-100 p-4 lg:grid-cols-[minmax(16rem,1fr)_12rem_11rem_14rem_auto]"
+                class="grid gap-3 border-b border-border p-4 lg:grid-cols-[minmax(16rem,1fr)_12rem_11rem_14rem_auto]"
                 @submit.prevent="applyFilters"
             >
                 <SearchField
@@ -519,7 +836,7 @@ function updateModerationCase(
                 <select
                     v-model="filters.status"
                     :aria-label="t('support.ticketStatus')"
-                    class="erin-focus h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                    class="erin-focus h-11 rounded-xl border border-border bg-card px-3 text-sm"
                 >
                     <option value="">{{ t('common.allStatuses') }}</option>
                     <option
@@ -533,7 +850,7 @@ function updateModerationCase(
                 <select
                     v-model="filters.priority"
                     :aria-label="t('support.priority')"
-                    class="erin-focus h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                    class="erin-focus h-11 rounded-xl border border-border bg-card px-3 text-sm"
                 >
                     <option value="">{{ t('support.allPriorities') }}</option>
                     <option
@@ -547,7 +864,7 @@ function updateModerationCase(
                 <select
                     v-model="filters.assigned_to"
                     :aria-label="t('support.assignee')"
-                    class="erin-focus h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                    class="erin-focus h-11 rounded-xl border border-border bg-card px-3 text-sm"
                 >
                     <option value="">{{ t('support.allAssignees') }}</option>
                     <option
@@ -568,7 +885,7 @@ function updateModerationCase(
                     <button
                         type="button"
                         :aria-label="t('common.resetFilters')"
-                        class="erin-focus grid size-11 place-items-center rounded-xl border border-slate-200 text-slate-500"
+                        class="erin-focus grid size-11 place-items-center rounded-xl border border-border text-muted-foreground"
                         @click="resetFilters"
                     >
                         <X class="size-4" />
@@ -580,10 +897,8 @@ function updateModerationCase(
                 v-if="tickets.data.length > 0"
                 class="grid min-h-[38rem] xl:grid-cols-[22rem_minmax(0,1fr)]"
             >
-                <aside
-                    class="border-b border-slate-200 xl:border-r xl:border-b-0"
-                >
-                    <div class="divide-y divide-slate-100">
+                <aside class="border-b border-border xl:border-r xl:border-b-0">
+                    <div class="divide-y divide-border">
                         <button
                             v-for="ticket in tickets.data"
                             :key="ticket.id"
@@ -592,7 +907,7 @@ function updateModerationCase(
                             :class="
                                 selectedTicket?.id === ticket.id
                                     ? 'bg-blue-50'
-                                    : 'hover:bg-slate-50'
+                                    : 'hover:bg-muted'
                             "
                             @click="selectedId = ticket.id"
                         >
@@ -600,7 +915,7 @@ function updateModerationCase(
                                 class="flex items-center justify-between gap-2"
                             >
                                 <span
-                                    class="text-[11px] font-bold text-slate-600"
+                                    class="text-[11px] font-bold text-muted-foreground"
                                 >
                                     {{ ticket.number }}
                                 </span>
@@ -616,11 +931,13 @@ function updateModerationCase(
                                 />
                             </div>
                             <p
-                                class="mt-2 text-sm leading-5 font-bold text-slate-800"
+                                class="mt-2 text-sm leading-5 font-bold text-foreground"
                             >
                                 {{ ticket.subject }}
                             </p>
-                            <p class="mt-2 truncate text-xs text-slate-600">
+                            <p
+                                class="mt-2 truncate text-xs text-muted-foreground"
+                            >
                                 {{ ticket.requester.name }}
                             </p>
                             <div
@@ -630,7 +947,7 @@ function updateModerationCase(
                                     :label="humanize(ticket.status)"
                                     :tone="statusTone(ticket.status)"
                                 />
-                                <span class="text-slate-600">
+                                <span class="text-muted-foreground">
                                     {{
                                         t(
                                             'support.messageCount',
@@ -649,7 +966,9 @@ function updateModerationCase(
                     >
                         <div>
                             <div class="flex flex-wrap items-center gap-2">
-                                <span class="text-xs font-bold text-slate-600">
+                                <span
+                                    class="text-xs font-bold text-muted-foreground"
+                                >
                                     {{ selectedTicket.number }}
                                 </span>
                                 <StatusBadge
@@ -657,10 +976,10 @@ function updateModerationCase(
                                     :tone="statusTone(selectedTicket.status)"
                                 />
                             </div>
-                            <h2 class="mt-2 text-xl font-bold text-slate-950">
+                            <h2 class="mt-2 text-xl font-bold text-foreground">
                                 {{ selectedTicket.subject }}
                             </h2>
-                            <p class="mt-1 text-xs text-slate-500">
+                            <p class="mt-1 text-xs text-muted-foreground">
                                 {{ humanize(selectedTicket.category) }} ·
                                 {{
                                     t('support.createdAt', {
@@ -671,7 +990,7 @@ function updateModerationCase(
                                 }}
                             </p>
                         </div>
-                        <div class="text-xs text-slate-500">
+                        <div class="text-xs text-muted-foreground">
                             <p>
                                 {{
                                     t('support.lastReplyAt', {
@@ -698,7 +1017,7 @@ function updateModerationCase(
                     >
                         <div class="space-y-6">
                             <div
-                                class="overflow-hidden rounded-2xl border border-slate-200"
+                                class="overflow-hidden rounded-2xl border border-border"
                             >
                                 <SupportConversation
                                     :key="selectedTicket.id"
@@ -714,12 +1033,12 @@ function updateModerationCase(
                                     message-field="body"
                                 />
                             </div>
-                            <section class="rounded-2xl bg-slate-50 p-5">
-                                <h3 class="text-sm font-bold text-slate-900">
+                            <section class="rounded-2xl bg-muted p-5">
+                                <h3 class="text-sm font-bold text-foreground">
                                     {{ t('support.overview') }}
                                 </h3>
                                 <p
-                                    class="mt-2 text-sm leading-6 text-slate-600"
+                                    class="mt-2 text-sm leading-6 text-muted-foreground"
                                 >
                                     {{
                                         t(
@@ -732,24 +1051,24 @@ function updateModerationCase(
                                     class="mt-4 grid gap-3 text-xs sm:grid-cols-2"
                                 >
                                     <div>
-                                        <dt class="text-slate-600">
+                                        <dt class="text-muted-foreground">
                                             {{ t('support.requester') }}
                                         </dt>
                                         <dd
-                                            class="mt-1 font-semibold text-slate-800"
+                                            class="mt-1 font-semibold text-foreground"
                                         >
                                             {{ selectedTicket.requester.name }}
                                         </dd>
-                                        <dd class="text-slate-500">
+                                        <dd class="text-muted-foreground">
                                             {{ selectedTicket.requester.email }}
                                         </dd>
                                     </div>
                                     <div>
-                                        <dt class="text-slate-600">
+                                        <dt class="text-muted-foreground">
                                             {{ t('support.company') }}
                                         </dt>
                                         <dd
-                                            class="mt-1 font-semibold text-slate-800"
+                                            class="mt-1 font-semibold text-foreground"
                                         >
                                             {{
                                                 selectedTicket.company?.name ??
@@ -763,20 +1082,20 @@ function updateModerationCase(
 
                         <aside class="space-y-5">
                             <form
-                                class="rounded-2xl border border-slate-200 p-5"
+                                class="rounded-2xl border border-border p-5"
                                 @submit.prevent="updateTicket"
                             >
-                                <h3 class="text-sm font-bold text-slate-900">
+                                <h3 class="text-sm font-bold text-foreground">
                                     {{ t('support.editingTitle') }}
                                 </h3>
                                 <label class="mt-4 block">
                                     <span
-                                        class="text-xs font-bold text-slate-600"
+                                        class="text-xs font-bold text-muted-foreground"
                                         >{{ t('common.status') }}</span
                                     >
                                     <select
                                         v-model="ticketForm.status"
-                                        class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                                        class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"
                                     >
                                         <option
                                             v-for="status in statuses"
@@ -789,13 +1108,13 @@ function updateModerationCase(
                                 </label>
                                 <label class="mt-3 block">
                                     <span
-                                        class="text-xs font-bold text-slate-600"
+                                        class="text-xs font-bold text-muted-foreground"
                                     >
                                         {{ t('support.priority') }}
                                     </span>
                                     <select
                                         v-model="ticketForm.priority"
-                                        class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                                        class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"
                                     >
                                         <option
                                             v-for="priority in priorities"
@@ -808,13 +1127,13 @@ function updateModerationCase(
                                 </label>
                                 <label class="mt-3 block">
                                     <span
-                                        class="text-xs font-bold text-slate-600"
+                                        class="text-xs font-bold text-muted-foreground"
                                     >
                                         {{ t('support.assignedTo') }}
                                     </span>
                                     <select
                                         v-model="ticketForm.assigned_to"
-                                        class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                                        class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"
                                     >
                                         <option value="">
                                             {{ t('common.notAssigned') }}

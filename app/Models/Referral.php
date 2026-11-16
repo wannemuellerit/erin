@@ -8,7 +8,17 @@ use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property ReferralStatus $status
+ * @property int|null $referred_user_id
+ * @property int $commission_cents
+ * @property string $currency
+ * @property Carbon|null $hold_until
+ * @property-read ReferralCode $referralCode
+ */
 #[ObservedBy([ReferralObserver::class])]
 class Referral extends Model
 {
@@ -59,5 +69,11 @@ class Referral extends Model
     public function statusHistory(): HasMany
     {
         return $this->hasMany(ReferralStatusHistory::class)->oldest('created_at');
+    }
+
+    /** @return HasOne<ReferralPayoutIntent, $this> */
+    public function payoutIntent(): HasOne
+    {
+        return $this->hasOne(ReferralPayoutIntent::class);
     }
 }

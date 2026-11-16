@@ -49,7 +49,7 @@ const { t } = useI18n();
             <template #actions
                 ><Link
                     href="/candidate/profile"
-                    class="inline-flex h-10 items-center gap-2 rounded-xl bg-[var(--erin-accent)] px-4 text-sm font-bold text-slate-950"
+                    class="inline-flex h-10 items-center gap-2 rounded-xl bg-[var(--erin-accent)] px-4 text-sm font-bold text-[var(--erin-accent-foreground)]"
                     ><UserRound class="size-4" />
                     {{ t('dashboard.candidate.editProfile') }}</Link
                 ></template
@@ -92,7 +92,7 @@ const { t } = useI18n();
                     :show-value="false"
                     tone="teal"
                 />
-                <p class="mt-4 text-xs leading-5 text-slate-500">
+                <p class="mt-4 text-xs leading-5 text-muted-foreground">
                     {{
                         dashboard?.can_apply
                             ? t('dashboard.candidate.applicationsEnabled')
@@ -103,7 +103,7 @@ const { t } = useI18n();
             <SectionCard :title="t('dashboard.candidate.latestApplications')">
                 <div
                     v-if="dashboard?.latest_applications?.length"
-                    class="divide-y divide-slate-100"
+                    class="divide-y divide-border"
                 >
                     <div
                         v-for="application in dashboard.latest_applications"
@@ -111,7 +111,7 @@ const { t } = useI18n();
                         class="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
                     >
                         <span
-                            class="grid size-10 place-items-center rounded-xl bg-blue-50 text-xs font-bold text-[var(--erin-primary)]"
+                            class="grid size-10 place-items-center rounded-xl bg-blue-50 text-xs font-bold text-[var(--erin-primary-text)]"
                             >#{{ application.id }}</span
                         >
                         <div class="min-w-0 flex-1">
@@ -121,7 +121,7 @@ const { t } = useI18n();
                                     t('dashboard.candidate.jobFallback')
                                 }}
                             </p>
-                            <p class="truncate text-xs text-slate-600">
+                            <p class="truncate text-xs text-muted-foreground">
                                 {{
                                     application.job_posting?.company?.name ||
                                     t('dashboard.candidate.companyFallback')
@@ -136,7 +136,10 @@ const { t } = useI18n();
                         />
                     </div>
                 </div>
-                <p v-else class="py-10 text-center text-sm text-slate-600">
+                <p
+                    v-else
+                    class="py-10 text-center text-sm text-muted-foreground"
+                >
                     {{ t('dashboard.candidate.noApplications') }}
                 </p>
             </SectionCard>

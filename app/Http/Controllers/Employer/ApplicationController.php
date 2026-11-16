@@ -7,18 +7,23 @@ use App\Enums\ReferralStatus;
 use App\Enums\VisaCaseStatus;
 use App\Enums\VisaStepStatus;
 use App\Http\Controllers\Controller;
+use App\Models\CandidateDocument;
 use App\Models\CandidateInternalReview;
+use App\Models\Conversation;
+use App\Models\Interview;
 use App\Models\JobApplication;
+use App\Models\Message;
 use App\Models\Referral;
-use App\Notifications\ActivityNotification;
 use App\Services\Activity\ActivityRecorder;
 use App\Services\Applications\ApplicationWorkflow;
 use App\Services\Audit\AuditLogger;
 use App\Services\Billing\EntitlementService;
 use App\Services\Companies\CurrentCompany;
+use App\Services\Platform\ProductNotificationDispatcher;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -26,8 +31,11 @@ use Inertia\Response;
 
 class ApplicationController extends Controller
 {
-    public function pipeline(Request $request, CurrentCompany $currentCompany): Response
-    {
+    public function pipeline(
+        Request $request,
+        CurrentCompany $currentCompany,
+        ApplicationWorkflow $workflow,
+    ): Response {
         $company = $currentCompany->forRequest($request);
         $applications = JobApplication::query()
             ->whereHas('jobPosting', fn ($query) => $query->where('company_id', $company->getKey()))
@@ -36,6 +44,13 @@ class ApplicationController extends Controller
                 'jobPosting:id,title',
                 'candidateProfile:id,user_id,first_name,last_name,current_country_code,current_position,desired_position,experience_years',
                 'candidateProfile.user:id,name,email',
+                'candidateProfile.documents:id,candidate_profile_id,type,status,original_name,scan_result,expires_at,shared_with_employers',
+                'screeningAnswers.question:id,question,type,is_required,options',
+                'statusHistory.actor:id,name',
+                'interviews.organizer:id,name',
+                'conversations.messages.sender:id,name',
+                'visaCase.steps',
+                'internalReviews.reviewer:id,name',
             ])
             ->latest('applied_at')
             ->get()
@@ -43,7 +58,15 @@ class ApplicationController extends Controller
                 'id' => $application->getKey(),
                 'status' => $application->status->value,
                 'pipeline_stage' => $application->pipelineStage(),
+                'updated_at' => $application->updated_at->toIso8601String(),
+                'allowed_statuses' => collect($workflow->allowedTransitions($application->status))
+                    ->map(fn (ApplicationStatus $status): array => [
+                        'value' => $status->value,
+                        'pipeline_stage' => $status->pipelineStage(),
+                    ])->values(),
                 'match_score' => $application->match_score,
+                'match_breakdown' => $application->match_breakdown,
+                'cover_letter' => $application->cover_letter,
                 'applied_at' => $application->applied_at->toIso8601String(),
                 'job' => $application->jobPosting?->only(['id', 'title']),
                 'candidate' => [
@@ -57,6 +80,20 @@ class ApplicationController extends Controller
                     'experience_years' => $application->candidateProfile->experience_years,
                     'identity_revealed' => $application->identityIsRevealed(),
                 ],
+                'screening_answers' => $application->screeningAnswers->map(fn ($answer): array => [
+                    'question' => $answer->question?->question,
+                    'type' => $answer->question?->type,
+                    'required' => $answer->question?->is_required,
+                    'answer' => $answer->answer,
+                ])->values()->all(),
+                'documents' => $this->visibleDocuments($application, $company->getKey()),
+                'internal_reviews' => $application->internalReviews->map(fn (CandidateInternalReview $review): array => [
+                    'metrics' => $review->metrics,
+                    'notes' => $review->notes,
+                    'reviewer' => $review->reviewer?->name,
+                    'created_at' => $review->created_at?->toIso8601String(),
+                ])->values()->all(),
+                'timeline' => $this->timeline($application),
             ])
             ->groupBy('pipeline_stage');
 
@@ -85,7 +122,9 @@ class ApplicationController extends Controller
         abort_unless($currentCompany->membership($request)->role->canRecruit(), 403);
         $validated = $request->validate([
             'status' => ['required', Rule::enum(ApplicationStatus::class)],
+            'from_status' => ['required', Rule::enum(ApplicationStatus::class)],
             'note' => ['nullable', 'string', 'max:3000'],
+            'version' => ['required', 'date'],
         ]);
         $target = ApplicationStatus::from($validated['status']);
         $originalStatus = $application->status;
@@ -105,6 +144,12 @@ class ApplicationController extends Controller
                     ->whereKey($application->getKey())
                     ->lockForUpdate()
                     ->firstOrFail();
+                if (
+                    $lockedApplication->status->value !== $validated['from_status']
+                    || ! $lockedApplication->updated_at->equalTo($validated['version'])
+                ) {
+                    throw new DomainException(__('Die Bewerbung wurde zwischenzeitlich geändert. Bitte laden Sie die Pipeline neu.'));
+                }
                 $from = $lockedApplication->status;
                 $originalStatus = $from;
                 $workflow->assertCanTransition($from, $target);
@@ -117,7 +162,13 @@ class ApplicationController extends Controller
                         'started_at' => now(),
                         'progress' => 0,
                     ]);
-                    $entitlements->consumeVisaCredit($company, $visaCase->getKey());
+                    $credit = $entitlements->consumeVisaCredit($company, $visaCase->getKey());
+                    $visaCase->update([
+                        'credit_status' => 'consumed',
+                        'credit_source' => $credit['source'],
+                        'credit_usage_period_id' => $credit['usage_period_id'],
+                        'credit_ledger_id' => $credit['ledger_id'],
+                    ]);
 
                     foreach ($this->visaSteps() as $index => $step) {
                         $visaCase->steps()->create([
@@ -162,34 +213,38 @@ class ApplicationController extends Controller
         }
 
         $application->refresh();
-        $application->candidateProfile->user->notify(new ActivityNotification([
-            'event' => 'application.status_changed',
-            'title' => __('Status deiner Bewerbung aktualisiert'),
-            'message' => __('Deine Bewerbung für „:job“ ist jetzt „:status“.', [
-                'job' => $application->jobPosting->title,
-                'status' => $target->value,
-            ]),
-            'translations' => [
-                'de' => [
-                    'title' => 'Status deiner Bewerbung aktualisiert',
-                    'message' => sprintf(
-                        'Deine Bewerbung für „%s“ ist jetzt „%s“.',
-                        $application->jobPosting->title,
-                        $target->value,
-                    ),
+        app(ProductNotificationDispatcher::class)->dispatch(
+            $application->candidateProfile->user,
+            'application.status_changed',
+            "application:{$application->getKey()}:status:{$target->value}",
+            [
+                'title' => __('Status deiner Bewerbung aktualisiert'),
+                'message' => __('Deine Bewerbung für „:job“ ist jetzt „:status“.', [
+                    'job' => $application->jobPosting->title,
+                    'status' => $target->value,
+                ]),
+                'translations' => [
+                    'de' => [
+                        'title' => 'Status deiner Bewerbung aktualisiert',
+                        'message' => sprintf(
+                            'Deine Bewerbung für „%s“ ist jetzt „%s“.',
+                            $application->jobPosting->title,
+                            $target->value,
+                        ),
+                    ],
+                    'en' => [
+                        'title' => 'Your application status was updated',
+                        'message' => sprintf(
+                            'Your application for “%s” is now “%s”.',
+                            $application->jobPosting->title,
+                            $target->value,
+                        ),
+                    ],
                 ],
-                'en' => [
-                    'title' => 'Your application status was updated',
-                    'message' => sprintf(
-                        'Your application for “%s” is now “%s”.',
-                        $application->jobPosting->title,
-                        $target->value,
-                    ),
-                ],
+                'url' => route('candidate.applications'),
+                'application_id' => $application->getKey(),
             ],
-            'url' => route('candidate.applications'),
-            'application_id' => $application->getKey(),
-        ]));
+        );
 
         $audit->record(
             'application.status_changed',
@@ -214,6 +269,87 @@ class ApplicationController extends Controller
         );
 
         return back()->with('success', __('Der Bewerbungsstatus wurde aktualisiert.'));
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function visibleDocuments(JobApplication $application, int $companyId): array
+    {
+        $grantedIds = DB::table('document_access_grants')
+            ->where('company_id', $companyId)
+            ->where('application_id', $application->getKey())
+            ->whereNull('revoked_at')
+            ->where('expires_at', '>', now())
+            ->pluck('candidate_document_id');
+
+        return array_values($application->candidateProfile->documents
+            ->filter(fn (CandidateDocument $document): bool => $grantedIds->contains($document->getKey()))
+            ->map(fn (CandidateDocument $document): array => [
+                'id' => $document->getKey(),
+                'type' => $document->type->value,
+                'name' => $document->original_name,
+                'status' => $document->status->value,
+                'scan_result' => $document->scan_result,
+                'expires_at' => $document->expires_at?->toIso8601String(),
+            ])->values()->all());
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function timeline(JobApplication $application): array
+    {
+        /** @var Collection<int, array<string, mixed>> $events */
+        $events = collect([[
+            'type' => 'application',
+            'event' => 'application.created',
+            'actor' => null,
+            'occurred_at' => $application->applied_at->toIso8601String(),
+            'data' => [],
+        ]]);
+
+        $events->push(...$application->statusHistory->map(fn ($history): array => [
+            'type' => 'status',
+            'event' => 'application.status_changed',
+            'actor' => $history->actor?->name,
+            'occurred_at' => $history->created_at->toIso8601String(),
+            'data' => [
+                'from' => $history->from_status?->value,
+                'to' => $history->to_status->value,
+                'note' => $history->note,
+            ],
+        ]));
+        $events->push(...$application->conversations->flatMap(
+            fn (Conversation $conversation): array => $conversation->messages->map(fn (Message $message): array => [
+                'type' => 'message',
+                'event' => 'message.sent',
+                'actor' => $message->sender?->name,
+                'occurred_at' => $message->created_at->toIso8601String(),
+                'data' => ['message_type' => $message->type],
+            ])->all(),
+        ));
+        $events->push(...$application->interviews->map(fn (Interview $interview): array => [
+            'type' => 'interview',
+            'event' => 'interview.'.$interview->status->value,
+            'actor' => $interview->organizer?->name,
+            'occurred_at' => $interview->updated_at->toIso8601String(),
+            'data' => ['starts_at' => $interview->starts_at?->toIso8601String()],
+        ]));
+        if ($application->visaCase !== null) {
+            $events->push(...$application->visaCase->steps->map(fn ($step): array => [
+                'type' => 'visa',
+                'event' => 'visa.step.'.$step->status->value,
+                'actor' => null,
+                'occurred_at' => $step->updated_at->toIso8601String(),
+                'data' => ['title' => $step->title],
+            ]));
+        }
+        $events->push(...$application->internalReviews->map(fn (CandidateInternalReview $review): array => [
+            'type' => 'internal',
+            'event' => 'candidate.internal_reviewed',
+            'actor' => $review->reviewer?->name,
+            'occurred_at' => $review->updated_at->toIso8601String(),
+            'data' => [],
+        ]));
+
+        return array_values($events->sortByDesc('occurred_at')->values()->all());
     }
 
     public function reviewCandidate(

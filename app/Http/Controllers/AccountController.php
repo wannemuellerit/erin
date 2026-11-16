@@ -5,12 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\Company;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class AccountController extends Controller
 {
     public function locale(Request $request): RedirectResponse
     {
-        $validated = $request->validate(['locale' => ['required', 'in:de,en']]);
+        $validated = $request->validate(['locale' => ['required', Rule::in(config('app.supported_locales', ['de', 'en']))]]);
         $request->user()?->update(['locale' => $validated['locale']]);
         $request->session()->put('locale', $validated['locale']);
 

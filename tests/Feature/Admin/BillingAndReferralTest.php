@@ -378,7 +378,7 @@ it('requires a new Stripe Price ID when a configured package price changes', fun
         ->and(AuditLog::query()->where('event', 'admin.plan.updated')->exists())->toBeTrue();
 });
 
-it('enforces the referral hold period before manual approval and payout', function () {
+it('enforces the referral hold period and prevents manual payout completion', function () {
     Notification::fake();
     $admin = User::factory()->create(['role' => UserRole::SuperAdmin]);
     $referrer = User::factory()->create();
@@ -413,20 +413,19 @@ it('enforces the referral hold period before manual approval and payout', functi
             'status' => ReferralStatus::Paid->value,
             'payout_reference' => 'BANK-2026-0001',
         ])
-        ->assertRedirect();
+        ->assertSessionHasErrors('status');
 
-    expect($referral->refresh()->status)->toBe(ReferralStatus::Paid)
+    expect($referral->refresh()->status)->toBe(ReferralStatus::Approved)
         ->and($referral->approved_at)->not->toBeNull()
-        ->and($referral->paid_at)->not->toBeNull()
-        ->and($referral->metadata['payout_reference'])->toBe('BANK-2026-0001')
+        ->and($referral->paid_at)->toBeNull()
+        ->and($referral->metadata['payout_reference'] ?? null)->toBeNull()
         ->and($referral->statusHistory()->pluck('to_status')->all())
         ->toBe([
             ReferralStatus::Holding->value,
             ReferralStatus::Approved->value,
-            ReferralStatus::Paid->value,
         ]);
 
-    Notification::assertSentToTimes($referrer, ActivityNotification::class, 2);
+    Notification::assertSentToTimes($referrer, ActivityNotification::class, 1);
 });
 
 it('notifies an eligible referral exactly once after the hold period', function () {

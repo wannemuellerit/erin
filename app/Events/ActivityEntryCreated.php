@@ -3,6 +3,7 @@
 namespace App\Events;
 
 use App\Models\ActivityEntry;
+use App\Services\Activity\ActivityDeepLinkResolver;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
@@ -57,6 +58,7 @@ class ActivityEntryCreated implements ShouldBroadcastNow
                 'event' => $this->entry->event,
                 'actor' => $this->entry->actor?->only(['id', 'name']),
                 'payload' => $this->entry->payload ?? [],
+                'url' => app(ActivityDeepLinkResolver::class)->forCompany($this->entry),
                 'occurred_at' => $this->entry->occurred_at->toIso8601String(),
             ],
         ];

@@ -10,7 +10,7 @@ import {
     Phone,
     ShieldAlert,
 } from '@lucide/vue';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import NotificationPreferencesController from '@/actions/App/Http/Controllers/Settings/NotificationPreferencesController';
 import Heading from '@/components/Heading.vue';
@@ -21,7 +21,18 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { edit } from '@/routes/notification-preferences';
 
 type EventKey =
-    'application' | 'interview' | 'message' | 'reminder' | 'support' | 'system';
+    | 'application'
+    | 'interview'
+    | 'message'
+    | 'document'
+    | 'visa'
+    | 'referral'
+    | 'reminder'
+    | 'support'
+    | 'billing'
+    | 'boost'
+    | 'company'
+    | 'system';
 
 type Preference = {
     database_enabled: boolean;
@@ -39,6 +50,19 @@ type Props = {
     push_subscription_store_url: string;
     push_subscription_destroy_url: string;
     push_subscription_test_url: string;
+    phone_channels_configured: boolean;
+    phone_channels: Array<{
+        id: number;
+        channel: 'sms' | 'whatsapp';
+        masked_phone: string;
+        country_code: string;
+        verified: boolean;
+        consented: boolean;
+        quiet_hours_start: string | null;
+        quiet_hours_end: string | null;
+    }>;
+    phone_channel_store_url: string;
+    phone_allowed_countries: string[];
 };
 
 const props = defineProps<Props>();
@@ -47,8 +71,14 @@ const eventKeys: EventKey[] = [
     'application',
     'interview',
     'message',
+    'document',
+    'visa',
+    'referral',
     'reminder',
     'support',
+    'billing',
+    'boost',
+    'company',
     'system',
 ];
 const initialPreferences = Object.fromEntries(
@@ -79,6 +109,31 @@ const pushProcessing = ref(false);
 const pushError = ref('');
 const pushTestProcessing = ref(false);
 const pushTestSent = ref(false);
+const phoneForm = useForm({
+    channel: 'sms' as 'sms' | 'whatsapp',
+    phone: '',
+    country_code: props.phone_allowed_countries[0] ?? 'DE',
+    consent: false,
+    quiet_hours_start: '22:00',
+    quiet_hours_end: '07:00',
+});
+const verificationCodes = reactive<Record<number, string>>({});
+const externalEvents = new Set<EventKey>([
+    'interview',
+    'document',
+    'visa',
+    'reminder',
+    'support',
+]);
+const phoneChannel = (channel: 'sms' | 'whatsapp') =>
+    props.phone_channels.find((entry) => entry.channel === channel);
+const channelReady = (channel: 'sms' | 'whatsapp') => {
+    const entry = phoneChannel(channel);
+
+    return (
+        props.phone_channels_configured && entry?.verified && entry.consented
+    );
+};
 
 const isPushActive = computed(() => browserSubscription.value !== null);
 const pushStatusText = computed(() => {
@@ -281,6 +336,27 @@ const submit = () => {
     });
 };
 
+const registerPhoneChannel = () => {
+    phoneForm.post(props.phone_channel_store_url, {
+        preserveScroll: true,
+        onSuccess: () => phoneForm.reset('phone', 'consent'),
+    });
+};
+
+const verifyPhoneChannel = (id: number) => {
+    router.post(
+        `/settings/notification-phone-channels/${id}/verify`,
+        { code: verificationCodes[id] ?? '' },
+        { preserveScroll: true },
+    );
+};
+
+const revokePhoneChannel = (id: number) => {
+    router.delete(`/settings/notification-phone-channels/${id}`, {
+        preserveScroll: true,
+    });
+};
+
 onMounted(() => {
     void registerServiceWorker().catch(() => {
         pushSupported.value = false;
@@ -315,13 +391,15 @@ defineOptions({
             class="rounded-2xl border border-blue-100 bg-blue-50/70 p-4 text-sm leading-6 text-blue-900"
         >
             <div class="flex gap-3">
-                <BellRing class="mt-0.5 size-5 shrink-0 text-blue-600" />
+                <BellRing
+                    class="mt-0.5 size-5 shrink-0 text-[var(--erin-primary-text)]"
+                />
                 <p>{{ t('settings.notifications.databaseHint') }}</p>
             </div>
         </div>
 
         <section
-            class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+            class="rounded-2xl border border-border bg-card p-5 shadow-sm"
             aria-labelledby="browser-push-title"
         >
             <div
@@ -336,11 +414,11 @@ defineOptions({
                     <div>
                         <h2
                             id="browser-push-title"
-                            class="font-semibold text-slate-950"
+                            class="font-semibold text-foreground"
                         >
                             {{ t('settings.notifications.pushTitle') }}
                         </h2>
-                        <p class="mt-1 text-sm leading-5 text-slate-500">
+                        <p class="mt-1 text-sm leading-5 text-muted-foreground">
                             {{ t('settings.notifications.pushDescription') }}
                         </p>
                         <div
@@ -348,7 +426,7 @@ defineOptions({
                             :class="
                                 isPushActive
                                     ? 'text-emerald-700'
-                                    : 'text-slate-500'
+                                    : 'text-muted-foreground'
                             "
                         >
                             <span class="inline-flex items-center gap-1.5">
@@ -361,7 +439,7 @@ defineOptions({
                             </span>
                             <span
                                 v-if="push_subscription_count > 0"
-                                class="text-slate-400"
+                                class="text-muted-foreground"
                             >
                                 {{ push_subscription_count }}
                                 {{
@@ -443,19 +521,182 @@ defineOptions({
             </p>
         </section>
 
+        <section
+            class="rounded-2xl border border-border bg-card p-5 shadow-sm"
+            aria-labelledby="phone-channels-title"
+        >
+            <div class="flex gap-3">
+                <div
+                    class="grid size-11 shrink-0 place-items-center rounded-xl bg-teal-50 text-teal-700"
+                >
+                    <Phone class="size-5" />
+                </div>
+                <div>
+                    <h2
+                        id="phone-channels-title"
+                        class="font-semibold text-foreground"
+                    >
+                        {{ t('settings.notifications.phoneTitle') }}
+                    </h2>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                        {{ t('settings.notifications.phoneDescription') }}
+                    </p>
+                </div>
+            </div>
+
+            <p
+                v-if="!phone_channels_configured"
+                class="mt-4 rounded-xl bg-orange-50 p-3 text-sm text-orange-900"
+            >
+                {{ t('settings.notifications.phoneUnavailable') }}
+            </p>
+            <form
+                v-else
+                class="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4"
+                @submit.prevent="registerPhoneChannel"
+            >
+                <select
+                    v-model="phoneForm.channel"
+                    class="erin-focus h-11 rounded-xl border border-border bg-card px-3 text-sm"
+                >
+                    <option value="sms">
+                        {{ t('settings.notifications.sms') }}
+                    </option>
+                    <option value="whatsapp">
+                        {{ t('settings.notifications.whatsapp') }}
+                    </option>
+                </select>
+                <input
+                    v-model="phoneForm.phone"
+                    required
+                    pattern="\+[1-9][0-9]{7,14}"
+                    class="erin-focus h-11 rounded-xl border border-border px-3 text-sm"
+                    :placeholder="t('settings.notifications.phonePlaceholder')"
+                />
+                <select
+                    v-model="phoneForm.country_code"
+                    class="erin-focus h-11 rounded-xl border border-border bg-card px-3 text-sm"
+                >
+                    <option
+                        v-for="country in phone_allowed_countries"
+                        :key="country"
+                        :value="country"
+                    >
+                        {{ country }}
+                    </option>
+                </select>
+                <div class="grid grid-cols-2 gap-2">
+                    <input
+                        v-model="phoneForm.quiet_hours_start"
+                        type="time"
+                        class="erin-focus h-11 rounded-xl border border-border px-2 text-sm"
+                        :aria-label="t('settings.notifications.quietStart')"
+                    />
+                    <input
+                        v-model="phoneForm.quiet_hours_end"
+                        type="time"
+                        class="erin-focus h-11 rounded-xl border border-border px-2 text-sm"
+                        :aria-label="t('settings.notifications.quietEnd')"
+                    />
+                </div>
+                <label
+                    class="flex items-start gap-2 text-xs text-muted-foreground md:col-span-2 xl:col-span-3"
+                >
+                    <Checkbox v-model="phoneForm.consent" />
+                    <span>{{
+                        t('settings.notifications.phoneConsent', {
+                            channel:
+                                phoneForm.channel === 'sms'
+                                    ? t('settings.notifications.sms')
+                                    : t('settings.notifications.whatsapp'),
+                        })
+                    }}</span>
+                </label>
+                <Button
+                    type="submit"
+                    :disabled="phoneForm.processing || !phoneForm.consent"
+                    >{{ t('settings.notifications.sendCode') }}</Button
+                >
+                <InputError
+                    class="md:col-span-2 xl:col-span-4"
+                    :message="
+                        phoneForm.errors.phone || phoneForm.errors.consent
+                    "
+                />
+            </form>
+
+            <div
+                v-if="phone_channels.length"
+                class="mt-5 grid gap-3 md:grid-cols-2"
+            >
+                <article
+                    v-for="channel in phone_channels"
+                    :key="channel.id"
+                    class="rounded-xl border border-border p-4"
+                >
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <strong class="text-sm uppercase">{{
+                                channel.channel
+                            }}</strong>
+                            <p class="text-xs text-muted-foreground">
+                                {{ channel.masked_phone }} ·
+                                {{ channel.country_code }}
+                            </p>
+                        </div>
+                        <Badge
+                            :variant="
+                                channel.verified && channel.consented
+                                    ? 'default'
+                                    : 'outline'
+                            "
+                            >{{
+                                channel.verified
+                                    ? t('settings.notifications.verified')
+                                    : t(
+                                          'settings.notifications.verificationPending',
+                                      )
+                            }}</Badge
+                        >
+                    </div>
+                    <div v-if="!channel.verified" class="mt-3 flex gap-2">
+                        <input
+                            v-model="verificationCodes[channel.id]"
+                            inputmode="numeric"
+                            pattern="[0-9]{6}"
+                            maxlength="6"
+                            class="erin-focus h-10 min-w-0 flex-1 rounded-xl border border-border px-3 text-sm"
+                            :placeholder="t('settings.notifications.code')"
+                        />
+                        <Button
+                            type="button"
+                            variant="outline"
+                            @click="verifyPhoneChannel(channel.id)"
+                            >{{ t('settings.notifications.verify') }}</Button
+                        >
+                    </div>
+                    <button
+                        type="button"
+                        class="erin-focus mt-3 text-xs font-bold text-red-600 underline"
+                        @click="revokePhoneChannel(channel.id)"
+                    >
+                        {{ t('settings.notifications.revoke') }}
+                    </button>
+                </article>
+            </div>
+        </section>
+
         <form class="space-y-4" @submit.prevent="submit">
             <article
                 v-for="event in eventKeys"
                 :key="event"
-                class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+                class="overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
             >
-                <header
-                    class="border-b border-slate-100 bg-slate-50/70 px-5 py-4"
-                >
-                    <h2 class="font-semibold text-slate-950">
+                <header class="border-b border-border bg-muted/70 px-5 py-4">
+                    <h2 class="font-semibold text-foreground">
                         {{ t(`settings.notifications.events.${event}.title`) }}
                     </h2>
-                    <p class="mt-1 text-sm leading-5 text-slate-500">
+                    <p class="mt-1 text-sm leading-5 text-muted-foreground">
                         {{
                             t(
                                 `settings.notifications.events.${event}.description`,
@@ -467,80 +708,109 @@ defineOptions({
                 <div class="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
                     <label
                         :for="`${event}-database`"
-                        class="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 p-3 transition hover:border-blue-200 hover:bg-blue-50/40"
+                        class="flex cursor-pointer items-center gap-3 rounded-xl border border-border p-3 transition hover:border-blue-200 hover:bg-blue-50/40"
                     >
                         <Checkbox
                             :id="`${event}-database`"
                             v-model="form.preferences[event].database_enabled"
                         />
-                        <BellRing class="size-4 text-blue-600" />
-                        <span class="text-sm font-medium text-slate-700">
+                        <BellRing
+                            class="size-4 text-[var(--erin-primary-text)]"
+                        />
+                        <span class="text-sm font-medium text-muted-foreground">
                             {{ t('settings.notifications.inApp') }}
                         </span>
                     </label>
 
                     <label
                         :for="`${event}-email`"
-                        class="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 p-3 transition hover:border-blue-200 hover:bg-blue-50/40"
+                        class="flex cursor-pointer items-center gap-3 rounded-xl border border-border p-3 transition hover:border-blue-200 hover:bg-blue-50/40"
                     >
                         <Checkbox
                             :id="`${event}-email`"
                             v-model="form.preferences[event].email_enabled"
                         />
                         <Mail class="size-4 text-teal-600" />
-                        <span class="text-sm font-medium text-slate-700">
+                        <span class="text-sm font-medium text-muted-foreground">
                             {{ t('settings.notifications.email') }}
                         </span>
                     </label>
 
                     <label
                         :for="`${event}-push`"
-                        class="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 p-3 transition hover:border-blue-200 hover:bg-blue-50/40"
+                        class="flex cursor-pointer items-center gap-3 rounded-xl border border-border p-3 transition hover:border-blue-200 hover:bg-blue-50/40"
                     >
                         <Checkbox
                             :id="`${event}-push`"
                             v-model="form.preferences[event].push_enabled"
                         />
                         <MonitorSmartphone class="size-4 text-orange-600" />
-                        <span class="text-sm font-medium text-slate-700">
+                        <span class="text-sm font-medium text-muted-foreground">
                             {{ t('settings.notifications.browserPush') }}
                         </span>
                     </label>
 
                     <label
                         :for="`${event}-sms`"
-                        class="flex items-center gap-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-3 text-slate-400"
+                        class="flex items-center gap-3 rounded-xl border p-3"
+                        :class="
+                            channelReady('sms') && externalEvents.has(event)
+                                ? 'cursor-pointer border-border text-muted-foreground'
+                                : 'border-dashed border-border bg-muted text-muted-foreground'
+                        "
                     >
                         <Checkbox
                             :id="`${event}-sms`"
-                            :model-value="false"
-                            disabled
+                            v-model="form.preferences[event].sms_enabled"
+                            :disabled="
+                                !channelReady('sms') ||
+                                !externalEvents.has(event)
+                            "
                         />
                         <Phone class="size-4" />
                         <span class="text-sm font-medium">
                             {{ t('settings.notifications.sms') }}
                         </span>
-                        <Badge variant="outline" class="ml-auto text-[10px]">
-                            {{ t('settings.notifications.comingLater') }}
-                        </Badge>
+                        <Badge
+                            v-if="!channelReady('sms')"
+                            variant="outline"
+                            class="ml-auto text-[10px]"
+                            >{{
+                                t('settings.notifications.verificationRequired')
+                            }}</Badge
+                        >
                     </label>
 
                     <label
                         :for="`${event}-whatsapp`"
-                        class="flex items-center gap-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-3 text-slate-400"
+                        class="flex items-center gap-3 rounded-xl border p-3"
+                        :class="
+                            channelReady('whatsapp') &&
+                            externalEvents.has(event)
+                                ? 'cursor-pointer border-border text-muted-foreground'
+                                : 'border-dashed border-border bg-muted text-muted-foreground'
+                        "
                     >
                         <Checkbox
                             :id="`${event}-whatsapp`"
-                            :model-value="false"
-                            disabled
+                            v-model="form.preferences[event].whatsapp_enabled"
+                            :disabled="
+                                !channelReady('whatsapp') ||
+                                !externalEvents.has(event)
+                            "
                         />
                         <MessageSquareText class="size-4" />
                         <span class="text-sm font-medium">
                             {{ t('settings.notifications.whatsapp') }}
                         </span>
-                        <Badge variant="outline" class="ml-auto text-[10px]">
-                            {{ t('settings.notifications.comingLater') }}
-                        </Badge>
+                        <Badge
+                            v-if="!channelReady('whatsapp')"
+                            variant="outline"
+                            class="ml-auto text-[10px]"
+                            >{{
+                                t('settings.notifications.verificationRequired')
+                            }}</Badge
+                        >
                     </label>
                 </div>
             </article>

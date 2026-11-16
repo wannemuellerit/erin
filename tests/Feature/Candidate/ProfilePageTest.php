@@ -18,6 +18,22 @@ use Inertia\Testing\AssertableInertia as Assert;
 
 uses(RefreshDatabase::class);
 
+it('persists availability through reload and repeated saves and rejects reversed times', function () {
+    $this->seed(DomainCatalogSeeder::class);
+    $profile = CandidateProfile::factory()->create();
+    $payload = erinCandidateProfilePayload($profile);
+    $payload['email'] = $profile->user->email;
+    foreach (range(1, 2) as $attempt) {
+        $this->actingAs($profile->user)->put(route('candidate.profile.update'), $payload)->assertSessionHasNoErrors();
+        $this->get(route('candidate.profile'))->assertInertia(fn (Assert $page) => $page
+            ->has('availability', 2)->where('availability.0.starts_at', '08:00:00')
+            ->where('availability.0.ends_at', '12:00:00')->where('availability.0.timezone', 'Europe/Berlin'));
+    }
+    $payload['availability'][0]['ends_at'] = '07:00';
+    $this->put(route('candidate.profile.update'), $payload)->assertSessionHasErrors('availability');
+    expect($profile->user->availabilitySlots()->count())->toBe(2);
+});
+
 function erinCandidateProfilePayload(CandidateProfile $profile): array
 {
     return [

@@ -1,9 +1,9 @@
-ARG PHP_VERSION=8.4
+ARG PHP_VERSION=8.5
 ARG ERIN_BUILD_SHA
 ARG ERIN_BUILD_ENV=production
 ARG ERIN_GOVERNANCE_TRUST_ROOT_SHA256
 
-FROM php:${PHP_VERSION}-fpm-bookworm@sha256:66a10c4b32b2f5886c32a4fb23c6cc3e727661e6a929c241befb335aaee0290e AS php-base
+FROM php:${PHP_VERSION}-fpm-bookworm@sha256:7b1deadd1d73c72d2eb952ebb494cd3e902d7b6ae4e4b3cd1113a1041b530c2c AS php-base
 
 ENV COMPOSER_ALLOW_SUPERUSER=1 \
     COMPOSER_HOME=/tmp/composer \
@@ -17,7 +17,6 @@ RUN apt-get update \
         libfreetype6-dev \
         libicu-dev \
         libjpeg62-turbo-dev \
-        libonig-dev \
         libpng-dev \
         libzip-dev \
         unzip \
@@ -27,8 +26,6 @@ RUN apt-get update \
         exif \
         gd \
         intl \
-        mbstring \
-        opcache \
         pcntl \
         pdo_mysql \
         sockets \
@@ -115,7 +112,7 @@ USER www-data
 ENTRYPOINT ["erin-entrypoint"]
 CMD ["php-fpm", "--nodaemonize"]
 
-FROM nginx:1.30-alpine@sha256:97d490c12ba55b4946b01546d1c3ed324e8d41ab1c9fcb2a616aa470620e5b46 AS nginx
+FROM nginx:1.30.1-alpine@sha256:c819f83c54b0361f5557601bf5eb4943d09360e7a7fdf426afc466570f45874d AS nginx
 
 ARG ERIN_BUILD_SHA
 ARG ERIN_BUILD_ENV=production

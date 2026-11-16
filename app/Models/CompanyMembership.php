@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\Pivot;
  * @property int $id
  * @property int $company_id
  * @property int $user_id
+ * @property int|null $location_id
  * @property CompanyMemberRole $role
  */
 class CompanyMembership extends Pivot
@@ -53,11 +54,24 @@ class CompanyMembership extends Pivot
         return $this->belongsTo(User::class, 'invited_by');
     }
 
+    /** @return BelongsTo<CompanyLocation, $this> */
+    public function location(): BelongsTo
+    {
+        return $this->belongsTo(CompanyLocation::class, 'location_id');
+    }
+
     /**
      * @return BelongsToMany<CompanyTeam, $this>
      */
     public function teams(): BelongsToMany
     {
-        return $this->belongsToMany(CompanyTeam::class, 'company_team_members');
+        return $this->belongsToMany(
+            CompanyTeam::class,
+            'company_team_members',
+            'company_membership_id',
+            'company_team_id',
+            'id',
+            'id',
+        );
     }
 }

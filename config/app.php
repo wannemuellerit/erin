@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'Laravel'),
+    'name' => env('APP_NAME', 'Faden'),
 
     /*
     |--------------------------------------------------------------------------
@@ -81,6 +81,8 @@ return [
     'locale' => env('APP_LOCALE', 'de'),
 
     'fallback_locale' => env('APP_FALLBACK_LOCALE', 'de'),
+
+    'supported_locales' => ['de', 'en', 'pl', 'ro', 'hr', 'es', 'pt'],
 
     'faker_locale' => env('APP_FAKER_LOCALE', 'de_DE'),
 
