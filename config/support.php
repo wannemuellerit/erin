@@ -1,6 +1,15 @@
 <?php
 
 return [
+    'chatbot' => [
+        'enabled' => (bool) env('SUPPORT_CHATBOT_ENABLED', true),
+        'provider_enabled' => (bool) env('SUPPORT_CHATBOT_PROVIDER_ENABLED', false),
+        'retention_days' => (int) env('SUPPORT_CHATBOT_RETENTION_DAYS', 30),
+        'max_sources' => (int) env('SUPPORT_CHATBOT_MAX_SOURCES', 3),
+        'max_daily_provider_requests' => (int) env('SUPPORT_CHATBOT_DAILY_PROVIDER_BUDGET', 1000),
+        'circuit_breaker_failures' => (int) env('SUPPORT_CHATBOT_CIRCUIT_BREAKER_FAILURES', 3),
+        'circuit_breaker_minutes' => (int) env('SUPPORT_CHATBOT_CIRCUIT_BREAKER_MINUTES', 10),
+    ],
     'attachments' => [
         'disk' => env('SUPPORT_ATTACHMENT_DISK', 'private'),
         'max_files' => (int) env('SUPPORT_ATTACHMENT_MAX_FILES', 8),

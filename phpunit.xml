@@ -33,10 +33,17 @@
         <env name="MAIL_MAILER" value="array" force="true"/>
         <env name="PRIVATE_FILESYSTEM_DRIVER" value="local" force="true"/>
         <env name="QUEUE_CONNECTION" value="sync" force="true"/>
+        <env name="SCOUT_DRIVER" value="collection" force="true"/>
         <env name="SESSION_DRIVER" value="array" force="true"/>
         <env name="PULSE_ENABLED" value="false" force="true"/>
         <env name="TELESCOPE_ENABLED" value="false" force="true"/>
         <env name="NIGHTWATCH_ENABLED" value="false" force="true"/>
         <env name="ZAMMAD_ENABLED" value="false" force="true"/>
+        <env name="LIVEKIT_URL" value="wss://livekit.test" force="true"/>
+        <env name="LIVEKIT_API_KEY" value="test-livekit-key" force="true"/>
+        <env name="LIVEKIT_API_SECRET" value="test-livekit-secret-at-least-32-bytes" force="true"/>
+        <env name="LIVEKIT_TOKEN_TTL_MINUTES" value="10" force="true"/>
+        <env name="LIVEKIT_E2EE_REQUIRED" value="true" force="true"/>
+        <env name="LIVEKIT_REGION" value="eu" force="true"/>
     </php>
 </phpunit>

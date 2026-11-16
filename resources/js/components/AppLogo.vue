@@ -8,11 +8,13 @@ const { t } = useI18n();
 <template>
     <AppLogoIcon class="size-9 shrink-0" />
     <div class="ml-1.5 grid flex-1 text-left">
-        <span class="truncate text-base leading-tight font-bold text-slate-950">
-            faden<span class="text-blue-600">.</span>
+        <span
+            class="truncate text-base leading-tight font-bold text-foreground"
+        >
+            faden<span class="text-[var(--erin-primary-text)]">.</span>
         </span>
         <span
-            class="truncate text-[10px] font-semibold tracking-[0.12em] text-slate-600 uppercase"
+            class="truncate text-[10px] font-semibold tracking-[0.12em] text-muted-foreground uppercase"
         >
             {{ t('public.common.recruitingOs') }}
         </span>

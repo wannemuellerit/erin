@@ -6,13 +6,16 @@ use App\Enums\ReferralStatus;
 use App\Enums\UserRole;
 use App\Models\Referral;
 use App\Models\ReferralCode;
+use App\Models\ReferralPayoutIntent;
 use App\Services\Platform\PlatformSettings;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 class ReferralController extends Controller
 {
@@ -53,6 +56,9 @@ class ReferralController extends Controller
                     'paid_cents' => $referrals->where('status', ReferralStatus::Paid)->sum('commission_cents'),
                 ],
                 'referrals' => $referrals,
+                'payoutAccount' => $user->payoutAccounts()->whereNull('disabled_at')->latest()->first()?->only(['id', 'provider', 'country_code', 'currency_code', 'status', 'kyc_status']),
+                'payoutIntents' => ReferralPayoutIntent::query()->whereHas('referral.referralCode', fn ($query) => $query->where('user_id', $user->getKey()))
+                    ->latest()->get(['public_id', 'amount_cents', 'currency_code', 'status', 'submitted_at', 'paid_at', 'failure_code']),
             ],
         );
     }
@@ -90,12 +96,18 @@ class ReferralController extends Controller
         $code = $user->referralCodes()->where('is_active', true)->firstOrFail();
         $link = route('referrals.track', $code->code);
 
-        Mail::raw(
-            ($validated['message'] ?? __('Ich möchte dir Faden empfehlen.'))."\n\n".$link,
-            fn ($message) => $message
-                ->to($validated['email'])
-                ->subject(__('Einladung zu Faden')),
-        );
+        try {
+            Mail::raw(
+                ($validated['message'] ?? __('Ich möchte dir Faden empfehlen.'))."\n\n".$link,
+                fn ($message) => $message
+                    ->to($validated['email'])
+                    ->subject(__('Einladung zu Faden')),
+            );
+        } catch (TransportExceptionInterface) {
+            throw ValidationException::withMessages([
+                'email' => __('Der E-Mail-Versand ist derzeit nicht verfügbar. Bitte versuche es später erneut.'),
+            ]);
+        }
 
         return back()->with('success', __('Die Empfehlung wurde per E-Mail versendet.'));
     }

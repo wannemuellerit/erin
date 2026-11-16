@@ -2,15 +2,15 @@
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { Building2, Search, ShieldAlert, X } from '@lucide/vue';
 import { reactive } from 'vue';
+import AdminPagination from './_components/AdminPagination.vue';
+import { useAdminI18n } from './_i18n';
+import { cleanFilters, statusTone } from './_shared';
+import type { AdminPaginator } from './_shared';
 import EmptyState from '@/components/product/EmptyState.vue';
 import PageHeader from '@/components/product/PageHeader.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
 import adminCompanies from '@/routes/admin/companies';
-import AdminPagination from './_components/AdminPagination.vue';
-import { useAdminI18n } from './_i18n';
-import { cleanFilters, statusTone } from './_shared';
-import type { AdminPaginator } from './_shared';
 
 type CompanyRow = {
     id: number;
@@ -128,7 +128,7 @@ function updateStatus(company: CompanyRow, event: Event): void {
 
         <SectionCard flush>
             <form
-                class="grid gap-3 border-b border-slate-100 p-4 xl:grid-cols-[minmax(16rem,1fr)_10rem_12rem_10rem_11rem_auto]"
+                class="grid gap-3 border-b border-border p-4 xl:grid-cols-[minmax(16rem,1fr)_10rem_12rem_10rem_11rem_auto]"
                 @submit.prevent="applyFilters"
             >
                 <label class="relative">
@@ -136,19 +136,19 @@ function updateStatus(company: CompanyRow, event: Event): void {
                         t('companies.searchLabel')
                     }}</span>
                     <Search
-                        class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-slate-400"
+                        class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
                     />
                     <input
                         v-model="filters.search"
                         type="search"
                         :placeholder="t('companies.searchPlaceholder')"
-                        class="erin-focus h-11 w-full rounded-xl border border-slate-200 bg-white pr-3 pl-10 text-sm"
+                        class="erin-focus h-11 w-full rounded-xl border border-border bg-card pr-3 pl-10 text-sm"
                     />
                 </label>
                 <select
                     v-model="filters.status"
                     :aria-label="t('companies.companyStatus')"
-                    class="erin-focus h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                    class="erin-focus h-11 rounded-xl border border-border bg-card px-3 text-sm"
                 >
                     <option value="">{{ t('common.allStatuses') }}</option>
                     <option
@@ -164,19 +164,19 @@ function updateStatus(company: CompanyRow, event: Event): void {
                     type="text"
                     :placeholder="t('companies.subscriptionPlaceholder')"
                     :aria-label="t('companies.subscriptionStatus')"
-                    class="erin-focus h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                    class="erin-focus h-11 rounded-xl border border-border bg-card px-3 text-sm"
                 />
                 <input
                     v-model="filters.plan"
                     type="text"
                     :placeholder="t('companies.planPlaceholder')"
                     :aria-label="t('companies.plan')"
-                    class="erin-focus h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                    class="erin-focus h-11 rounded-xl border border-border bg-card px-3 text-sm"
                 />
                 <select
                     v-model="filters.sort"
                     :aria-label="t('companies.sorting')"
-                    class="erin-focus h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                    class="erin-focus h-11 rounded-xl border border-border bg-card px-3 text-sm"
                 >
                     <option value="newest">{{ t('companies.newest') }}</option>
                     <option value="last_active">
@@ -194,7 +194,7 @@ function updateStatus(company: CompanyRow, event: Event): void {
                     <button
                         type="button"
                         :aria-label="t('common.resetFilters')"
-                        class="erin-focus grid size-11 place-items-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50"
+                        class="erin-focus grid size-11 place-items-center rounded-xl border border-border text-muted-foreground hover:bg-muted"
                         @click="resetFilters"
                     >
                         <X class="size-4" />
@@ -203,10 +203,10 @@ function updateStatus(company: CompanyRow, event: Event): void {
             </form>
 
             <div v-if="companies.data.length > 0" class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-slate-100 text-left">
-                    <thead class="bg-slate-50/80">
+                <table class="min-w-full divide-y divide-border text-left">
+                    <thead class="bg-muted/80">
                         <tr
-                            class="text-[11px] font-bold tracking-wide text-slate-500 uppercase"
+                            class="text-[11px] font-bold tracking-wide text-muted-foreground uppercase"
                         >
                             <th class="px-5 py-3">
                                 {{ t('companies.columns.company') }}
@@ -225,24 +225,24 @@ function updateStatus(company: CompanyRow, event: Event): void {
                             </th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-100">
+                    <tbody class="divide-y divide-border">
                         <tr
                             v-for="company in companies.data"
                             :key="company.id"
                             class="align-top"
                         >
                             <td class="px-5 py-4">
-                                <p class="text-sm font-bold text-slate-900">
+                                <p class="text-sm font-bold text-foreground">
                                     {{ company.name }}
                                 </p>
-                                <p class="mt-0.5 text-xs text-slate-500">
+                                <p class="mt-0.5 text-xs text-muted-foreground">
                                     {{
                                         company.legal_name ??
                                         company.email ??
                                         '—'
                                     }}
                                 </p>
-                                <p class="mt-2 text-xs text-slate-600">
+                                <p class="mt-2 text-xs text-muted-foreground">
                                     {{
                                         [
                                             company.city,
@@ -256,7 +256,9 @@ function updateStatus(company: CompanyRow, event: Event): void {
                                 </p>
                             </td>
                             <td class="px-5 py-4">
-                                <p class="text-sm font-semibold text-slate-800">
+                                <p
+                                    class="text-sm font-semibold text-foreground"
+                                >
                                     {{
                                         company.plan?.name ??
                                         t('companies.noPlan')
@@ -264,7 +266,7 @@ function updateStatus(company: CompanyRow, event: Event): void {
                                 </p>
                                 <p
                                     v-if="company.plan"
-                                    class="mt-1 text-xs text-slate-500"
+                                    class="mt-1 text-xs text-muted-foreground"
                                 >
                                     {{
                                         company.plan.price_cents === null
@@ -284,7 +286,9 @@ function updateStatus(company: CompanyRow, event: Event): void {
                                         statusTone(company.subscription_status)
                                     "
                                 />
-                                <p class="mt-1 text-[11px] text-slate-600">
+                                <p
+                                    class="mt-1 text-[11px] text-muted-foreground"
+                                >
                                     {{
                                         t('companies.renewal', {
                                             date: formatDate(
@@ -294,7 +298,7 @@ function updateStatus(company: CompanyRow, event: Event): void {
                                     }}
                                 </p>
                             </td>
-                            <td class="px-5 py-4 text-xs text-slate-600">
+                            <td class="px-5 py-4 text-xs text-muted-foreground">
                                 <p>
                                     {{
                                         t(
@@ -321,10 +325,10 @@ function updateStatus(company: CompanyRow, event: Event): void {
                                 </p>
                             </td>
                             <td
-                                class="px-5 py-4 text-xs whitespace-nowrap text-slate-500"
+                                class="px-5 py-4 text-xs whitespace-nowrap text-muted-foreground"
                             >
                                 <p>{{ formatDate(company.last_active_at) }}</p>
-                                <p class="mt-1 text-slate-600">
+                                <p class="mt-1 text-muted-foreground">
                                     {{
                                         t('users.createdAt', {
                                             date: formatDate(
@@ -347,7 +351,7 @@ function updateStatus(company: CompanyRow, event: Event): void {
                                             name: company.name,
                                         })
                                     "
-                                    class="erin-focus mt-2 block h-9 min-w-36 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold disabled:opacity-60"
+                                    class="erin-focus mt-2 block h-9 min-w-36 rounded-lg border border-border bg-card px-2 text-xs font-semibold disabled:opacity-60"
                                     @change="updateStatus(company, $event)"
                                 >
                                     <option

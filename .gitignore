@@ -29,3 +29,6 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+/.localization-cache.json
+__pycache__/
+*.py[cod]

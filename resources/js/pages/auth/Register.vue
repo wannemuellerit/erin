@@ -57,7 +57,7 @@ watchEffect(() => {
                     :class="
                         accountType === 'candidate'
                             ? 'border-teal-400 bg-teal-50 ring-1 ring-teal-400'
-                            : 'border-slate-200 hover:border-slate-300'
+                            : 'border-border hover:border-border'
                     "
                     @click="accountType = 'candidate'"
                 >
@@ -66,14 +66,14 @@ watchEffect(() => {
                         :class="
                             accountType === 'candidate'
                                 ? 'text-teal-600'
-                                : 'text-slate-400'
+                                : 'text-muted-foreground'
                         "
                     />
-                    <span class="block text-sm font-bold text-slate-900">
+                    <span class="block text-sm font-bold text-foreground">
                         {{ t('auth.candidateChoice') }}
                     </span>
                     <span
-                        class="mt-1 block text-[11px] leading-4 text-slate-500"
+                        class="mt-1 block text-[11px] leading-4 text-muted-foreground"
                     >
                         {{ t('auth.candidateChoiceHint') }}
                     </span>
@@ -88,7 +88,7 @@ watchEffect(() => {
                     :class="
                         accountType === 'company'
                             ? 'border-blue-400 bg-blue-50 ring-1 ring-blue-400'
-                            : 'border-slate-200 hover:border-slate-300'
+                            : 'border-border hover:border-border'
                     "
                     @click="accountType = 'company'"
                 >
@@ -96,21 +96,21 @@ watchEffect(() => {
                         class="mb-2 size-5"
                         :class="
                             accountType === 'company'
-                                ? 'text-blue-600'
-                                : 'text-slate-400'
+                                ? 'text-[var(--erin-primary-text)]'
+                                : 'text-muted-foreground'
                         "
                     />
-                    <span class="block text-sm font-bold text-slate-900">
+                    <span class="block text-sm font-bold text-foreground">
                         {{ t('auth.companyChoice') }}
                     </span>
                     <span
-                        class="mt-1 block text-[11px] leading-4 text-slate-500"
+                        class="mt-1 block text-[11px] leading-4 text-muted-foreground"
                     >
                         {{ t('auth.companyChoiceHint') }}
                     </span>
                     <Check
                         v-if="accountType === 'company'"
-                        class="absolute top-3 right-3 size-4 text-blue-600"
+                        class="absolute top-3 right-3 size-4 text-[var(--erin-primary-text)]"
                     />
                 </button>
             </div>

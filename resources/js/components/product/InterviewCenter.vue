@@ -9,16 +9,16 @@ import {
     Plus,
     Video,
 } from '@lucide/vue';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import EmptyState from '@/components/product/EmptyState.vue';
+import LiveKitInterviewRoom from '@/components/product/LiveKitInterviewRoom.vue';
 import PageHeader from '@/components/product/PageHeader.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
 import { useFormatters } from '@/composables/useFormatters';
 import { useStatusLabels } from '@/composables/useStatusLabels';
-import de from '@/i18n/messages/product-components-de';
-import en from '@/i18n/messages/product-components-en';
+import { productMessages } from '@/i18n/product-locales';
 import { update as updateAvailability } from '@/routes/availability';
 import { respond } from '@/routes/interviews';
 import type {
@@ -33,11 +33,12 @@ const props = withDefaults(defineProps<InterviewCenterProps>(), {
     interviews: () => [],
     availability: () => [],
     timezone: 'Europe/Berlin',
+    applications: () => [],
 });
 
 const { t } = useI18n({
     useScope: 'local',
-    messages: { de, en },
+    messages: productMessages,
 });
 const { formatDate: formatLocalizedDate } = useFormatters();
 
@@ -49,6 +50,63 @@ const availabilityForm = useForm({
         timezone: slot.timezone,
     })),
 });
+const proposalForm = useForm({
+    application_id: Number(
+        new URLSearchParams(window.location.search).get('application') ??
+            props.applications?.[0]?.id ??
+            0,
+    ),
+    slots: [
+        {
+            starts_at: '',
+            ends_at: '',
+            timezone: props.timezone,
+            note: '',
+        },
+    ],
+});
+const addProposalSlot = () => {
+    if (proposalForm.slots.length < 5) {
+        proposalForm.slots.push({
+            starts_at: '',
+            ends_at: '',
+            timezone: props.timezone,
+            note: '',
+        });
+    }
+};
+const submitProposal = () => {
+    if (proposalForm.application_id < 1) {
+        return;
+    }
+
+    proposalForm.post(
+        `/interviews/applications/${proposalForm.application_id}`,
+        { preserveScroll: true },
+    );
+};
+const counterInterviewId = ref<number | null>(null);
+const counterForm = useForm({
+    response: 'counter',
+    slots: [
+        {
+            starts_at: '',
+            ends_at: '',
+            timezone: props.timezone,
+        },
+    ],
+    note: '',
+});
+const submitCounter = () => {
+    if (counterInterviewId.value === null) {
+        return;
+    }
+
+    counterForm.post(respond.url(counterInterviewId.value), {
+        preserveScroll: true,
+        onSuccess: () => (counterInterviewId.value = null),
+    });
+};
 const statusTone = (status: string): StatusTone =>
     status === 'confirmed'
         ? 'green'
@@ -127,7 +185,8 @@ const weekdays = computed(() => [
                     <article
                         v-for="interview in interviews"
                         :key="interview.id"
-                        class="rounded-xl border border-slate-200 p-4"
+                        data-test="interview-card"
+                        class="rounded-xl border border-border p-4"
                     >
                         <div
                             class="flex flex-col gap-4 sm:flex-row sm:items-center"
@@ -139,7 +198,7 @@ const weekdays = computed(() => [
                             </div>
                             <div class="min-w-0 flex-1">
                                 <div class="flex flex-wrap items-center gap-2">
-                                    <h3 class="font-bold text-slate-900">
+                                    <h3 class="font-bold text-foreground">
                                         {{ person(interview) }}
                                     </h3>
                                     <StatusBadge
@@ -147,7 +206,7 @@ const weekdays = computed(() => [
                                         :tone="statusTone(interview.status)"
                                     />
                                 </div>
-                                <p class="mt-1 text-xs text-slate-500">
+                                <p class="mt-1 text-xs text-muted-foreground">
                                     {{
                                         interview.application?.job_posting
                                             ?.title ??
@@ -155,7 +214,7 @@ const weekdays = computed(() => [
                                     }}
                                 </p>
                                 <p
-                                    class="mt-2 flex items-center gap-1.5 text-xs font-medium text-slate-600"
+                                    class="mt-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
                                 >
                                     <Clock3
                                         class="size-3.5 text-[var(--erin-secondary)]"
@@ -166,7 +225,7 @@ const weekdays = computed(() => [
                                 <a
                                     v-if="interview.ics_url"
                                     :href="interview.ics_url"
-                                    class="grid size-10 place-items-center rounded-xl border border-slate-200 text-slate-500"
+                                    class="grid size-10 place-items-center rounded-xl border border-border text-muted-foreground"
                                     :title="
                                         t('interviewCenter.calendarDownload')
                                     "
@@ -185,38 +244,96 @@ const weekdays = computed(() => [
                                 >
                                     {{ t('interviewCenter.cancel') }}
                                 </button>
+                                <button
+                                    v-if="
+                                        ![
+                                            'cancelled',
+                                            'completed',
+                                            'no_show',
+                                        ].includes(interview.status)
+                                    "
+                                    type="button"
+                                    class="h-10 rounded-xl border border-violet-200 px-3 text-xs font-bold text-violet-700"
+                                    @click="counterInterviewId = interview.id"
+                                >
+                                    {{ t('interviewCenter.counterProposal') }}
+                                </button>
                             </div>
                         </div>
+                        <LiveKitInterviewRoom
+                            v-if="interview.status === 'confirmed'"
+                            :interview-id="interview.id"
+                            :can-join="interview.can_join ?? false"
+                        />
                         <div
                             v-if="
                                 interview.proposals?.some(
                                     (proposal) => proposal.status === 'pending',
                                 )
                             "
-                            class="mt-4 grid gap-2 border-t border-slate-100 pt-4 sm:grid-cols-2"
+                            class="mt-4 grid gap-2 border-t border-border pt-4 sm:grid-cols-2"
                         >
                             <button
                                 v-for="proposal in interview.proposals.filter(
                                     (item) => item.status === 'pending',
                                 )"
                                 :key="proposal.id"
-                                class="flex items-center justify-between rounded-xl bg-slate-50 p-3 text-left hover:bg-blue-50"
+                                class="flex items-center justify-between rounded-xl bg-muted p-3 text-left hover:bg-blue-50"
                                 @click="accept(interview, proposal)"
                             >
                                 <span
                                     ><span class="block text-xs font-bold">{{
                                         formatDate(proposal.starts_at)
                                     }}</span
-                                    ><span class="text-[10px] text-slate-400">{{
-                                        proposal.timezone
-                                    }}</span></span
+                                    ><span
+                                        class="text-[10px] text-muted-foreground"
+                                        >{{ proposal.timezone }}</span
+                                    ></span
                                 >
                                 <span
-                                    class="text-[10px] font-bold text-[var(--erin-primary)]"
+                                    class="text-[10px] font-bold text-[var(--erin-primary-text)]"
                                     >{{ t('interviewCenter.confirm') }}</span
                                 >
                             </button>
                         </div>
+                        <form
+                            v-if="counterInterviewId === interview.id"
+                            class="mt-4 grid gap-2 rounded-xl border border-violet-200 bg-violet-50 p-3 sm:grid-cols-2"
+                            @submit.prevent="submitCounter"
+                        >
+                            <input
+                                v-model="counterForm.slots[0].starts_at"
+                                required
+                                type="datetime-local"
+                                class="h-10 rounded-lg border px-2 text-xs"
+                                :aria-label="t('interviewCenter.slotStart')"
+                            />
+                            <input
+                                v-model="counterForm.slots[0].ends_at"
+                                required
+                                type="datetime-local"
+                                class="h-10 rounded-lg border px-2 text-xs"
+                                :aria-label="t('interviewCenter.slotEnd')"
+                            />
+                            <input
+                                v-model="counterForm.note"
+                                class="h-10 rounded-lg border px-2 text-xs sm:col-span-2"
+                                :placeholder="t('interviewCenter.optionalNote')"
+                            />
+                            <button
+                                type="submit"
+                                class="h-10 rounded-lg bg-violet-700 text-xs font-bold text-white"
+                            >
+                                {{ t('interviewCenter.sendCounterProposal') }}
+                            </button>
+                            <button
+                                type="button"
+                                class="h-10 rounded-lg text-xs font-bold text-muted-foreground"
+                                @click="counterInterviewId = null"
+                            >
+                                {{ t('interviewCenter.dismiss') }}
+                            </button>
+                        </form>
                     </article>
                 </div>
                 <EmptyState
@@ -247,7 +364,7 @@ const weekdays = computed(() => [
                     >
                         <select
                             v-model.number="slot.weekday"
-                            class="h-9 rounded-lg border border-slate-200 px-2 text-xs"
+                            class="h-9 rounded-lg border border-border px-2 text-xs"
                         >
                             <option
                                 v-for="(day, dayIndex) in weekdays"
@@ -260,12 +377,12 @@ const weekdays = computed(() => [
                         <input
                             v-model="slot.starts_at"
                             type="time"
-                            class="h-9 rounded-lg border border-slate-200 px-1 text-xs"
+                            class="h-9 rounded-lg border border-border px-1 text-xs"
                         />
                         <input
                             v-model="slot.ends_at"
                             type="time"
-                            class="h-9 rounded-lg border border-slate-200 px-1 text-xs"
+                            class="h-9 rounded-lg border border-border px-1 text-xs"
                         />
                         <button
                             type="button"
@@ -278,7 +395,7 @@ const weekdays = computed(() => [
                     </div>
                     <button
                         type="button"
-                        class="inline-flex h-9 items-center gap-2 text-xs font-bold text-[var(--erin-primary)]"
+                        class="inline-flex h-9 items-center gap-2 text-xs font-bold text-[var(--erin-primary-text)]"
                         @click="addSlot"
                     >
                         <Plus class="size-4" />
@@ -287,13 +404,91 @@ const weekdays = computed(() => [
                     <button
                         type="submit"
                         :disabled="availabilityForm.processing"
-                        class="h-10 w-full rounded-xl bg-[var(--erin-primary)] text-xs font-bold text-white disabled:opacity-50"
+                        class="h-10 w-full rounded-xl bg-[var(--erin-primary)] text-xs font-bold text-[var(--erin-primary-foreground)] disabled:opacity-50"
                     >
                         {{ t('interviewCenter.saveAvailability') }}
                     </button>
                 </form>
             </SectionCard>
         </div>
+        <SectionCard
+            v-if="perspective === 'employer' && applications?.length"
+            :title="t('interviewCenter.proposalTitle')"
+            :description="t('interviewCenter.proposalDescription')"
+        >
+            <form class="space-y-3" @submit.prevent="submitProposal">
+                <select
+                    v-model.number="proposalForm.application_id"
+                    required
+                    class="h-10 w-full rounded-xl border border-border px-3 text-xs font-bold"
+                >
+                    <option
+                        v-for="application in applications"
+                        :key="application.id"
+                        :value="application.id"
+                    >
+                        {{ application.candidate_name }} ·
+                        {{ application.job_title }}
+                    </option>
+                </select>
+                <div
+                    v-for="(slot, index) in proposalForm.slots"
+                    :key="index"
+                    class="grid gap-2 rounded-xl bg-muted p-3 sm:grid-cols-[1fr_1fr_auto]"
+                >
+                    <input
+                        v-model="slot.starts_at"
+                        required
+                        type="datetime-local"
+                        class="h-10 rounded-lg border px-2 text-xs"
+                        :aria-label="t('interviewCenter.slotStart')"
+                    />
+                    <input
+                        v-model="slot.ends_at"
+                        required
+                        type="datetime-local"
+                        class="h-10 rounded-lg border px-2 text-xs"
+                        :aria-label="t('interviewCenter.slotEnd')"
+                    />
+                    <button
+                        type="button"
+                        class="px-2 text-xs font-bold text-red-600"
+                        :aria-label="t('interviewCenter.removeProposal')"
+                        @click="proposalForm.slots.splice(index, 1)"
+                    >
+                        ×
+                    </button>
+                    <input
+                        v-model="slot.note"
+                        class="h-10 rounded-lg border px-2 text-xs sm:col-span-2"
+                        :placeholder="t('interviewCenter.optionalNote')"
+                    />
+                    <span class="self-center text-xs text-muted-foreground">{{
+                        slot.timezone
+                    }}</span>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <button
+                        v-if="proposalForm.slots.length < 5"
+                        type="button"
+                        class="h-10 rounded-xl border px-3 text-xs font-bold"
+                        @click="addProposalSlot"
+                    >
+                        {{ t('interviewCenter.addProposal') }}
+                    </button>
+                    <button
+                        type="submit"
+                        :disabled="
+                            proposalForm.processing ||
+                            !proposalForm.slots.length
+                        "
+                        class="h-10 rounded-xl bg-[var(--erin-primary)] px-4 text-xs font-bold text-[var(--erin-primary-foreground)] disabled:opacity-50"
+                    >
+                        {{ t('interviewCenter.sendProposal') }}
+                    </button>
+                </div>
+            </form>
+        </SectionCard>
         <section class="erin-panel overflow-hidden bg-slate-900 p-6 text-white">
             <div class="flex flex-col gap-5 sm:flex-row sm:items-center">
                 <span
@@ -304,7 +499,7 @@ const weekdays = computed(() => [
                     <h2 class="font-extrabold">
                         {{ t('interviewCenter.securityTitle') }}
                     </h2>
-                    <p class="mt-1 text-sm leading-6 text-slate-300">
+                    <p class="mt-1 text-sm leading-6 text-slate-200">
                         {{ t('interviewCenter.securityDescription') }}
                     </p>
                 </div>

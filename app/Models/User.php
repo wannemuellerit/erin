@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\CompanyMemberRole;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
+use App\Services\Mail\EmailSuppressionService;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -16,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Notifications\Notification;
 use Illuminate\Support\Carbon;
 use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
@@ -93,6 +95,12 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
         return $this->hasMany(ReferralCode::class);
     }
 
+    /** @return HasMany<PayoutAccount, $this> */
+    public function payoutAccounts(): HasMany
+    {
+        return $this->hasMany(PayoutAccount::class);
+    }
+
     /**
      * @return HasMany<SupportTicket, $this>
      */
@@ -125,6 +133,18 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
         return $this->hasMany(NotificationPreference::class);
     }
 
+    /** @return HasMany<NotificationPhoneChannel, $this> */
+    public function notificationPhoneChannels(): HasMany
+    {
+        return $this->hasMany(NotificationPhoneChannel::class);
+    }
+
+    /** @return HasMany<PartnerMember, $this> */
+    public function partnerMemberships(): HasMany
+    {
+        return $this->hasMany(PartnerMember::class);
+    }
+
     /**
      * @return HasMany<AiRun, $this>
      */
@@ -144,6 +164,13 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     public function isSuperAdmin(): bool
     {
         return $this->role === UserRole::SuperAdmin;
+    }
+
+    public function routeNotificationForMail(?Notification $notification = null): ?string
+    {
+        return app(EmailSuppressionService::class)->isSuppressed($this->email)
+            ? null
+            : $this->email;
     }
 
     /**

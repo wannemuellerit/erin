@@ -7,7 +7,7 @@ use RuntimeException;
 
 final class ZammadMessageMarker
 {
-    private const PREFIX = 'Erin operation message:';
+    private const PREFIX = 'Faden operation message:';
 
     public function for(SupportTicketMessage $message): string
     {

@@ -61,6 +61,18 @@ class JobApplication extends Model
         return $this->belongsTo(CandidateProfile::class);
     }
 
+    /** @return BelongsTo<CompanyTeam, $this> */
+    public function companyTeam(): BelongsTo
+    {
+        return $this->belongsTo(CompanyTeam::class, 'company_team_id');
+    }
+
+    /** @return BelongsTo<CompanyMembership, $this> */
+    public function contactMembership(): BelongsTo
+    {
+        return $this->belongsTo(CompanyMembership::class, 'contact_membership_id');
+    }
+
     /**
      * @return HasMany<ApplicationStatusHistory, $this>
      */
@@ -92,6 +104,14 @@ class JobApplication extends Model
     public function internalReviews(): HasMany
     {
         return $this->hasMany(CandidateInternalReview::class, 'application_id');
+    }
+
+    /**
+     * @return HasMany<Conversation, $this>
+     */
+    public function conversations(): HasMany
+    {
+        return $this->hasMany(Conversation::class, 'application_id');
     }
 
     /**

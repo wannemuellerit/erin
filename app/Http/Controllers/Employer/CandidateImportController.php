@@ -13,6 +13,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
@@ -155,7 +156,9 @@ class CandidateImportController extends Controller
             static fn (?string $header): bool => filled($header),
         ));
         if (count($mappedHeaders) !== count(array_unique($mappedHeaders))) {
-            abort(422, __('Jede Quellspalte darf nur einem Zielfeld zugeordnet werden.'));
+            throw ValidationException::withMessages([
+                'mapping' => __('Jede Quellspalte darf nur einem Zielfeld zugeordnet werden.'),
+            ]);
         }
         $candidateImport->update([
             'mapping' => $selection,
@@ -179,6 +182,27 @@ class CandidateImportController extends Controller
         $candidateImport->delete();
 
         return back()->with('success', __('Der Kandidatenimport wurde gelöscht.'));
+    }
+
+    public function cancel(
+        Request $request,
+        CandidateImport $candidateImport,
+        CurrentCompany $currentCompany,
+    ): RedirectResponse {
+        $company = $currentCompany->forRequest($request);
+        abort_unless($candidateImport->company_id === $company->getKey(), 404);
+        abort_unless($currentCompany->membership($request)->role->canRecruit(), 403);
+        abort_unless(in_array($candidateImport->status, ['awaiting_mapping', 'queued', 'processing'], true), 422);
+
+        $now = now();
+        $candidateImport->update([
+            'status' => $candidateImport->status === 'awaiting_mapping' ? 'cancelled' : $candidateImport->status,
+            'cancellation_requested_at' => $candidateImport->cancellation_requested_at ?? $now,
+            'cancelled_at' => $candidateImport->status === 'awaiting_mapping' ? $now : null,
+            'completed_at' => $candidateImport->status === 'awaiting_mapping' ? $now : null,
+        ]);
+
+        return back()->with('success', __('Der Abbruch des Kandidatenimports wurde angefordert.'));
     }
 
     public function template(): StreamedResponse

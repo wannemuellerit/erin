@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Settings\NotificationPhoneChannelController;
 use App\Http\Controllers\Settings\NotificationPreferencesController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\PushSubscriptionController;
@@ -10,7 +11,7 @@ use Illuminate\Auth\Middleware\RequirePassword;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth'])->group(function () {
-    Route::redirect('settings', '/settings/profile');
+    Route::get('settings', fn () => redirect('/settings/profile'));
 
     Route::get('settings/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('settings/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -44,6 +45,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('settings/push-subscriptions/test', [PushSubscriptionController::class, 'test'])
         ->middleware('throttle:3,1')
         ->name('push-subscriptions.test');
+    Route::post('settings/notification-phone-channels', [NotificationPhoneChannelController::class, 'store'])
+        ->middleware('throttle:3,10')->name('notification-phone-channels.store');
+    Route::post('settings/notification-phone-channels/{channel}/verify', [NotificationPhoneChannelController::class, 'verify'])
+        ->middleware('throttle:6,10')->name('notification-phone-channels.verify');
+    Route::delete('settings/notification-phone-channels/{channel}', [NotificationPhoneChannelController::class, 'destroy'])
+        ->name('notification-phone-channels.destroy');
 });
 
 /* @chisel-passkeys */

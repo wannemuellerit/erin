@@ -2,14 +2,14 @@
 import { Head, router } from '@inertiajs/vue3';
 import { Search, ScrollText, X } from '@lucide/vue';
 import { computed, reactive } from 'vue';
-import EmptyState from '@/components/product/EmptyState.vue';
-import PageHeader from '@/components/product/PageHeader.vue';
-import SectionCard from '@/components/product/SectionCard.vue';
-import adminAudit from '@/routes/admin/audit';
 import AdminPagination from './_components/AdminPagination.vue';
 import { useAdminI18n } from './_i18n';
 import { cleanFilters } from './_shared';
 import type { AdminPaginator } from './_shared';
+import EmptyState from '@/components/product/EmptyState.vue';
+import PageHeader from '@/components/product/PageHeader.vue';
+import SectionCard from '@/components/product/SectionCard.vue';
+import adminAudit from '@/routes/admin/audit';
 
 type AuditLogRow = {
     id: number;
@@ -130,17 +130,17 @@ function resolveAlert(id: number): void {
             :title="t('audit.alertsTitle')"
             :description="t('audit.alertsDescription')"
         >
-            <div class="divide-y divide-slate-100">
+            <div class="divide-y divide-border">
                 <div
                     v-for="alert in security_alerts"
                     :key="alert.id"
                     class="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between"
                 >
                     <div>
-                        <p class="text-sm font-bold text-slate-900">
+                        <p class="text-sm font-bold text-foreground">
                             {{ humanize(alert.type) }}
                         </p>
-                        <p class="mt-1 text-xs text-slate-500">
+                        <p class="mt-1 text-xs text-muted-foreground">
                             {{ alert.user?.name ?? t('audit.unknownUser') }} ·
                             {{
                                 t('audit.detections', {
@@ -154,7 +154,7 @@ function resolveAlert(id: number): void {
                     <button
                         v-if="can_manage_audit"
                         type="button"
-                        class="erin-focus rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700"
+                        class="erin-focus rounded-xl border border-border px-4 py-2 text-xs font-bold text-muted-foreground"
                         @click="resolveAlert(alert.id)"
                     >
                         {{ t('audit.resolveAlert') }}
@@ -174,25 +174,25 @@ function resolveAlert(id: number): void {
 
         <SectionCard flush>
             <form
-                class="grid gap-3 border-b border-slate-100 p-4 xl:grid-cols-[minmax(14rem,1fr)_13rem_8rem_8rem_10rem_10rem_auto]"
+                class="grid gap-3 border-b border-border p-4 xl:grid-cols-[minmax(14rem,1fr)_13rem_8rem_8rem_10rem_10rem_auto]"
                 @submit.prevent="applyFilters"
             >
                 <label class="relative">
                     <span class="sr-only">{{ t('audit.searchLabel') }}</span>
                     <Search
-                        class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-slate-400"
+                        class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
                     />
                     <input
                         v-model="filters.search"
                         type="search"
                         :placeholder="t('audit.searchPlaceholder')"
-                        class="erin-focus h-11 w-full rounded-xl border border-slate-200 pr-3 pl-10 text-sm"
+                        class="erin-focus h-11 w-full rounded-xl border border-border pr-3 pl-10 text-sm"
                     />
                 </label>
                 <select
                     v-model="filters.event"
                     :aria-label="t('audit.event')"
-                    class="erin-focus h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                    class="erin-focus h-11 rounded-xl border border-border bg-card px-3 text-sm"
                 >
                     <option value="">{{ t('audit.allEvents') }}</option>
                     <option v-for="event in events" :key="event" :value="event">
@@ -205,7 +205,7 @@ function resolveAlert(id: number): void {
                     min="1"
                     :placeholder="t('audit.actorId')"
                     :aria-label="t('audit.actorId')"
-                    class="erin-focus h-11 rounded-xl border border-slate-200 px-3 text-sm"
+                    class="erin-focus h-11 rounded-xl border border-border px-3 text-sm"
                 />
                 <input
                     v-model="filters.company_id"
@@ -213,19 +213,19 @@ function resolveAlert(id: number): void {
                     min="1"
                     :placeholder="t('common.companyId')"
                     :aria-label="t('common.companyId')"
-                    class="erin-focus h-11 rounded-xl border border-slate-200 px-3 text-sm"
+                    class="erin-focus h-11 rounded-xl border border-border px-3 text-sm"
                 />
                 <input
                     v-model="filters.from"
                     type="date"
                     :aria-label="t('common.from')"
-                    class="erin-focus h-11 rounded-xl border border-slate-200 px-3 text-sm"
+                    class="erin-focus h-11 rounded-xl border border-border px-3 text-sm"
                 />
                 <input
                     v-model="filters.until"
                     type="date"
                     :aria-label="t('common.until')"
-                    class="erin-focus h-11 rounded-xl border border-slate-200 px-3 text-sm"
+                    class="erin-focus h-11 rounded-xl border border-border px-3 text-sm"
                 />
                 <div class="flex gap-2">
                     <button
@@ -237,7 +237,7 @@ function resolveAlert(id: number): void {
                     <button
                         type="button"
                         :aria-label="t('common.resetFilters')"
-                        class="erin-focus grid size-11 place-items-center rounded-xl border border-slate-200 text-slate-500"
+                        class="erin-focus grid size-11 place-items-center rounded-xl border border-border text-muted-foreground"
                         @click="resetFilters"
                     >
                         <X class="size-4" />
@@ -246,10 +246,10 @@ function resolveAlert(id: number): void {
             </form>
 
             <div v-if="logs.data.length > 0" class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-slate-100 text-left">
-                    <thead class="bg-slate-50/80">
+                <table class="min-w-full divide-y divide-border text-left">
+                    <thead class="bg-muted/80">
                         <tr
-                            class="text-[11px] font-bold tracking-wide text-slate-500 uppercase"
+                            class="text-[11px] font-bold tracking-wide text-muted-foreground uppercase"
                         >
                             <th class="px-5 py-3">
                                 {{ t('audit.columns.event') }}
@@ -268,7 +268,7 @@ function resolveAlert(id: number): void {
                             </th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-100">
+                    <tbody class="divide-y divide-border">
                         <tr
                             v-for="log in logs.data"
                             :key="log.id"
@@ -276,23 +276,23 @@ function resolveAlert(id: number): void {
                         >
                             <td class="px-5 py-4">
                                 <p
-                                    class="font-mono text-xs font-bold text-slate-800"
+                                    class="font-mono text-xs font-bold text-foreground"
                                 >
                                     {{ log.event }}
                                 </p>
-                                <p class="mt-1 text-xs text-slate-500">
+                                <p class="mt-1 text-xs text-muted-foreground">
                                     {{ targetLabel(log) }}
                                 </p>
                                 <details v-if="hasDetails(log)" class="mt-2">
                                     <summary
-                                        class="cursor-pointer text-xs font-semibold text-blue-600"
+                                        class="cursor-pointer text-xs font-semibold text-[var(--erin-primary-text)]"
                                     >
                                         {{ t('audit.changeDetails') }}
                                     </summary>
                                     <div class="mt-2 max-w-xl space-y-2">
                                         <pre
                                             v-if="log.before_values"
-                                            class="overflow-auto rounded-lg bg-slate-950 p-3 text-[10px] text-slate-200"
+                                            class="overflow-auto rounded-lg bg-slate-950 p-3 text-[10px] text-foreground"
                                             >{{ t('audit.before') }}: {{
                                                 JSON.stringify(
                                                     log.before_values,
@@ -302,7 +302,7 @@ function resolveAlert(id: number): void {
                                             }}</pre>
                                         <pre
                                             v-if="log.after_values"
-                                            class="overflow-auto rounded-lg bg-slate-950 p-3 text-[10px] text-slate-200"
+                                            class="overflow-auto rounded-lg bg-slate-950 p-3 text-[10px] text-foreground"
                                             >{{ t('audit.after') }}: {{
                                                 JSON.stringify(
                                                     log.after_values,
@@ -312,7 +312,7 @@ function resolveAlert(id: number): void {
                                             }}</pre>
                                         <pre
                                             v-if="log.metadata"
-                                            class="overflow-auto rounded-lg bg-slate-950 p-3 text-[10px] text-slate-200"
+                                            class="overflow-auto rounded-lg bg-slate-950 p-3 text-[10px] text-foreground"
                                             >{{ t('audit.metadata') }}: {{
                                                 JSON.stringify(
                                                     log.metadata,
@@ -324,25 +324,27 @@ function resolveAlert(id: number): void {
                                 </details>
                             </td>
                             <td class="px-5 py-4">
-                                <p class="text-sm font-semibold text-slate-800">
+                                <p
+                                    class="text-sm font-semibold text-foreground"
+                                >
                                     {{ log.actor?.name ?? t('common.system') }}
                                 </p>
                                 <p
                                     v-if="log.actor"
-                                    class="mt-0.5 text-xs text-slate-500"
+                                    class="mt-0.5 text-xs text-muted-foreground"
                                 >
                                     {{ log.actor.email }}
                                 </p>
                                 <p
                                     v-if="log.actor"
-                                    class="mt-1 text-[11px] text-slate-600"
+                                    class="mt-1 text-[11px] text-muted-foreground"
                                 >
                                     {{ humanize(log.actor.role) }} · #{{
                                         log.actor.id
                                     }}
                                 </p>
                             </td>
-                            <td class="px-5 py-4 text-xs text-slate-600">
+                            <td class="px-5 py-4 text-xs text-muted-foreground">
                                 <p>
                                     {{
                                         log.company?.name ??
@@ -351,7 +353,7 @@ function resolveAlert(id: number): void {
                                 </p>
                                 <p
                                     v-if="log.company"
-                                    class="mt-1 text-slate-600"
+                                    class="mt-1 text-muted-foreground"
                                 >
                                     {{
                                         t('audit.companyReference', {
@@ -360,18 +362,18 @@ function resolveAlert(id: number): void {
                                     }}
                                 </p>
                             </td>
-                            <td class="px-5 py-4 text-xs text-slate-600">
+                            <td class="px-5 py-4 text-xs text-muted-foreground">
                                 <p>{{ log.ip_address ?? '—' }}</p>
                                 <p
                                     v-if="log.user_agent"
-                                    class="mt-1 max-w-56 truncate text-slate-600"
+                                    class="mt-1 max-w-56 truncate text-muted-foreground"
                                     :title="log.user_agent"
                                 >
                                     {{ log.user_agent }}
                                 </p>
                             </td>
                             <td
-                                class="px-5 py-4 text-right text-xs whitespace-nowrap text-slate-500"
+                                class="px-5 py-4 text-right text-xs whitespace-nowrap text-muted-foreground"
                             >
                                 {{ formatDate(log.created_at) }}
                             </td>

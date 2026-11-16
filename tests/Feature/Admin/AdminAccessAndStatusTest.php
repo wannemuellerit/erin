@@ -5,8 +5,10 @@ use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Models\AuditLog;
 use App\Models\Company;
+use App\Models\Plan;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 
 uses(RefreshDatabase::class);
 
@@ -96,4 +98,30 @@ it('lets superadmins block companies with a documented reason', function () {
             ->where('event', 'admin.company.status_updated')
             ->where('auditable_id', $company->id)
             ->exists())->toBeTrue();
+});
+
+it('shows reconciliable revenue only to superadmins while support sees operational quality', function () {
+    $admin = User::factory()->create(['role' => UserRole::SuperAdmin]);
+    $support = User::factory()->create(['role' => UserRole::Support]);
+    $plan = Plan::factory()->create(['price_cents' => 120000, 'term_months' => 12]);
+    Company::factory()->create([
+        'current_plan_id' => $plan->getKey(),
+        'subscription_status' => 'active',
+        'status' => CompanyStatus::Active,
+    ]);
+
+    $this->actingAs($admin)->get(route('admin.dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('metrics.financial.mrr_cents', 10000)
+            ->where('metrics.financial.currency', 'EUR')
+            ->where('metrics.growth.active_subscriptions', 1)
+            ->has('metrics.operations.failed_webhooks_24h'));
+
+    $this->actingAs($support)->get(route('admin.dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('metrics.financial', null)
+            ->where('metrics.growth.active_subscriptions', 1)
+            ->has('metrics.operations.failed_webhooks_24h'));
 });

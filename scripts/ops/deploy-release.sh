@@ -56,7 +56,7 @@ rollback() {
         export ERIN_APP_TAG="$previous_sha"
         export ERIN_BUILD_SHA="$previous_sha"
         docker compose --env-file "$env_file" -f "$compose_file" up -d --no-build \
-            php-fpm queue scheduler reverb nginx || true
+            php-fpm horizon scheduler reverb nginx || true
     fi
 
     jq -n \

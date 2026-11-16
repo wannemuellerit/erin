@@ -22,7 +22,7 @@ withDefaults(
 );
 
 const toneClasses = {
-    blue: 'bg-blue-50 text-blue-600 ring-blue-100',
+    blue: 'bg-blue-50 text-[var(--erin-primary-text)] ring-blue-100',
     teal: 'bg-teal-50 text-teal-600 ring-teal-100',
     orange: 'bg-orange-50 text-orange-600 ring-orange-100',
     violet: 'bg-violet-50 text-violet-600 ring-violet-100',
@@ -35,9 +35,11 @@ const toneClasses = {
     >
         <div class="flex items-start justify-between gap-4">
             <div>
-                <p class="text-sm font-medium text-slate-500">{{ label }}</p>
+                <p class="text-sm font-medium text-muted-foreground">
+                    {{ label }}
+                </p>
                 <p
-                    class="mt-2 text-2xl font-bold tracking-tight text-slate-950"
+                    class="mt-2 text-2xl font-bold tracking-tight text-foreground"
                 >
                     {{ value }}
                 </p>
@@ -57,7 +59,7 @@ const toneClasses = {
                 :class="{
                     'text-emerald-600': trend === 'up',
                     'text-red-600': trend === 'down',
-                    'text-slate-500': trend === 'neutral',
+                    'text-muted-foreground': trend === 'neutral',
                 }"
             >
                 <ArrowUpRight v-if="trend === 'up'" class="size-3.5" />
@@ -65,7 +67,7 @@ const toneClasses = {
                 <Minus v-else class="size-3.5" />
                 {{ change }}
             </span>
-            <span v-if="hint" class="text-slate-600">{{ hint }}</span>
+            <span v-if="hint" class="text-muted-foreground">{{ hint }}</span>
         </div>
     </article>
 </template>

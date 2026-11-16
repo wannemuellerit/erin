@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers\Employer;
 
+use App\Enums\CountryOperation;
 use App\Enums\JobStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Employer\UpsertJobPostingRequest;
 use App\Jobs\ScanJobMedia;
 use App\Models\Company;
 use App\Models\JobMedia;
 use App\Models\JobPosting;
+use App\Models\JobTemplate;
 use App\Models\Language;
 use App\Models\Occupation;
 use App\Models\Skill;
@@ -15,15 +18,19 @@ use App\Services\Activity\ActivityRecorder;
 use App\Services\Audit\AuditLogger;
 use App\Services\Billing\EntitlementService;
 use App\Services\Companies\CurrentCompany;
+use App\Services\Countries\CountryLaunchGate;
 use App\Services\Documents\UploadPolicy;
+use App\Services\Jobs\JobPublishingReadiness;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -54,19 +61,20 @@ class JobController extends Controller
     }
 
     public function store(
-        Request $request,
+        UpsertJobPostingRequest $request,
         CurrentCompany $currentCompany,
         AuditLogger $audit,
         ActivityRecorder $activity,
     ): RedirectResponse {
         $company = $currentCompany->forRequest($request);
         $this->assertCanRecruit($request, $currentCompany);
-        $validated = $this->validateJob($request);
+        $validated = $request->validated();
+        $this->assertLocationBelongsToCompany($company, $validated['location_id'] ?? null);
         $this->assertUploadQuota($request);
 
         $job = DB::transaction(function () use ($request, $company, $validated): JobPosting {
             $job = $company->jobPostings()->create([
-                ...Arr::except($validated, ['skills', 'languages', 'screening_questions', 'media']),
+                ...Arr::except($validated, ['skills', 'languages', 'screening_questions', 'media', 'template_id', 'translations']),
                 'created_by' => $request->user()?->getKey(),
                 'slug' => $this->uniqueSlug($company->getKey(), $validated['title']),
                 'status' => JobStatus::Draft,
@@ -97,11 +105,14 @@ class JobController extends Controller
         $company = $currentCompany->forRequest($request);
         $this->assertOwned($job, $company->getKey());
         $this->assertCanRecruit($request, $currentCompany);
-        $job->load(['skills', 'languages', 'screeningQuestions', 'media']);
+        $job->load(['skills', 'languages', 'screeningQuestions', 'media', 'translations']);
 
         return Inertia::render('employer/JobForm', [
             'job' => [
                 ...Arr::except($job->toArray(), ['media']),
+                'translations' => $job->translations()
+                    ->get(['locale', 'title', 'position', 'description'])
+                    ->keyBy('locale'),
                 'media' => $job->media->map(
                     fn (JobMedia $media): array => [
                         'id' => $media->getKey(),
@@ -125,24 +136,37 @@ class JobController extends Controller
     }
 
     public function update(
-        Request $request,
+        UpsertJobPostingRequest $request,
         JobPosting $job,
         CurrentCompany $currentCompany,
         AuditLogger $audit,
+        ActivityRecorder $activity,
     ): RedirectResponse {
         $company = $currentCompany->forRequest($request);
         $this->assertOwned($job, $company->getKey());
         $this->assertCanRecruit($request, $currentCompany);
-        $validated = $this->validateJob($request);
+        $validated = $request->validated();
+        $this->assertLocationBelongsToCompany($company, $validated['location_id'] ?? null);
+        if ($job->media()->count() + count($request->file('media', [])) > 10) {
+            throw ValidationException::withMessages(['media' => __('Eine Stellenanzeige darf höchstens zehn Dateien enthalten.')]);
+        }
+        $this->assertScreeningQuestionsMutable($job, $validated['screening_questions'] ?? []);
         $this->assertUploadQuota($request);
         $before = $job->toArray();
 
         DB::transaction(function () use ($job, $validated, $request): void {
-            $job->update(Arr::except($validated, ['skills', 'languages', 'screening_questions', 'media']));
+            $job->update(Arr::except($validated, ['skills', 'languages', 'screening_questions', 'media', 'template_id', 'translations']));
             $this->syncRelations($job, $validated, $request);
         });
 
         $audit->record('job.updated', $job, $before, $job->fresh()->toArray(), companyId: $company->getKey());
+        $activity->record(
+            'job.updated',
+            $request->user(),
+            $company,
+            $job,
+            ['job_title' => $job->title],
+        );
 
         return back()->with('success', __('Stellenanzeige wurde aktualisiert.'));
     }
@@ -152,13 +176,21 @@ class JobController extends Controller
         JobPosting $job,
         CurrentCompany $currentCompany,
         EntitlementService $entitlements,
+        JobPublishingReadiness $readiness,
         AuditLogger $audit,
+        CountryLaunchGate $countries,
+        ActivityRecorder $activity,
     ): RedirectResponse {
         $company = $currentCompany->forRequest($request);
         $this->assertOwned($job, $company->getKey());
         $this->assertCanRecruit($request, $currentCompany);
         $validated = $request->validate(['status' => ['required', Rule::enum(JobStatus::class)]]);
         $target = JobStatus::from($validated['status']);
+        if ($target === JobStatus::Published && ($missing = $readiness->missing($job)) !== []) {
+            return back()->withErrors(['status' => __('Vor der Veröffentlichung fehlen: :fields.', [
+                'fields' => implode(', ', $missing),
+            ])]);
+        }
         $allowed = [
             JobStatus::Draft->value => [JobStatus::Published, JobStatus::Archived],
             JobStatus::Published->value => [JobStatus::Paused, JobStatus::Filled, JobStatus::Archived],
@@ -169,7 +201,7 @@ class JobController extends Controller
         $before = $job->status;
 
         try {
-            DB::transaction(function () use ($company, $job, $target, $allowed, $entitlements): void {
+            DB::transaction(function () use ($company, $job, $target, $allowed, $entitlements, $countries): void {
                 Company::query()->whereKey($company->getKey())->lockForUpdate()->firstOrFail();
                 $job->refresh();
                 abort_unless(
@@ -179,6 +211,13 @@ class JobController extends Controller
                 );
 
                 if ($target === JobStatus::Published) {
+                    if (filled($job->target_country_code)) {
+                        $countries->assertEnabled(CountryOperation::Recruiting, $job->target_country_code);
+                        if ($job->visa_package_available) {
+                            $countries->assertEnabled(CountryOperation::Visa, $job->target_country_code);
+                            $countries->assertEnabled(CountryOperation::Relocation, $job->target_country_code);
+                        }
+                    }
                     $entitlements->assertCanPublishJob($company, $job);
                 }
 
@@ -199,6 +238,13 @@ class JobController extends Controller
             ['status' => $target->value],
             companyId: $company->getKey(),
         );
+        $activity->record(
+            'job.status_changed',
+            $request->user(),
+            $company,
+            $job,
+            ['job_title' => $job->title, 'status' => $target->value],
+        );
 
         return back()->with('success', __('Der Stellenstatus wurde geändert.'));
     }
@@ -209,6 +255,7 @@ class JobController extends Controller
         CurrentCompany $currentCompany,
         EntitlementService $entitlements,
         AuditLogger $audit,
+        ActivityRecorder $activity,
     ): RedirectResponse {
         $company = $currentCompany->forRequest($request);
         $this->assertOwned($job, $company->getKey());
@@ -217,62 +264,131 @@ class JobController extends Controller
 
         try {
             DB::transaction(function () use ($company, $job, $entitlements): void {
+                $lockedJob = JobPosting::query()
+                    ->whereKey($job->getKey())
+                    ->where('company_id', $company->getKey())
+                    ->lockForUpdate()
+                    ->firstOrFail();
+                if ($lockedJob->boosted_until?->isFuture()) {
+                    throw new DomainException(__('Diese Stellenanzeige besitzt bereits einen aktiven Boost.'));
+                }
                 $entitlements->consumeBoost($company);
-                $job->update(['boosted_until' => now()->addDay()]);
+                $lockedJob->update(['boosted_until' => now()->addDay()]);
             }, 3);
         } catch (DomainException $exception) {
             return back()->withErrors(['boost' => $exception->getMessage()]);
         }
 
+        $job->refresh();
         $audit->record('job.boosted', $job, after: [
             'boosted_until' => $job->boosted_until?->toIso8601String(),
         ], companyId: $company->getKey());
+        $activity->record(
+            'job.boosted',
+            $request->user(),
+            $company,
+            $job,
+            ['job_title' => $job->title],
+        );
 
         return back()->with('success', __('Die Stellenanzeige wird 24 Stunden hervorgehoben.'));
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private function validateJob(Request $request): array
-    {
-        return $request->validate([
-            'title' => ['required', 'string', 'max:180'],
-            'position' => ['required', 'string', 'max:180'],
-            'description' => ['required', 'string', 'max:50000'],
-            'occupation_id' => ['nullable', 'exists:occupations,id'],
-            'location_id' => ['nullable', 'exists:company_locations,id'],
-            'expected_experience_years' => ['nullable', 'numeric', 'min:0', 'max:60'],
-            'language_notes' => ['nullable', 'string', 'max:3000'],
-            'hours_min' => ['nullable', 'integer', 'min:1', 'max:80'],
-            'hours_max' => ['nullable', 'integer', 'gte:hours_min', 'max:80'],
-            'employment_type' => ['required', Rule::in(['full_time', 'part_time', 'temporary', 'permanent'])],
-            'compensation_min_cents' => ['nullable', 'integer', 'min:0'],
-            'compensation_max_cents' => ['nullable', 'integer', 'gte:compensation_min_cents'],
-            'currency' => ['required', Rule::in(['EUR'])],
-            'compensation_interval' => ['required', Rule::in(['hour', 'month', 'year'])],
-            'is_remote' => ['boolean'],
-            'visa_package_available' => ['boolean'],
-            'skills' => ['array'],
-            'skills.*.id' => ['required', 'exists:skills,id'],
-            'skills.*.importance' => ['nullable', 'integer', 'min:1', 'max:5'],
-            'skills.*.minimum_experience_years' => ['nullable', 'numeric', 'min:0', 'max:60'],
-            'languages' => ['array'],
-            'languages.*.id' => ['required', 'exists:languages,id'],
-            'languages.*.minimum_level' => ['required', Rule::in(['A1', 'A2', 'B1', 'B2', 'C1', 'C2'])],
-            'languages.*.is_required' => ['boolean'],
-            'screening_questions' => ['array', 'max:5'],
-            'screening_questions.*.question' => ['required', 'string', 'max:500'],
-            'screening_questions.*.type' => ['required', Rule::in(['text', 'yes_no', 'choice'])],
-            'screening_questions.*.is_required' => ['boolean'],
-            'screening_questions.*.options' => ['nullable', 'array', 'max:10'],
-            'media' => ['array', 'max:10'],
-            'media.*' => [
-                'file',
-                'mimes:jpg,jpeg,png,gif,pdf,doc,docx',
-                'max:'.app(UploadPolicy::class)->maxFileKilobytes(10240),
-            ],
-        ]);
+    public function duplicate(
+        Request $request,
+        JobPosting $job,
+        CurrentCompany $currentCompany,
+        AuditLogger $audit,
+    ): RedirectResponse {
+        $company = $currentCompany->forRequest($request);
+        $this->assertOwned($job, $company->getKey());
+        $this->assertCanRecruit($request, $currentCompany);
+        $job->load(['skills', 'languages', 'screeningQuestions', 'translations']);
+        $copy = DB::transaction(function () use ($job, $request, $company): JobPosting {
+            $copy = $job->replicate([
+                'slug', 'status', 'published_at', 'closed_at', 'boosted_until',
+            ]);
+            $copy->title = __('Kopie von :title', ['title' => $job->title]);
+            $copy->slug = $this->uniqueSlug($company->getKey(), $copy->title);
+            $copy->status = JobStatus::Draft;
+            $copy->created_by = $request->user()?->getKey();
+            $copy->published_at = null;
+            $copy->closed_at = null;
+            $copy->boosted_until = null;
+            $copy->save();
+            $copy->skills()->sync(DB::table('job_skill')->where('job_posting_id', $job->getKey())
+                ->get()->mapWithKeys(fn (object $row): array => [(int) $row->skill_id => [
+                    'importance' => $row->importance,
+                    'minimum_experience_years' => $row->minimum_experience_years,
+                ]])->all());
+            $copy->languages()->sync(DB::table('job_language')->where('job_posting_id', $job->getKey())
+                ->get()->mapWithKeys(fn (object $row): array => [(int) $row->language_id => [
+                    'minimum_level' => $row->minimum_level,
+                    'is_required' => $row->is_required,
+                ]])->all());
+            foreach ($job->screeningQuestions as $question) {
+                $copy->screeningQuestions()->create($question->only([
+                    'question', 'type', 'is_required', 'sort_order', 'options',
+                ]));
+            }
+            foreach ($job->translations as $translation) {
+                $copy->translations()->create([
+                    ...$translation->only(['locale', 'title', 'position', 'description']),
+                    'title' => $translation->locale === 'de' ? $copy->title : $translation->title,
+                ]);
+            }
+
+            return $copy;
+        });
+        $audit->record('job.duplicated', $copy, after: [
+            'source_job_id' => $job->getKey(),
+        ], companyId: $company->getKey());
+
+        return redirect()->route('employer.jobs.edit', $copy)
+            ->with('success', __('Die Stellenanzeige wurde als neuer Entwurf dupliziert.'));
+    }
+
+    public function destroy(
+        Request $request,
+        JobPosting $job,
+        CurrentCompany $currentCompany,
+        AuditLogger $audit,
+    ): RedirectResponse {
+        $company = $currentCompany->forRequest($request);
+        $this->assertOwned($job, $company->getKey());
+        $this->assertCanRecruit($request, $currentCompany);
+        abort_unless(in_array($job->status, [JobStatus::Draft, JobStatus::Archived], true), 422, __('Nur Entwürfe und archivierte Stellen können gelöscht werden.'));
+        abort_if($job->applications()->exists() || $job->invitations()->exists(), 422, __('Stellen mit Bewerbungen oder Einladungen müssen aus Nachweisgründen archiviert bleiben.'));
+        $media = $job->media()->get(['disk', 'path']);
+        $before = $job->toArray();
+        $job->delete();
+        foreach ($media as $file) {
+            Storage::disk($file->disk)->delete($file->path);
+        }
+        $audit->record('job.deleted', $job, before: $before, companyId: $company->getKey());
+
+        return redirect()->route('employer.jobs.index')->with('success', __('Die Stellenanzeige wurde gelöscht.'));
+    }
+
+    public function destroyMedia(
+        Request $request,
+        JobPosting $job,
+        JobMedia $media,
+        CurrentCompany $currentCompany,
+        AuditLogger $audit,
+    ): RedirectResponse {
+        $company = $currentCompany->forRequest($request);
+        $this->assertOwned($job, $company->getKey());
+        $this->assertCanRecruit($request, $currentCompany);
+        abort_unless($media->job_posting_id === $job->getKey(), 404);
+        $before = $media->toArray();
+        DB::transaction(function () use ($media): void {
+            abort_unless(Storage::disk($media->disk)->delete($media->path), 503, __('Die Datei konnte nicht entfernt werden.'));
+            $media->delete();
+        });
+        $audit->record('job.media_deleted', $media, before: $before, companyId: $company->getKey());
+
+        return back()->with('success', __('Die Datei wurde aus der Stellenanzeige entfernt.'));
     }
 
     /**
@@ -280,6 +396,7 @@ class JobController extends Controller
      */
     private function syncRelations(JobPosting $job, array $validated, Request $request): void
     {
+        $this->assertTemplateAllowed($job->company, $validated['template_id'] ?? null);
         /** @var list<array{id: int, importance?: int, minimum_experience_years?: float|int|null}> $skills */
         $skills = is_array($validated['skills'] ?? null) ? array_values($validated['skills']) : [];
         $skillSync = [];
@@ -300,25 +417,51 @@ class JobController extends Controller
             ];
         }
         $job->languages()->sync($languageSync);
-        $job->screeningQuestions()->delete();
-        foreach ($validated['screening_questions'] ?? [] as $index => $question) {
-            $job->screeningQuestions()->create([...$question, 'sort_order' => $index]);
+        if (! $job->applications()->exists()) {
+            $job->screeningQuestions()->delete();
+            foreach ($validated['screening_questions'] ?? [] as $index => $question) {
+                $job->screeningQuestions()->create([...$question, 'sort_order' => $index]);
+            }
         }
 
-        foreach ($request->file('media', []) as $file) {
-            $path = $file->store("companies/{$job->company_id}/jobs/{$job->getKey()}", 'private');
-            abort_if($path === false, 500);
-            $media = $job->media()->create([
-                'uploaded_by' => $request->user()?->getKey(),
-                'type' => str_starts_with((string) $file->getMimeType(), 'image/') ? 'image' : 'document',
-                'disk' => 'private',
-                'path' => $path,
-                'original_name' => $file->getClientOriginalName(),
-                'mime_type' => $file->getMimeType(),
-                'size_bytes' => $file->getSize(),
-                'scan_result' => 'pending',
-            ]);
-            ScanJobMedia::dispatch($media->getKey())->afterCommit();
+        $translations = is_array($validated['translations'] ?? null) ? $validated['translations'] : [];
+        $translations['de'] = [
+            'title' => $validated['title'],
+            'position' => $validated['position'],
+            'description' => $validated['description'],
+        ];
+        foreach ($translations as $locale => $translation) {
+            if (! is_array($translation) || ! filled($translation['title'] ?? null)) {
+                continue;
+            }
+            $job->translations()->updateOrCreate(
+                ['locale' => $locale],
+                Arr::only($translation, ['title', 'position', 'description']),
+            );
+        }
+        $job->translations()->whereNotIn('locale', array_keys($translations))->delete();
+
+        $storedPaths = [];
+        try {
+            foreach ($request->file('media', []) as $file) {
+                $path = $file->store("companies/{$job->company_id}/jobs/{$job->getKey()}", 'private');
+                abort_if($path === false, 500);
+                $storedPaths[] = $path;
+                $media = $job->media()->create([
+                    'uploaded_by' => $request->user()?->getKey(),
+                    'type' => str_starts_with((string) $file->getMimeType(), 'image/') ? 'image' : 'document',
+                    'disk' => 'private',
+                    'path' => $path,
+                    'original_name' => $file->getClientOriginalName(),
+                    'mime_type' => $file->getMimeType(),
+                    'size_bytes' => $file->getSize(),
+                    'scan_result' => 'pending',
+                ]);
+                ScanJobMedia::dispatch($media->getKey())->afterCommit();
+            }
+        } catch (\Throwable $exception) {
+            Storage::disk('private')->delete($storedPaths);
+            throw $exception;
         }
     }
 
@@ -332,7 +475,44 @@ class JobController extends Controller
             'skills' => Skill::query()->where('is_active', true)->orderBy('name_de')->get(),
             'languages' => Language::query()->orderBy('name_de')->get(),
             'locations' => $company->locations()->orderBy('name')->get(),
+            'templates' => JobTemplate::query()
+                ->where(function ($query) use ($company): void {
+                    $query->where('company_id', $company->getKey())
+                        ->orWhere(function ($global) use ($company): void {
+                            $global->whereNull('company_id')
+                                ->where(function ($allowed) use ($company): void {
+                                    $allowed->where('is_premium', false)
+                                        ->orWhere('plan_id', $company->current_plan_id);
+                                });
+                        });
+                })
+                ->orderBy('is_premium')
+                ->orderBy('name')
+                ->get(['id', 'name', 'content', 'is_premium', 'company_id', 'plan_id']),
         ];
+    }
+
+    private function assertTemplateAllowed(Company $company, mixed $templateId): void
+    {
+        if ($templateId === null) {
+            return;
+        }
+
+        $allowed = JobTemplate::query()
+            ->whereKey((int) $templateId)
+            ->where(function ($query) use ($company): void {
+                $query->where('company_id', $company->getKey())
+                    ->orWhere(function ($global) use ($company): void {
+                        $global->whereNull('company_id')
+                            ->where(function ($plans) use ($company): void {
+                                $plans->where('is_premium', false)
+                                    ->orWhere('plan_id', $company->current_plan_id);
+                            });
+                    });
+            })
+            ->exists();
+
+        abort_unless($allowed, 403, __('Diese Stellenvorlage ist für den aktuellen Tarif nicht verfügbar.'));
     }
 
     private function assertCanRecruit(Request $request, CurrentCompany $currentCompany): void
@@ -355,6 +535,40 @@ class JobController extends Controller
     private function assertOwned(JobPosting $job, int $companyId): void
     {
         abort_unless($job->company_id === $companyId, 404);
+    }
+
+    private function assertLocationBelongsToCompany(Company $company, ?int $locationId): void
+    {
+        if ($locationId !== null && ! $company->locations()->whereKey($locationId)->exists()) {
+            throw ValidationException::withMessages([
+                'location_id' => __('Der ausgewählte Standort gehört nicht zu diesem Unternehmen.'),
+            ]);
+        }
+    }
+
+    /** @param list<array<string, mixed>> $submitted */
+    private function assertScreeningQuestionsMutable(JobPosting $job, array $submitted): void
+    {
+        if (! $job->applications()->exists()) {
+            return;
+        }
+        $current = $job->screeningQuestions()->get()->map(fn ($question): array => [
+            'question' => $question->question,
+            'type' => $question->type,
+            'is_required' => (bool) $question->is_required,
+            'options' => array_values($question->options ?? []),
+        ])->values()->all();
+        $next = collect($submitted)->map(fn (array $question): array => [
+            'question' => $question['question'],
+            'type' => $question['type'],
+            'is_required' => (bool) ($question['is_required'] ?? false),
+            'options' => array_values($question['options'] ?? []),
+        ])->values()->all();
+        if ($current !== $next) {
+            throw ValidationException::withMessages([
+                'screening_questions' => __('Screening-Fragen können nach der ersten Bewerbung nicht mehr verändert werden, da Antworten revisionssicher erhalten bleiben müssen.'),
+            ]);
+        }
     }
 
     private function uniqueSlug(int $companyId, string $title): string

@@ -12,12 +12,14 @@ const props = withDefaults(
         maxFiles?: number;
         disabled?: boolean;
         compact?: boolean;
+        multiple?: boolean;
     }>(),
     {
         accept: '.jpg,.jpeg,.png,.gif,.pdf,.doc,.docx,.mp3,.m4a,.ogg,.wav,.webm',
         maxFiles: 8,
         disabled: false,
         compact: false,
+        multiple: true,
     },
 );
 
@@ -57,8 +59,8 @@ function removeFile(index: number): void {
             class="erin-focus relative inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl font-bold"
             :class="
                 compact
-                    ? 'size-9 text-slate-400 hover:bg-white hover:text-[var(--erin-primary)]'
-                    : 'min-h-10 border border-slate-200 bg-white px-3 text-xs text-slate-700 hover:border-blue-300 hover:text-blue-700'
+                    ? 'size-9 text-muted-foreground hover:bg-card hover:text-[var(--erin-primary-text)]'
+                    : 'min-h-10 border border-border bg-card px-3 text-xs text-muted-foreground hover:border-blue-300 hover:text-[var(--erin-primary-text-hover)]'
             "
             :aria-label="selectedLabel"
         >
@@ -74,7 +76,7 @@ function removeFile(index: number): void {
                 :id="id"
                 ref="input"
                 type="file"
-                multiple
+                :multiple="multiple"
                 class="sr-only"
                 :accept="accept"
                 :disabled="disabled"
@@ -90,12 +92,12 @@ function removeFile(index: number): void {
             <li
                 v-for="(file, index) in modelValue"
                 :key="`${file.name}-${file.size}-${index}`"
-                class="inline-flex max-w-full items-center gap-2 rounded-lg bg-slate-100 px-2.5 py-1.5 text-xs text-slate-700"
+                class="inline-flex max-w-full items-center gap-2 rounded-lg bg-muted px-2.5 py-1.5 text-xs text-muted-foreground"
             >
                 <span class="truncate">{{ file.name }}</span>
                 <button
                     type="button"
-                    class="erin-focus rounded text-slate-500 hover:text-red-600"
+                    class="erin-focus rounded text-muted-foreground hover:text-red-600"
                     :aria-label="`${removeLabel}: ${file.name}`"
                     :disabled="disabled"
                     @click="removeFile(index)"

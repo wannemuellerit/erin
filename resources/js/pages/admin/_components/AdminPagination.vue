@@ -13,10 +13,10 @@ const { t, formatNumber } = useAdminI18n();
 <template>
     <nav
         v-if="paginator.last_page > 1 || paginator.total > 0"
-        class="flex flex-col gap-3 border-t border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
+        class="flex flex-col gap-3 border-t border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
         :aria-label="t('pagination.aria')"
     >
-        <p class="text-xs text-slate-500">
+        <p class="text-xs text-muted-foreground">
             <template v-if="paginator.total > 0">
                 {{
                     t('pagination.summary', {
@@ -46,14 +46,14 @@ const { t, formatNumber } = useAdminI18n();
                     :class="
                         link.active
                             ? 'border-blue-600 bg-blue-600 text-white'
-                            : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700'
+                            : 'border-border bg-card text-muted-foreground hover:border-blue-200 hover:bg-blue-50 hover:text-[var(--erin-primary-text-hover)]'
                     "
                 >
                     <span v-html="link.label" />
                 </Link>
                 <span
                     v-else
-                    class="inline-flex min-h-9 min-w-9 cursor-not-allowed items-center justify-center rounded-lg border border-slate-100 px-2.5 text-xs font-bold text-slate-300"
+                    class="inline-flex min-h-9 min-w-9 cursor-not-allowed items-center justify-center rounded-lg border border-border bg-muted px-2.5 text-xs font-bold text-muted-foreground"
                 >
                     <span v-html="link.label" />
                 </span>

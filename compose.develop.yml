@@ -56,12 +56,11 @@ x-app-environment: &app-environment
   FILESYSTEM_DISK: s3
   PRIVATE_FILESYSTEM_DRIVER: s3
   PRIVATE_FILESYSTEM_PREFIX: ${PRIVATE_FILESYSTEM_PREFIX:-}
-  AWS_ACCESS_KEY_ID: ${MINIO_APP_USER:?MINIO_APP_USER must be set}
-  AWS_SECRET_ACCESS_KEY: ${MINIO_APP_PASSWORD:?MINIO_APP_PASSWORD must be set}
-  MINIO_APP_USER: ${MINIO_APP_USER:?MINIO_APP_USER must be set}
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?AWS_ACCESS_KEY_ID must be set}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?AWS_SECRET_ACCESS_KEY must be set}
   AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-eu-central-1}
   AWS_BUCKET: ${AWS_BUCKET:-erin-private}
-  AWS_ENDPOINT: http://minio:9000
+  AWS_ENDPOINT: ${AWS_ENDPOINT:?AWS_ENDPOINT must be set}
   AWS_USE_PATH_STYLE_ENDPOINT: "true"
   CLAMAV_HOST: clamav
   CLAMAV_PORT: 3310
@@ -235,8 +234,6 @@ x-app-service: &app-service
       condition: service_healthy
     meilisearch:
       condition: service_healthy
-    minio-init:
-      condition: service_completed_successfully
     clamav:
       condition: service_healthy
 
@@ -302,50 +299,6 @@ services:
       timeout: 5s
       retries: 20
 
-  minio:
-    image: minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
-    command: ["server", "/data", "--console-address", ":9001"]
-    restart: unless-stopped
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER must be set}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD must be set}
-    volumes:
-      - minio-data:/data
-    healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:9000/minio/health/ready"]
-      interval: 10s
-      timeout: 5s
-      retries: 20
-
-  minio-init:
-    image: minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
-    restart: "no"
-    depends_on:
-      minio:
-        condition: service_healthy
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER must be set}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD must be set}
-      MINIO_APP_USER: ${MINIO_APP_USER:?MINIO_APP_USER must be set}
-      MINIO_APP_PASSWORD: ${MINIO_APP_PASSWORD:?MINIO_APP_PASSWORD must be set}
-      AWS_BUCKET: ${AWS_BUCKET:-erin-private}
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - >
-        test "$${MINIO_APP_USER}" != "$${MINIO_ROOT_USER}" &&
-        test "$${MINIO_APP_PASSWORD}" != "$${MINIO_ROOT_PASSWORD}" &&
-        mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}" &&
-        mc mb --ignore-existing "local/$${AWS_BUCKET}" &&
-        mc anonymous set none "local/$${AWS_BUCKET}" &&
-        printf '%s\n'
-        "{\"Version\":\"2012-10-17\",\"Statement\":[
-        {\"Effect\":\"Allow\",\"Action\":[\"s3:GetBucketLocation\",\"s3:ListBucket\",\"s3:ListBucketMultipartUploads\"],\"Resource\":[\"arn:aws:s3:::$${AWS_BUCKET}\"]},
-        {\"Effect\":\"Allow\",\"Action\":[\"s3:GetObject\",\"s3:PutObject\",\"s3:DeleteObject\",\"s3:AbortMultipartUpload\",\"s3:ListMultipartUploadParts\"],\"Resource\":[\"arn:aws:s3:::$${AWS_BUCKET}/*\"]}
-        ]}" > /tmp/erin-app-bucket-policy.json &&
-        mc admin user add local "$${MINIO_APP_USER}" "$${MINIO_APP_PASSWORD}" &&
-        mc admin policy create local erin-app-bucket /tmp/erin-app-bucket-policy.json &&
-        mc admin policy attach local erin-app-bucket --user "$${MINIO_APP_USER}" &&
-        rm -f /tmp/erin-app-bucket-policy.json
 
   clamav:
     image: clamav/clamav:1.4@sha256:e7ead98e7e07231b151bce988e0cfb0a3b46e6e7046d9dd44fd838c0df724a03
@@ -462,6 +415,7 @@ volumes:
   mysql-data:
   redis-data:
   meilisearch-data:
+  # Retained for recovery of existing deployments; migrate data before switching storage.
   minio-data:
   clamav-data:
 

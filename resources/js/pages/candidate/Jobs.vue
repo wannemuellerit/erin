@@ -187,7 +187,7 @@ const employmentTypeLabel = (value: string) => {
             <template #actions>
                 <button
                     type="button"
-                    class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[var(--erin-primary)] px-4 text-sm font-bold text-white"
+                    class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[var(--erin-primary)] px-4 text-sm font-bold text-[var(--erin-primary-foreground)]"
                     @click="submitSearch"
                 >
                     {{ t('candidate.jobs.search') }}
@@ -208,7 +208,7 @@ const employmentTypeLabel = (value: string) => {
                 />
                 <button
                     type="button"
-                    class="text-xs font-bold text-slate-400"
+                    class="text-xs font-bold text-muted-foreground"
                     @click="router.get(jobsIndex.url())"
                 >
                     {{ t('candidate.jobs.clearFilters') }}
@@ -224,12 +224,14 @@ const employmentTypeLabel = (value: string) => {
             >
                 <div class="flex items-start gap-4">
                     <span
-                        class="grid size-12 shrink-0 place-items-center rounded-xl bg-blue-50 font-extrabold text-[var(--erin-primary)]"
+                        class="grid size-12 shrink-0 place-items-center rounded-xl bg-blue-50 font-extrabold text-[var(--erin-primary-text)]"
                         >{{ job.company?.name?.slice(0, 2) ?? 'ER' }}</span
                     >
                     <div class="min-w-0 flex-1">
                         <div class="flex flex-wrap items-center gap-2">
-                            <h2 class="text-base font-extrabold text-slate-950">
+                            <h2
+                                class="text-base font-extrabold text-foreground"
+                            >
                                 {{ job.title }}
                             </h2>
                             <StatusBadge
@@ -238,14 +240,16 @@ const employmentTypeLabel = (value: string) => {
                                 tone="orange"
                             />
                         </div>
-                        <p class="mt-1 text-xs font-medium text-slate-500">
+                        <p
+                            class="mt-1 text-xs font-medium text-muted-foreground"
+                        >
                             {{
                                 job.company?.name ??
                                 t('candidate.common.companyUnavailable')
                             }}
                         </p>
                         <div
-                            class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500"
+                            class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"
                         >
                             <span class="inline-flex items-center gap-1"
                                 ><MapPin
@@ -260,7 +264,7 @@ const employmentTypeLabel = (value: string) => {
                                 v-if="job.published_at"
                                 class="inline-flex items-center gap-1"
                                 ><Clock3
-                                    class="size-3.5 text-[var(--erin-primary)]"
+                                    class="size-3.5 text-[var(--erin-primary-text)]"
                                 />{{
                                     formatDate(job.published_at, {
                                         dateStyle: 'medium',
@@ -274,12 +278,14 @@ const employmentTypeLabel = (value: string) => {
                             class="block text-lg font-extrabold text-[var(--erin-secondary)]"
                             >{{ job.match.score ?? 0 }} %</span
                         ><span
-                            class="block text-[9px] font-bold text-slate-400 uppercase"
+                            class="block text-[9px] font-bold text-muted-foreground uppercase"
                             >{{ t('candidate.jobs.match') }}</span
                         >
                     </div>
                 </div>
-                <p class="mt-4 line-clamp-3 text-sm leading-6 text-slate-600">
+                <p
+                    class="mt-4 line-clamp-3 text-sm leading-6 text-muted-foreground"
+                >
                     {{
                         job.description ||
                         t('candidate.jobs.descriptionMissing')
@@ -289,7 +295,7 @@ const employmentTypeLabel = (value: string) => {
                     <span
                         v-for="skill in job.skills ?? []"
                         :key="skill.id"
-                        class="rounded-lg bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-600"
+                        class="rounded-lg bg-muted px-2.5 py-1 text-[10px] font-semibold text-muted-foreground"
                         >{{ localizedField(skill, 'name', skill.slug) }}</span
                     >
                     <span
@@ -299,16 +305,16 @@ const employmentTypeLabel = (value: string) => {
                     >
                 </div>
                 <div
-                    class="mt-5 flex items-center justify-between gap-3 border-t border-slate-100 pt-4"
+                    class="mt-5 flex items-center justify-between gap-3 border-t border-border pt-4"
                 >
-                    <p class="text-sm font-extrabold text-slate-800">
+                    <p class="text-sm font-extrabold text-foreground">
                         {{ money(job) }}
                     </p>
                     <button
                         v-if="!job.already_applied"
                         type="button"
                         :disabled="!can_apply"
-                        class="h-10 rounded-xl bg-[var(--erin-primary)] px-4 text-xs font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-200"
+                        class="h-10 rounded-xl bg-[var(--erin-primary)] px-4 text-xs font-bold text-[var(--erin-primary-foreground)] disabled:cursor-not-allowed disabled:bg-border"
                         @click="beginApplication(job)"
                     >
                         {{
@@ -324,7 +330,7 @@ const employmentTypeLabel = (value: string) => {
                     />
                     <Link
                         :href="show.url(job.id)"
-                        class="h-10 rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700"
+                        class="h-10 rounded-xl border border-border px-4 py-2.5 text-xs font-bold text-muted-foreground hover:border-blue-300 hover:text-[var(--erin-primary-text-hover)]"
                     >
                         {{ t('candidate.jobDetail.overview') }}
                     </Link>
@@ -337,7 +343,7 @@ const employmentTypeLabel = (value: string) => {
                     <div>
                         <label
                             :for="`cover-letter-${job.id}`"
-                            class="text-xs font-bold text-slate-700"
+                            class="text-xs font-bold text-muted-foreground"
                         >
                             {{ t('candidate.jobs.coverLetter') }}
                         </label>
@@ -345,7 +351,7 @@ const employmentTypeLabel = (value: string) => {
                             :id="`cover-letter-${job.id}`"
                             v-model="applicationForm.cover_letter"
                             rows="4"
-                            class="erin-focus mt-1.5 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm"
+                            class="erin-focus mt-1.5 w-full rounded-xl border border-border bg-card p-3 text-sm"
                             :placeholder="
                                 t('candidate.jobs.coverLetterPlaceholder')
                             "
@@ -358,7 +364,7 @@ const employmentTypeLabel = (value: string) => {
                     >
                         <label
                             :for="`screening-${job.id}-${question.id}`"
-                            class="text-xs font-bold text-slate-700"
+                            class="text-xs font-bold text-muted-foreground"
                         >
                             {{ question.question }}
                             <span
@@ -373,7 +379,7 @@ const employmentTypeLabel = (value: string) => {
                             v-model="applicationForm.answers[index].answer"
                             :required="question.is_required"
                             rows="3"
-                            class="erin-focus mt-1.5 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm"
+                            class="erin-focus mt-1.5 w-full rounded-xl border border-border bg-card p-3 text-sm"
                         />
                     </div>
                     <p
@@ -385,7 +391,7 @@ const employmentTypeLabel = (value: string) => {
                     <div class="flex justify-end gap-2">
                         <button
                             type="button"
-                            class="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-600"
+                            class="h-9 rounded-xl border border-border bg-card px-3 text-xs font-bold text-muted-foreground"
                             @click="applyingJobId = null"
                         >
                             {{ t('candidate.jobs.cancel') }}
@@ -393,7 +399,7 @@ const employmentTypeLabel = (value: string) => {
                         <button
                             type="submit"
                             :disabled="applicationForm.processing"
-                            class="h-9 rounded-xl bg-[var(--erin-primary)] px-4 text-xs font-bold text-white disabled:opacity-50"
+                            class="h-9 rounded-xl bg-[var(--erin-primary)] px-4 text-xs font-bold text-[var(--erin-primary-foreground)] disabled:opacity-50"
                         >
                             {{ t('candidate.jobs.submit') }}
                         </button>
@@ -406,11 +412,13 @@ const employmentTypeLabel = (value: string) => {
             class="erin-panel grid min-h-80 place-items-center p-8 text-center"
         >
             <div>
-                <BriefcaseBusiness class="mx-auto size-9 text-slate-300" />
+                <BriefcaseBusiness
+                    class="mx-auto size-9 text-muted-foreground"
+                />
                 <h2 class="mt-4 font-bold">
                     {{ t('candidate.jobs.emptyTitle') }}
                 </h2>
-                <p class="mt-2 max-w-md text-sm text-slate-500">
+                <p class="mt-2 max-w-md text-sm text-muted-foreground">
                     {{ t('candidate.jobs.emptyDescription') }}
                 </p>
             </div>

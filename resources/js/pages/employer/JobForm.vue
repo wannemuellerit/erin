@@ -1,18 +1,16 @@
 <script setup lang="ts">
-import { Head, Link, useForm } from '@inertiajs/vue3';
-import {
-    ArrowLeft,
-    FilePlus2,
-    ImagePlus,
-    Save,
-    Sparkles,
-    WandSparkles,
-} from '@lucide/vue';
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { ArrowLeft, Save, Sparkles, WandSparkles } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import PageHeader from '@/components/product/PageHeader.vue';
+import FileAttachmentPicker from '@/components/product/FileAttachmentPicker.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
+import StatusBadge from '@/components/product/StatusBadge.vue';
 import Textarea from '@/components/product/Textarea.vue';
+import JobScreeningQuestions from '@/components/employer/JobScreeningQuestions.vue';
+import type { ScreeningQuestionDraft } from '@/components/employer/JobScreeningQuestions.vue';
+import { Button } from '@/components/ui/button';
 import { useLocalizedField } from '@/composables/useLocalizedField';
 import { useStatusLabels } from '@/composables/useStatusLabels';
 import { run as runAi } from '@/routes/ai';
@@ -31,10 +29,20 @@ type Job = {
     status?: string;
     position?: string;
     description?: string;
+    summary?: string | null;
+    responsibilities?: string | null;
+    requirements?: string | null;
+    benefits?: string | null;
     occupation_id?: number | null;
     location_id?: number | null;
+    target_country_code?: string | null;
     expected_experience_years?: number | null;
     language_notes?: string | null;
+    application_deadline?: string | null;
+    start_date?: string | null;
+    vacancies?: number;
+    contact_name?: string | null;
+    contact_email?: string | null;
     hours_min?: number | null;
     hours_max?: number | null;
     employment_type?: string;
@@ -42,6 +50,7 @@ type Job = {
     compensation_max_cents?: number | null;
     currency?: string;
     compensation_interval?: string;
+    salary_visible?: boolean;
     is_remote?: boolean;
     visa_package_available?: boolean;
     skills?: Array<{
@@ -61,6 +70,38 @@ type Job = {
         is_required?: boolean;
         options?: string[] | null;
     }>;
+    translations?: Record<
+        string,
+        { title?: string; position?: string; description?: string }
+    >;
+    media?: Array<{
+        id: number;
+        original_name: string;
+        scan_result?: string | null;
+        size_bytes?: number | null;
+        download_url?: string | null;
+    }>;
+};
+
+type JobTemplate = {
+    id: number;
+    name: string;
+    is_premium: boolean;
+    content: Partial<{
+        title: string;
+        position: string;
+        description: string;
+        employment_type: string;
+        hours_min: number;
+        hours_max: number;
+        language_notes: string;
+        screening_questions: Array<{
+            question: string;
+            type: string;
+            is_required: boolean;
+            options?: string[];
+        }>;
+    }>;
 };
 
 const props = withDefaults(
@@ -70,6 +111,7 @@ const props = withDefaults(
         skills?: Option[];
         languages?: Option[];
         locations?: Option[];
+        templates?: JobTemplate[];
     }>(),
     {
         job: null,
@@ -77,6 +119,7 @@ const props = withDefaults(
         skills: () => [],
         languages: () => [],
         locations: () => [],
+        templates: () => [],
     },
 );
 const { t } = useI18n();
@@ -93,7 +136,7 @@ const headerTitle = computed(() =>
         ? t('employer.jobForm.editTitle')
         : t('employer.jobForm.createTitle'),
 );
-const screeningQuestions = ref(
+const screeningQuestions = ref<ScreeningQuestionDraft[]>(
     props.job?.screening_questions?.map((question) => ({
         question: question.question ?? '',
         type: question.type ?? 'text',
@@ -102,14 +145,25 @@ const screeningQuestions = ref(
     })) ?? [],
 );
 const form = useForm({
+    template_id: null as number | null,
     title: props.job?.title ?? '',
     position: props.job?.position ?? '',
+    summary: props.job?.summary ?? '',
     description: props.job?.description ?? '',
+    responsibilities: props.job?.responsibilities ?? '',
+    requirements: props.job?.requirements ?? '',
+    benefits: props.job?.benefits ?? '',
     occupation_id: props.job?.occupation_id ?? (null as number | null),
     location_id: props.job?.location_id ?? (null as number | null),
+    target_country_code: props.job?.target_country_code ?? 'DE',
     expected_experience_years:
         props.job?.expected_experience_years ?? (null as number | null),
     language_notes: props.job?.language_notes ?? '',
+    application_deadline: props.job?.application_deadline?.slice(0, 10) ?? '',
+    start_date: props.job?.start_date?.slice(0, 10) ?? '',
+    vacancies: props.job?.vacancies ?? 1,
+    contact_name: props.job?.contact_name ?? '',
+    contact_email: props.job?.contact_email ?? '',
     hours_min: props.job?.hours_min ?? (null as number | null),
     hours_max: props.job?.hours_max ?? (null as number | null),
     employment_type: props.job?.employment_type ?? 'full_time',
@@ -119,6 +173,7 @@ const form = useForm({
         props.job?.compensation_max_cents ?? (null as number | null),
     currency: props.job?.currency ?? 'EUR',
     compensation_interval: props.job?.compensation_interval ?? 'year',
+    salary_visible: props.job?.salary_visible ?? true,
     is_remote: props.job?.is_remote ?? false,
     visa_package_available: props.job?.visa_package_available ?? false,
     skills:
@@ -135,20 +190,33 @@ const form = useForm({
             is_required: language.pivot?.is_required ?? true,
         })) ?? [],
     screening_questions: screeningQuestions.value,
+    translations: {
+        de: {
+            title: props.job?.translations?.de?.title ?? props.job?.title ?? '',
+            position:
+                props.job?.translations?.de?.position ??
+                props.job?.position ??
+                '',
+            description:
+                props.job?.translations?.de?.description ??
+                props.job?.description ??
+                '',
+        },
+        en: {
+            title: props.job?.translations?.en?.title ?? '',
+            position: props.job?.translations?.en?.position ?? '',
+            description: props.job?.translations?.en?.description ?? '',
+        },
+    },
     media: [] as File[],
 });
-const addQuestion = () => {
-    if (screeningQuestions.value.length < 5) {
-        screeningQuestions.value.push({
-            question: '',
-            type: 'text',
-            is_required: false,
-            options: [],
-        });
-    }
-};
 const submit = () => {
     form.screening_questions = screeningQuestions.value;
+    form.translations.de = {
+        title: form.title,
+        position: form.position,
+        description: form.description,
+    };
 
     if (props.job) {
         form.put(update.url(props.job.id), {
@@ -161,8 +229,53 @@ const submit = () => {
 
     form.post(store.url(), { forceFormData: true });
 };
-const setMedia = (event: Event) => {
-    form.media = Array.from((event.target as HTMLInputElement).files ?? []);
+const applyTemplate = () => {
+    const template = props.templates.find(
+        (candidate) => candidate.id === form.template_id,
+    );
+
+    if (!template) {
+        return;
+    }
+
+    if (template.content.title !== undefined) {
+        form.title = template.content.title;
+    }
+
+    if (template.content.position !== undefined) {
+        form.position = template.content.position;
+    }
+
+    if (template.content.description !== undefined) {
+        form.description = template.content.description;
+    }
+
+    if (template.content.employment_type !== undefined) {
+        form.employment_type = template.content.employment_type;
+    }
+
+    if (template.content.hours_min !== undefined) {
+        form.hours_min = template.content.hours_min;
+    }
+
+    if (template.content.hours_max !== undefined) {
+        form.hours_max = template.content.hours_max;
+    }
+
+    if (template.content.language_notes !== undefined) {
+        form.language_notes = template.content.language_notes;
+    }
+
+    if (template.content.screening_questions) {
+        screeningQuestions.value = template.content.screening_questions
+            .slice(0, 5)
+            .map((question) => ({
+                question: question.question,
+                type: question.type,
+                is_required: question.is_required,
+                options: question.options ?? [],
+            }));
+    }
 };
 const aiRunning = ref<'job_create' | 'job_improve' | null>(null);
 const aiError = ref('');
@@ -236,7 +349,7 @@ const useAi = async (task: 'job_create' | 'job_improve') => {
     }
 };
 const fieldClass =
-    'erin-focus mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-900 placeholder:text-slate-400';
+    'erin-focus mt-1.5 h-11 w-full rounded-xl border border-border bg-card px-3.5 text-sm text-foreground placeholder:text-muted-foreground';
 </script>
 
 <template>
@@ -244,7 +357,7 @@ const fieldClass =
     <div class="erin-page">
         <Link
             :href="jobsIndex()"
-            class="inline-flex w-fit items-center gap-2 text-xs font-bold text-slate-500 hover:text-[var(--erin-primary)]"
+            class="inline-flex w-fit items-center gap-2 text-xs font-bold text-muted-foreground hover:text-[var(--erin-primary-text)]"
             ><ArrowLeft class="size-4" />
             {{ t('employer.jobForm.backToJobs') }}</Link
         >
@@ -275,12 +388,55 @@ const fieldClass =
         >
             <div class="space-y-6">
                 <SectionCard
+                    v-if="templates.length"
+                    :title="t('employer.jobForm.templatesTitle')"
+                    :description="t('employer.jobForm.templatesDescription')"
+                >
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
+                        <label class="flex-1">
+                            <span
+                                class="text-sm font-bold text-muted-foreground"
+                                >{{ t('employer.jobForm.template') }}</span
+                            >
+                            <select
+                                v-model="form.template_id"
+                                :class="fieldClass"
+                            >
+                                <option :value="null">
+                                    {{ t('employer.jobForm.noTemplate') }}
+                                </option>
+                                <option
+                                    v-for="template in templates"
+                                    :key="template.id"
+                                    :value="template.id"
+                                >
+                                    {{ template.name
+                                    }}{{
+                                        template.is_premium
+                                            ? ` · ${t('employer.jobForm.premiumTemplate')}`
+                                            : ''
+                                    }}
+                                </option>
+                            </select>
+                        </label>
+                        <button
+                            type="button"
+                            :disabled="form.template_id === null"
+                            class="h-11 rounded-xl border border-blue-200 px-4 text-sm font-bold text-[var(--erin-primary-text-hover)] disabled:opacity-50"
+                            @click="applyTemplate"
+                        >
+                            {{ t('employer.jobForm.applyTemplate') }}
+                        </button>
+                    </div>
+                </SectionCard>
+                <SectionCard
                     :title="t('employer.jobForm.basicsTitle')"
                     :description="t('employer.jobForm.basicsDescription')"
                 >
                     <div class="grid gap-5 sm:grid-cols-2">
                         <label class="sm:col-span-2"
-                            ><span class="text-sm font-bold text-slate-700"
+                            ><span
+                                class="text-sm font-bold text-muted-foreground"
                                 >{{
                                     t('employer.jobForm.fields.title')
                                 }}
@@ -299,7 +455,8 @@ const fieldClass =
                             ></label
                         >
                         <label
-                            ><span class="text-sm font-bold text-slate-700"
+                            ><span
+                                class="text-sm font-bold text-muted-foreground"
                                 >{{
                                     t('employer.jobForm.fields.position')
                                 }}
@@ -313,9 +470,12 @@ const fieldClass =
                                 "
                         /></label>
                         <label
-                            ><span class="text-sm font-bold text-slate-700">{{
-                                t('employer.jobForm.fields.occupation')
-                            }}</span
+                            ><span
+                                class="text-sm font-bold text-muted-foreground"
+                                >{{
+                                    t('employer.jobForm.fields.occupation')
+                                }}
+                                *</span
                             ><select
                                 v-model="form.occupation_id"
                                 :class="fieldClass"
@@ -338,10 +498,29 @@ const fieldClass =
                                 </option>
                             </select></label
                         >
+                        <label>
+                            <span
+                                class="text-sm font-bold text-muted-foreground"
+                                >{{
+                                    t('employer.jobForm.fields.targetCountry')
+                                }}</span
+                            >
+                            <input
+                                v-model="form.target_country_code"
+                                :class="fieldClass"
+                                maxlength="2"
+                                required
+                            />
+                        </label>
                         <label
-                            ><span class="text-sm font-bold text-slate-700">{{
-                                t('employer.jobForm.fields.expectedExperience')
-                            }}</span
+                            ><span
+                                class="text-sm font-bold text-muted-foreground"
+                                >{{
+                                    t(
+                                        'employer.jobForm.fields.expectedExperience',
+                                    )
+                                }}
+                                *</span
                             ><input
                                 v-model.number="form.expected_experience_years"
                                 :class="fieldClass"
@@ -350,9 +529,19 @@ const fieldClass =
                                 max="60"
                         /></label>
                         <label
-                            ><span class="text-sm font-bold text-slate-700">{{
-                                t('employer.jobForm.fields.languageRequirement')
-                            }}</span
+                            class="flex items-center gap-2 pt-7 text-sm font-semibold text-muted-foreground"
+                        >
+                            <input v-model="form.is_remote" type="checkbox" />
+                            {{ t('employer.jobForm.fields.remote') }}
+                        </label>
+                        <label
+                            ><span
+                                class="text-sm font-bold text-muted-foreground"
+                                >{{
+                                    t(
+                                        'employer.jobForm.fields.languageRequirement',
+                                    )
+                                }}</span
                             ><input
                                 v-model="form.language_notes"
                                 :class="fieldClass"
@@ -361,9 +550,12 @@ const fieldClass =
                                 "
                         /></label>
                         <label
-                            ><span class="text-sm font-bold text-slate-700">{{
-                                t('employer.jobForm.fields.hoursFrom')
-                            }}</span
+                            ><span
+                                class="text-sm font-bold text-muted-foreground"
+                                >{{
+                                    t('employer.jobForm.fields.hoursFrom')
+                                }}
+                                *</span
                             ><input
                                 v-model.number="form.hours_min"
                                 :class="fieldClass"
@@ -372,9 +564,12 @@ const fieldClass =
                                 max="80"
                         /></label>
                         <label
-                            ><span class="text-sm font-bold text-slate-700">{{
-                                t('employer.jobForm.fields.hoursTo')
-                            }}</span
+                            ><span
+                                class="text-sm font-bold text-muted-foreground"
+                                >{{
+                                    t('employer.jobForm.fields.hoursTo')
+                                }}
+                                *</span
                             ><input
                                 v-model.number="form.hours_max"
                                 :class="fieldClass"
@@ -383,9 +578,11 @@ const fieldClass =
                                 max="80"
                         /></label>
                         <label
-                            ><span class="text-sm font-bold text-slate-700">{{
-                                t('employer.jobForm.fields.employmentType')
-                            }}</span
+                            ><span
+                                class="text-sm font-bold text-muted-foreground"
+                                >{{
+                                    t('employer.jobForm.fields.employmentType')
+                                }}</span
                             ><select
                                 v-model="form.employment_type"
                                 :class="fieldClass"
@@ -421,9 +618,12 @@ const fieldClass =
                             </select></label
                         >
                         <label
-                            ><span class="text-sm font-bold text-slate-700">{{
-                                t('employer.jobForm.fields.location')
-                            }}</span
+                            ><span
+                                class="text-sm font-bold text-muted-foreground"
+                                >{{ t('employer.jobForm.fields.location') }}
+                                <template v-if="!form.is_remote"
+                                    >*</template
+                                ></span
                             ><select
                                 v-model="form.location_id"
                                 :class="fieldClass"
@@ -441,12 +641,24 @@ const fieldClass =
                                         · {{ location.city }}</template
                                     >
                                 </option>
-                            </select></label
+                            </select>
+                            <a
+                                v-if="locations.length === 0"
+                                href="/employer/company"
+                                class="mt-2 block text-xs text-[var(--erin-primary-text)] underline"
+                            >
+                                {{ t('employer.companyProfile.addLocation') }}
+                            </a></label
                         >
                         <label
-                            ><span class="text-sm font-bold text-slate-700">{{
-                                t('employer.jobForm.fields.compensationFrom')
-                            }}</span
+                            ><span
+                                class="text-sm font-bold text-muted-foreground"
+                                >{{
+                                    t(
+                                        'employer.jobForm.fields.compensationFrom',
+                                    )
+                                }}
+                                *</span
                             ><input
                                 v-model.number="form.compensation_min_cents"
                                 :class="fieldClass"
@@ -454,9 +666,103 @@ const fieldClass =
                                 min="0"
                         /></label>
                         <label
-                            ><span class="text-sm font-bold text-slate-700">{{
-                                t('employer.jobForm.fields.compensationTo')
-                            }}</span
+                            ><span
+                                class="text-sm font-bold text-muted-foreground"
+                                >{{
+                                    t(
+                                        'employer.jobForm.fields.compensationInterval',
+                                    )
+                                }}
+                                *</span
+                            ><select
+                                v-model="form.compensation_interval"
+                                :class="fieldClass"
+                            >
+                                <option value="hour">
+                                    {{ t('employer.jobForm.intervals.hour') }}
+                                </option>
+                                <option value="month">
+                                    {{ t('employer.jobForm.intervals.month') }}
+                                </option>
+                                <option value="year">
+                                    {{ t('employer.jobForm.intervals.year') }}
+                                </option>
+                            </select></label
+                        >
+                        <label
+                            ><span
+                                class="text-sm font-bold text-muted-foreground"
+                                >{{
+                                    t('employer.jobForm.fields.vacancies')
+                                }}
+                                *</span
+                            ><input
+                                v-model.number="form.vacancies"
+                                :class="fieldClass"
+                                type="number"
+                                min="1"
+                                max="500"
+                        /></label>
+                        <label
+                            ><span
+                                class="text-sm font-bold text-muted-foreground"
+                                >{{
+                                    t(
+                                        'employer.jobForm.fields.applicationDeadline',
+                                    )
+                                }}</span
+                            ><input
+                                v-model="form.application_deadline"
+                                :class="fieldClass"
+                                type="date"
+                        /></label>
+                        <label
+                            ><span
+                                class="text-sm font-bold text-muted-foreground"
+                                >{{
+                                    t('employer.jobForm.fields.startDate')
+                                }}</span
+                            ><input
+                                v-model="form.start_date"
+                                :class="fieldClass"
+                                type="date"
+                        /></label>
+                        <label
+                            ><span
+                                class="text-sm font-bold text-muted-foreground"
+                                >{{
+                                    t('employer.jobForm.fields.contactName')
+                                }}</span
+                            ><input
+                                v-model="form.contact_name"
+                                :class="fieldClass"
+                        /></label>
+                        <label
+                            ><span
+                                class="text-sm font-bold text-muted-foreground"
+                                >{{
+                                    t('employer.jobForm.fields.contactEmail')
+                                }}</span
+                            ><input
+                                v-model="form.contact_email"
+                                :class="fieldClass"
+                                type="email"
+                        /></label>
+                        <label
+                            class="flex items-center gap-2 text-sm font-semibold text-muted-foreground sm:col-span-2"
+                            ><input
+                                v-model="form.salary_visible"
+                                type="checkbox"
+                            />{{
+                                t('employer.jobForm.fields.salaryVisible')
+                            }}</label
+                        >
+                        <label
+                            ><span
+                                class="text-sm font-bold text-muted-foreground"
+                                >{{
+                                    t('employer.jobForm.fields.compensationTo')
+                                }}</span
                             ><input
                                 v-model.number="form.compensation_max_cents"
                                 :class="fieldClass"
@@ -471,9 +777,23 @@ const fieldClass =
                         t('employer.jobForm.jobDescriptionDescription')
                     "
                 >
-                    <div class="rounded-xl border border-slate-200">
+                    <label
+                        class="mb-5 block text-sm font-bold text-muted-foreground"
+                    >
+                        {{ t('employer.jobForm.fields.summary') }} *
+                        <Textarea
+                            v-model="form.summary"
+                            required
+                            rows="3"
+                            class="mt-1.5"
+                            :placeholder="
+                                t('employer.jobForm.placeholders.summary')
+                            "
+                        />
+                    </label>
+                    <div class="rounded-xl border border-border">
                         <div
-                            class="flex justify-end border-b border-slate-200 bg-slate-50 p-2"
+                            class="flex justify-end border-b border-border bg-muted p-2"
                         >
                             <button
                                 type="button"
@@ -502,6 +822,36 @@ const fieldClass =
                             "
                         />
                     </div>
+                    <div class="mt-5 grid gap-5 lg:grid-cols-2">
+                        <label class="text-sm font-bold text-foreground"
+                            >{{
+                                t('employer.jobForm.fields.responsibilities')
+                            }}
+                            *<Textarea
+                                v-model="form.responsibilities"
+                                required
+                                rows="7"
+                                class="mt-1.5"
+                        /></label>
+                        <label class="text-sm font-bold text-foreground"
+                            >{{
+                                t('employer.jobForm.fields.requirements')
+                            }}
+                            *<Textarea
+                                v-model="form.requirements"
+                                required
+                                rows="7"
+                                class="mt-1.5"
+                        /></label>
+                        <label
+                            class="text-sm font-bold text-foreground lg:col-span-2"
+                            >{{ t('employer.jobForm.fields.benefits')
+                            }}<Textarea
+                                v-model="form.benefits"
+                                rows="5"
+                                class="mt-1.5"
+                        /></label>
+                    </div>
                     <p
                         v-if="aiError"
                         class="mt-3 text-xs font-bold text-red-600"
@@ -528,6 +878,214 @@ const fieldClass =
                     </div>
                 </SectionCard>
                 <SectionCard
+                    :title="t('employer.jobForm.qualificationsTitle')"
+                    :description="
+                        t('employer.jobForm.qualificationsDescription')
+                    "
+                >
+                    <div class="grid gap-6 lg:grid-cols-2">
+                        <div>
+                            <p
+                                class="mb-3 text-sm font-bold text-muted-foreground"
+                            >
+                                {{ t('employer.jobForm.skills') }} *
+                            </p>
+                            <div class="space-y-2">
+                                <label
+                                    v-for="skill in skills"
+                                    :key="skill.id"
+                                    class="flex items-center gap-3 rounded-xl border border-border p-3 text-sm"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        :checked="
+                                            form.skills.some(
+                                                (item) => item.id === skill.id,
+                                            )
+                                        "
+                                        @change="
+                                            form.skills = form.skills.some(
+                                                (item) => item.id === skill.id,
+                                            )
+                                                ? form.skills.filter(
+                                                      (item) =>
+                                                          item.id !== skill.id,
+                                                  )
+                                                : [
+                                                      ...form.skills,
+                                                      {
+                                                          id: skill.id,
+                                                          importance: 3,
+                                                          minimum_experience_years:
+                                                              null,
+                                                      },
+                                                  ]
+                                        "
+                                    />
+                                    <span class="flex-1 font-semibold">{{
+                                        localizedField(
+                                            skill,
+                                            'name',
+                                            skill.name ?? '',
+                                        )
+                                    }}</span>
+                                    <select
+                                        v-if="
+                                            form.skills.some(
+                                                (item) => item.id === skill.id,
+                                            )
+                                        "
+                                        v-model.number="
+                                            form.skills.find(
+                                                (item) => item.id === skill.id,
+                                            )!.importance
+                                        "
+                                        class="h-8 rounded-lg border border-border px-2 text-xs"
+                                    >
+                                        <option
+                                            v-for="importance in 5"
+                                            :key="importance"
+                                            :value="importance"
+                                        >
+                                            {{
+                                                t(
+                                                    'employer.jobForm.importance',
+                                                    { value: importance },
+                                                )
+                                            }}
+                                        </option>
+                                    </select>
+                                </label>
+                            </div>
+                        </div>
+                        <div>
+                            <p
+                                class="mb-3 text-sm font-bold text-muted-foreground"
+                            >
+                                {{ t('employer.jobForm.languages') }} *
+                            </p>
+                            <div class="space-y-2">
+                                <label
+                                    v-for="language in languages"
+                                    :key="language.id"
+                                    class="flex items-center gap-3 rounded-xl border border-border p-3 text-sm"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        :checked="
+                                            form.languages.some(
+                                                (item) =>
+                                                    item.id === language.id,
+                                            )
+                                        "
+                                        @change="
+                                            form.languages =
+                                                form.languages.some(
+                                                    (item) =>
+                                                        item.id === language.id,
+                                                )
+                                                    ? form.languages.filter(
+                                                          (item) =>
+                                                              item.id !==
+                                                              language.id,
+                                                      )
+                                                    : [
+                                                          ...form.languages,
+                                                          {
+                                                              id: language.id,
+                                                              minimum_level:
+                                                                  'B1',
+                                                              is_required: true,
+                                                          },
+                                                      ]
+                                        "
+                                    />
+                                    <span class="flex-1 font-semibold">{{
+                                        localizedField(
+                                            language,
+                                            'name',
+                                            language.name ?? '',
+                                        )
+                                    }}</span>
+                                    <select
+                                        v-if="
+                                            form.languages.some(
+                                                (item) =>
+                                                    item.id === language.id,
+                                            )
+                                        "
+                                        v-model="
+                                            form.languages.find(
+                                                (item) =>
+                                                    item.id === language.id,
+                                            )!.minimum_level
+                                        "
+                                        class="h-8 rounded-lg border border-border px-2 text-xs"
+                                    >
+                                        <option
+                                            v-for="level in [
+                                                'A1',
+                                                'A2',
+                                                'B1',
+                                                'B2',
+                                                'C1',
+                                                'C2',
+                                            ]"
+                                            :key="level"
+                                        >
+                                            {{ level }}
+                                        </option>
+                                    </select>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </SectionCard>
+                <SectionCard
+                    :title="t('employer.jobForm.translationsTitle')"
+                    :description="t('employer.jobForm.translationsDescription')"
+                >
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <label>
+                            <span
+                                class="text-sm font-bold text-muted-foreground"
+                                >{{ t('employer.jobForm.englishTitle') }}</span
+                            >
+                            <input
+                                v-model="form.translations.en.title"
+                                :class="fieldClass"
+                                maxlength="180"
+                            />
+                        </label>
+                        <label>
+                            <span
+                                class="text-sm font-bold text-muted-foreground"
+                                >{{
+                                    t('employer.jobForm.englishPosition')
+                                }}</span
+                            >
+                            <input
+                                v-model="form.translations.en.position"
+                                :class="fieldClass"
+                                maxlength="180"
+                            />
+                        </label>
+                        <label class="sm:col-span-2">
+                            <span
+                                class="text-sm font-bold text-muted-foreground"
+                                >{{
+                                    t('employer.jobForm.englishDescription')
+                                }}</span
+                            >
+                            <Textarea
+                                v-model="form.translations.en.description"
+                                rows="7"
+                                class="mt-1.5"
+                            />
+                        </label>
+                    </div>
+                </SectionCard>
+                <SectionCard
                     :title="t('employer.jobForm.screeningTitle')"
                     :description="
                         t('employer.jobForm.screeningDescription', {
@@ -536,88 +1094,69 @@ const fieldClass =
                         })
                     "
                 >
-                    <div class="space-y-3">
-                        <div
-                            v-for="(question, index) in screeningQuestions"
-                            :key="index"
-                            class="flex items-center gap-3"
-                        >
-                            <span
-                                class="grid size-8 shrink-0 place-items-center rounded-lg bg-slate-100 text-xs font-bold text-slate-500"
-                                >{{ index + 1 }}</span
-                            ><input
-                                v-model="question.question"
-                                required
-                                class="erin-focus h-10 flex-1 rounded-xl border border-slate-200 px-3 text-sm"
-                            /><select
-                                v-model="question.type"
-                                class="h-10 rounded-xl border border-slate-200 px-2 text-xs"
-                            >
-                                <option value="text">
-                                    {{
-                                        t('employer.jobForm.questionTypes.text')
-                                    }}
-                                </option>
-                                <option value="yes_no">
-                                    {{
-                                        t(
-                                            'employer.jobForm.questionTypes.yesNo',
-                                        )
-                                    }}
-                                </option>
-                                <option value="choice">
-                                    {{
-                                        t(
-                                            'employer.jobForm.questionTypes.choice',
-                                        )
-                                    }}
-                                </option></select
-                            ><button
-                                type="button"
-                                class="text-xs font-bold text-red-500"
-                                @click="screeningQuestions.splice(index, 1)"
-                            >
-                                {{ t('employer.jobForm.remove') }}
-                            </button>
-                        </div>
-                    </div>
-                    <button
-                        v-if="screeningQuestions.length < 5"
-                        type="button"
-                        class="mt-4 inline-flex h-9 items-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 text-xs font-bold text-slate-600 hover:bg-slate-50"
-                        @click="addQuestion"
-                    >
-                        <FilePlus2 class="size-4" />
-                        {{ t('employer.jobForm.addQuestion') }}
-                    </button>
+                    <JobScreeningQuestions v-model="screeningQuestions" />
                 </SectionCard>
                 <SectionCard :title="t('employer.jobForm.mediaTitle')">
-                    <label
-                        class="flex min-h-32 w-full cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 text-center hover:border-blue-300 hover:bg-blue-50/40"
-                        ><ImagePlus
-                            class="size-6 text-[var(--erin-primary)]" /><span
-                            class="mt-2 text-sm font-bold text-slate-700"
-                            >{{ t('employer.jobForm.chooseFiles') }}</span
-                        ><span class="mt-1 text-xs text-slate-400">{{
-                            t('employer.jobForm.fileRequirements')
-                        }}</span
-                        ><input
-                            class="sr-only"
-                            type="file"
-                            multiple
-                            accept=".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx"
-                            @change="setMedia"
-                    /></label>
+                    <div v-if="job?.media?.length" class="mb-4 space-y-2">
+                        <div
+                            v-for="medium in job.media"
+                            :key="medium.id"
+                            class="flex items-center gap-3 rounded-xl border border-border p-3 text-sm"
+                        >
+                            <span
+                                class="min-w-0 flex-1 truncate font-semibold"
+                                >{{ medium.original_name }}</span
+                            >
+                            <StatusBadge
+                                :label="medium.scan_result ?? 'pending'"
+                                :tone="
+                                    medium.scan_result === 'clean'
+                                        ? 'green'
+                                        : 'yellow'
+                                "
+                            />
+                            <a
+                                v-if="medium.download_url"
+                                :href="medium.download_url"
+                                class="text-xs font-bold text-blue-600"
+                                >{{ t('employer.jobForm.download') }}</a
+                            >
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                class="text-red-600"
+                                @click="
+                                    router.delete(
+                                        `/employer/jobs/${job!.id}/media/${medium.id}`,
+                                        { preserveScroll: true },
+                                    )
+                                "
+                                >{{ t('employer.jobForm.remove') }}</Button
+                            >
+                        </div>
+                    </div>
+                    <FileAttachmentPicker
+                        id="job-media"
+                        v-model="form.media"
+                        :max-files="10"
+                        accept=".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx"
+                        :label="t('employer.jobForm.chooseFiles')"
+                        :remove-label="t('employer.jobForm.removeFile')"
+                    />
+                    <p class="mt-2 text-xs text-slate-400">
+                        {{ t('employer.jobForm.fileRequirements') }}
+                    </p>
                 </SectionCard>
             </div>
             <aside class="space-y-4 xl:sticky xl:top-24 xl:self-start">
                 <SectionCard :title="t('employer.jobForm.publishingTitle')">
                     <div class="space-y-3 text-xs">
                         <div class="flex justify-between">
-                            <span class="text-slate-500">{{
+                            <span class="text-muted-foreground">{{
                                 t('employer.jobForm.status')
                             }}</span
-                            ><span class="font-bold text-slate-700">{{
+                            ><span class="font-bold text-muted-foreground">{{
                                 statusLabel('job', job?.status ?? 'draft')
                             }}</span>
                         </div>
@@ -626,7 +1165,7 @@ const fieldClass =
                         <button
                             type="submit"
                             :disabled="form.processing"
-                            class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[var(--erin-primary)] text-sm font-bold text-white hover:bg-[var(--erin-primary-hover)] disabled:opacity-50"
+                            class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[var(--erin-primary)] text-sm font-bold text-[var(--erin-primary-foreground)] hover:bg-[var(--erin-primary-hover)] disabled:opacity-50"
                         >
                             <Save class="size-4" />
                             {{
@@ -637,7 +1176,7 @@ const fieldClass =
                         </button>
                         <Link
                             :href="jobsIndex()"
-                            class="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 text-xs font-bold text-slate-600"
+                            class="inline-flex h-10 items-center justify-center rounded-xl border border-border text-xs font-bold text-muted-foreground"
                             >{{ t('employer.jobForm.cancel') }}</Link
                         >
                     </div>
@@ -647,15 +1186,15 @@ const fieldClass =
                         ><input
                             v-model="form.visa_package_available"
                             type="checkbox"
-                            class="mt-1 size-4 rounded border-slate-300 text-[var(--erin-primary)]"
+                            class="mt-1 size-4 rounded border-border text-[var(--erin-primary-text)]"
                         /><span
                             ><span
-                                class="block text-sm font-bold text-slate-700"
+                                class="block text-sm font-bold text-muted-foreground"
                                 >{{
                                     t('employer.jobForm.offerVisaSupport')
                                 }}</span
                             ><span
-                                class="mt-1 block text-xs leading-5 text-slate-500"
+                                class="mt-1 block text-xs leading-5 text-muted-foreground"
                                 >{{
                                     t('employer.jobForm.visaSupportDescription')
                                 }}</span

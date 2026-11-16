@@ -295,19 +295,19 @@ it('selects notification channels by exact event category and safe defaults', fu
     ]);
 
     $user->notificationPreferences()->create([
-        'event' => 'system',
+        'event' => 'billing',
         'database_enabled' => false,
         'email_enabled' => true,
         'push_enabled' => false,
     ]);
-    $unknownSystemEvent = new ActivityNotification([
+    $billingEvent = new ActivityNotification([
         'event' => 'billing.payment_failed',
         'title' => 'Payment',
         'message' => 'Please review.',
     ]);
 
-    expect($unknownSystemEvent->via($user))->toBe(['mail'])
-        ->and($unknownSystemEvent->via($user))->not->toContain('broadcast');
+    expect($billingEvent->via($user))->toBe(['mail'])
+        ->and($billingEvent->via($user))->not->toContain('broadcast');
 });
 
 it('persists in app notifications only while the database channel is enabled', function () {
@@ -363,12 +363,19 @@ it('builds localized database mail broadcast and web push payloads', function ()
         'name' => 'Emil',
         'locale' => 'de',
     ]);
+    $polishUser = User::factory()->create([
+        'name' => 'Ola',
+        'locale' => 'pl',
+    ]);
 
     $englishMail = $notification->toMail($englishUser);
     $englishPush = $notification->toWebPush($englishUser)->toArray();
     $englishBroadcast = $notification->toBroadcast($englishUser)->data;
     $germanMail = $notification->toMail($germanUser);
     $germanPush = $notification->toWebPush($germanUser)->toArray();
+    $polishPayload = $notification->toArray($polishUser);
+    $polishMail = $notification->toMail($polishUser);
+    $polishPush = $notification->toWebPush($polishUser)->toArray();
 
     expect($notification->toArray($englishUser))
         ->toMatchArray([
@@ -404,6 +411,20 @@ it('builds localized database mail broadcast and web push payloads', function ()
             'title' => 'Neue Nachricht',
             'body' => 'Du hast eine neue Nachricht erhalten.',
             'lang' => 'de',
+            'tag' => 'erin-message',
+        ])
+        ->and($polishPayload)
+        ->toMatchArray([
+            'title' => __('Neue Aktivität in Faden', [], 'pl'),
+            'message' => __('In Faden gibt es eine neue Aktualisierung. Öffne die Plattform für Details.', [], 'pl'),
+        ])
+        ->and($polishMail->subject)->toBe(__('Neue Aktivität in Faden', [], 'pl'))
+        ->and($polishMail->greeting)->toBe(__('Hallo:name,', ['name' => ' Ola'], 'pl'))
+        ->and($polishPush)
+        ->toMatchArray([
+            'title' => __('Neue Aktivität in Faden', [], 'pl'),
+            'body' => __('In Faden gibt es eine neue Aktualisierung. Öffne die Plattform für Details.', [], 'pl'),
+            'lang' => 'pl',
             'tag' => 'erin-message',
         ]);
 });

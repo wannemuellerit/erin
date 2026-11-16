@@ -30,7 +30,7 @@ class ProcessCandidateImport implements ShouldBeUnique, ShouldQueue
 
     public function __construct(public readonly int $importId)
     {
-        $this->onQueue('low');
+        $this->onQueue('imports');
     }
 
     public function uniqueId(): string
@@ -47,6 +47,15 @@ class ProcessCandidateImport implements ShouldBeUnique, ShouldQueue
         if (! in_array($import->status, ['queued', 'processing'], true)) {
             return;
         }
+        if ($import->cancellation_requested_at !== null) {
+            $import->update([
+                'status' => 'cancelled',
+                'cancelled_at' => now(),
+                'completed_at' => now(),
+            ]);
+
+            return;
+        }
 
         $import->update([
             'status' => 'processing',
@@ -60,9 +69,15 @@ class ProcessCandidateImport implements ShouldBeUnique, ShouldQueue
         $total = 0;
         $imported = 0;
         $failed = 0;
+        $cancelled = false;
 
         try {
             foreach ($reader->mappedRows($path, $import->original_filename, $mapping) as $rowNumber => $data) {
+                if (CandidateImport::query()->whereKey($import->getKey())->whereNotNull('cancellation_requested_at')->exists()) {
+                    $cancelled = true;
+
+                    break;
+                }
                 $total++;
                 if ($total > 500) {
                     throw new RuntimeException('Die Datei enthält mehr als 500 Datensätze.');
@@ -154,14 +169,15 @@ class ProcessCandidateImport implements ShouldBeUnique, ShouldQueue
         }
 
         $import->update([
-            'status' => $failed > 0 ? 'completed_with_errors' : 'completed',
+            'status' => $cancelled ? 'cancelled' : ($failed > 0 ? 'completed_with_errors' : 'completed'),
             'total_rows' => $total,
             'imported_rows' => $imported,
             'failed_rows' => $failed,
+            'cancelled_at' => $cancelled ? now() : null,
             'completed_at' => now(),
         ]);
         $activity->record(
-            'candidate_import.completed',
+            $cancelled ? 'candidate_import.cancelled' : 'candidate_import.completed',
             $import->creator,
             $import->company,
             $import,
@@ -179,6 +195,15 @@ class ProcessCandidateImport implements ShouldBeUnique, ShouldQueue
             /** @var CandidateImport|null $import */
             $import = CandidateImport::query()->find($this->importId);
             if ($import === null) {
+                return;
+            }
+            if ($import->cancellation_requested_at !== null || $import->status === 'cancelled') {
+                $import->update([
+                    'status' => 'cancelled',
+                    'cancelled_at' => $import->cancelled_at ?? now(),
+                    'completed_at' => now(),
+                ]);
+
                 return;
             }
 

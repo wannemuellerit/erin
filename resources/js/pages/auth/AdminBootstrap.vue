@@ -36,7 +36,9 @@ watchEffect(() => {
     <div
         class="mb-6 flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-950"
     >
-        <ShieldCheck class="mt-0.5 size-5 shrink-0 text-blue-600" />
+        <ShieldCheck
+            class="mt-0.5 size-5 shrink-0 text-[var(--erin-primary-text)]"
+        />
         <div>
             <p class="font-bold">{{ t('auth.bootstrapAdmin.secureTitle') }}</p>
             <p class="mt-1 leading-6 text-blue-800">

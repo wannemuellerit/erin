@@ -111,6 +111,15 @@ const employmentTypeLabel = (value: unknown) => {
 
     return te(key) ? t(key) : status.replaceAll('_', ' ');
 };
+const duplicateJob = (id: number) =>
+    router.post(`/employer/jobs/${id}/duplicate`);
+const deleteJob = (row: ProductTableRow) => {
+    if (
+        window.confirm(t('employer.jobs.deleteConfirm', { title: row.title }))
+    ) {
+        router.delete(`/employer/jobs/${Number(row.id)}`);
+    }
+};
 </script>
 
 <template>
@@ -125,7 +134,7 @@ const employmentTypeLabel = (value: unknown) => {
             <template v-if="canManageJobs" #actions>
                 <Link
                     :href="create()"
-                    class="inline-flex h-10 items-center gap-2 rounded-xl bg-[var(--erin-primary)] px-4 text-sm font-bold text-white hover:bg-[var(--erin-primary-hover)]"
+                    class="inline-flex h-10 items-center gap-2 rounded-xl bg-[var(--erin-primary)] px-4 text-sm font-bold text-[var(--erin-primary-foreground)] hover:bg-[var(--erin-primary-hover)]"
                     ><Plus class="size-4" />
                     {{ t('employer.jobs.create') }}</Link
                 >
@@ -176,10 +185,10 @@ const employmentTypeLabel = (value: unknown) => {
                                     ? edit(Number(row.id))
                                     : '/employer/jobs'
                             "
-                            class="font-bold text-slate-900 hover:text-[var(--erin-primary)]"
+                            class="font-bold text-foreground hover:text-[var(--erin-primary-text)]"
                             >{{ row.title }}</Link
                         >
-                        <p class="mt-0.5 text-xs text-slate-400">
+                        <p class="mt-0.5 text-xs text-muted-foreground">
                             {{ employmentTypeLabel(row.employment_type) }}
                         </p>
                     </div></template
@@ -196,7 +205,7 @@ const employmentTypeLabel = (value: unknown) => {
                         "
                 /></template>
                 <template #cell-applications="{ value }"
-                    ><span class="font-bold text-slate-800">{{
+                    ><span class="font-bold text-foreground">{{
                         value
                     }}</span></template
                 >
@@ -204,7 +213,7 @@ const employmentTypeLabel = (value: unknown) => {
                     <div class="flex justify-end gap-2">
                         <Link
                             :href="edit(Number(row.id))"
-                            class="rounded-lg border border-slate-200 px-2.5 py-1.5 text-[10px] font-bold text-slate-600"
+                            class="rounded-lg border border-border px-2.5 py-1.5 text-[10px] font-bold text-muted-foreground"
                             >{{ t('employer.jobs.edit') }}</Link
                         >
                         <button
@@ -237,6 +246,24 @@ const employmentTypeLabel = (value: unknown) => {
                             "
                         >
                             {{ t('employer.jobs.pause') }}
+                        </button>
+                        <button
+                            type="button"
+                            class="rounded-lg border border-border px-2.5 py-1.5 text-[10px] font-bold text-muted-foreground hover:bg-muted"
+                            @click="duplicateJob(Number(row.id))"
+                        >
+                            {{ t('employer.jobs.duplicate') }}
+                        </button>
+                        <button
+                            v-if="
+                                row.status === 'draft' ||
+                                row.status === 'archived'
+                            "
+                            type="button"
+                            class="rounded-lg bg-red-50 px-2.5 py-1.5 text-[10px] font-bold text-red-700"
+                            @click="deleteJob(row)"
+                        >
+                            {{ t('employer.jobs.delete') }}
                         </button>
                     </div>
                 </template>
