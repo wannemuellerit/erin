@@ -79,7 +79,7 @@ final class PartnerCaseWorkflow
     public function transfer(PartnerCase $case, ?User $actor = null): PartnerCase
     {
         return DB::transaction(function () use ($case, $actor): PartnerCase {
-            $case = PartnerCase::query()->lockForUpdate()->findOrFail($case->getKey());
+            $case = PartnerCase::query()->where('public_id', $case->public_id)->lockForUpdate()->firstOrFail();
             abort_unless($case->hasActiveConsent(), 422, __('Eine aktive, zweckgebundene Einwilligung ist erforderlich.'));
             abort_if($case->organization === null || ! $case->organization->isOperational(), 422, __('Der Partner ist nicht freigegeben.'));
 
