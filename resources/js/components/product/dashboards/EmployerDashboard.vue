@@ -78,7 +78,7 @@ const { t } = useI18n();
             <template #actions>
                 <Link
                     href="/employer/candidates"
-                    class="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700"
+                    class="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-bold text-muted-foreground"
                     ><UserRoundSearch
                         class="size-4 text-[var(--erin-secondary)]"
                     />
@@ -86,7 +86,7 @@ const { t } = useI18n();
                 >
                 <Link
                     href="/employer/jobs/create"
-                    class="inline-flex h-10 items-center gap-2 rounded-xl bg-[var(--erin-primary)] px-4 text-sm font-bold text-white"
+                    class="inline-flex h-10 items-center gap-2 rounded-xl bg-[var(--erin-primary)] px-4 text-sm font-bold text-[var(--erin-primary-foreground)]"
                     ><Plus class="size-4" />
                     {{ t('dashboard.employer.createJob') }}</Link
                 >
@@ -97,11 +97,11 @@ const { t } = useI18n();
             v-if="dashboard?.requires_company"
             class="erin-panel p-8 text-center"
         >
-            <BriefcaseBusiness class="mx-auto size-9 text-slate-300" />
+            <BriefcaseBusiness class="mx-auto size-9 text-muted-foreground" />
             <h2 class="mt-4 font-bold">
                 {{ t('dashboard.employer.noCompanyTitle') }}
             </h2>
-            <p class="mt-2 text-sm text-slate-500">
+            <p class="mt-2 text-sm text-muted-foreground">
                 {{ t('dashboard.employer.noCompanyDescription') }}
             </p>
         </div>
@@ -142,7 +142,7 @@ const { t } = useI18n();
                 >
                     <div
                         v-if="dashboard?.recent_applications?.length"
-                        class="divide-y divide-slate-100"
+                        class="divide-y divide-border"
                     >
                         <div
                             v-for="application in dashboard.recent_applications"
@@ -150,7 +150,7 @@ const { t } = useI18n();
                             class="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
                         >
                             <span
-                                class="grid size-10 place-items-center rounded-xl bg-blue-50 text-xs font-bold text-[var(--erin-primary)]"
+                                class="grid size-10 place-items-center rounded-xl bg-blue-50 text-xs font-bold text-[var(--erin-primary-text)]"
                                 >#{{ application.id }}</span
                             >
                             <div class="min-w-0 flex-1">
@@ -163,7 +163,9 @@ const { t } = useI18n();
                                         )
                                     }}
                                 </p>
-                                <p class="truncate text-xs text-slate-600">
+                                <p
+                                    class="truncate text-xs text-muted-foreground"
+                                >
                                     {{
                                         application.job_posting?.title ||
                                         t('dashboard.employer.jobFallback')
@@ -192,7 +194,10 @@ const { t } = useI18n();
                             />
                         </div>
                     </div>
-                    <p v-else class="py-10 text-center text-sm text-slate-600">
+                    <p
+                        v-else
+                        class="py-10 text-center text-sm text-muted-foreground"
+                    >
                         {{ t('dashboard.employer.noApplications') }}
                     </p>
                 </SectionCard>
@@ -222,7 +227,7 @@ const { t } = useI18n();
                     </div>
                     <Link
                         href="/employer/billing"
-                        class="mt-5 block text-center text-xs font-bold text-[var(--erin-primary)]"
+                        class="mt-5 block text-center text-xs font-bold text-[var(--erin-primary-text)]"
                         >{{ t('dashboard.employer.managePlan') }}</Link
                     >
                 </SectionCard>
@@ -234,7 +239,7 @@ const { t } = useI18n();
                 <h2 class="font-extrabold">
                     {{ dashboard.dashboard_notice.title }}
                 </h2>
-                <p class="mt-1 text-sm text-slate-300">
+                <p class="mt-1 text-sm text-slate-200">
                     {{ dashboard.dashboard_notice.body }}
                 </p>
                 <a

@@ -52,6 +52,8 @@ type Company = {
     industry?: string | null;
     employee_count?: number | null;
     country_code?: string | null;
+    registered_country_code?: string | null;
+    default_target_country_code?: string | null;
     city?: string | null;
     description?: string | null;
     benefits?: Record<string, boolean> | null;
@@ -79,6 +81,7 @@ const benefitLabel = (benefit: string) =>
         : benefit;
 
 const form = useForm({
+    locations_submitted: true,
     name: props.company?.name ?? '',
     legal_name: props.company?.legal_name ?? '',
     website: props.company?.website ?? '',
@@ -86,6 +89,14 @@ const form = useForm({
     industry: props.company?.industry ?? '',
     employee_count: props.company?.employee_count ?? (null as number | null),
     country_code: props.company?.country_code ?? 'DE',
+    registered_country_code:
+        props.company?.registered_country_code ??
+        props.company?.country_code ??
+        'DE',
+    default_target_country_code:
+        props.company?.default_target_country_code ??
+        props.company?.country_code ??
+        'DE',
     city: props.company?.city ?? '',
     description: props.company?.description ?? '',
     benefits: Object.fromEntries(
@@ -96,6 +107,7 @@ const form = useForm({
     ) as Record<string, boolean>,
     locations:
         props.company?.locations?.map((location) => ({
+            id: location.id ?? null,
             name: location.name ?? '',
             country_code: location.country_code ?? 'DE',
             city: location.city ?? '',
@@ -108,7 +120,7 @@ const form = useForm({
 });
 
 const input =
-    'erin-focus mt-1.5 h-11 w-full rounded-xl border border-slate-200 px-3.5 text-sm';
+    'erin-focus mt-1.5 h-11 w-full rounded-xl border border-border px-3.5 text-sm';
 const logo = computed(() =>
     props.company?.media?.find((medium) => medium.is_logo),
 );
@@ -158,6 +170,7 @@ const selectedMediaLabel = computed(() => {
 });
 const addLocation = () => {
     form.locations.push({
+        id: null,
         name: '',
         country_code: 'DE',
         city: '',
@@ -171,6 +184,17 @@ const submit = () => {
         forceFormData: true,
         preserveScroll: true,
         onSuccess: () => {
+            form.locations = (props.company?.locations ?? []).map(
+                (location) => ({
+                    id: location.id ?? null,
+                    name: location.name ?? '',
+                    country_code: location.country_code ?? 'DE',
+                    city: location.city ?? '',
+                    postal_code: location.postal_code ?? '',
+                    address_line1: location.address_line1 ?? '',
+                    is_headquarters: location.is_headquarters ?? false,
+                }),
+            );
             form.logo = null;
             form.media = [];
         },
@@ -191,7 +215,7 @@ const submit = () => {
                 <button
                     type="button"
                     :disabled="form.processing || !company"
-                    class="inline-flex h-10 items-center gap-2 rounded-xl bg-[var(--erin-primary)] px-4 text-sm font-bold text-white disabled:opacity-50"
+                    class="inline-flex h-10 items-center gap-2 rounded-xl bg-[var(--erin-primary)] px-4 text-sm font-bold text-[var(--erin-primary-foreground)] disabled:opacity-50"
                     @click="submit"
                 >
                     <Save class="size-4" />
@@ -205,11 +229,11 @@ const submit = () => {
             class="erin-panel grid min-h-72 place-items-center p-8 text-center"
         >
             <div>
-                <Building2 class="mx-auto size-9 text-slate-300" />
+                <Building2 class="mx-auto size-9 text-muted-foreground" />
                 <h2 class="mt-4 font-bold">
                     {{ t('employer.companyProfile.emptyTitle') }}
                 </h2>
-                <p class="mt-2 text-sm text-slate-500">
+                <p class="mt-2 text-sm text-muted-foreground">
                     {{ t('employer.companyProfile.emptyDescription') }}
                 </p>
             </div>
@@ -232,7 +256,7 @@ const submit = () => {
                         class="flex flex-col gap-4 rounded-2xl bg-slate-950 p-5 text-white sm:flex-row sm:items-center"
                     >
                         <span
-                            class="grid size-20 shrink-0 place-items-center rounded-2xl bg-white text-xl font-extrabold text-[var(--erin-primary)]"
+                            class="grid size-20 shrink-0 place-items-center rounded-2xl bg-card text-xl font-extrabold text-[var(--erin-primary-text)]"
                         >
                             {{ company.name.slice(0, 2).toUpperCase() }}
                         </span>
@@ -240,16 +264,19 @@ const submit = () => {
                             <p class="font-bold">{{ company.name }}</p>
                             <p
                                 v-if="logo"
-                                class="mt-1 truncate text-xs text-slate-300"
+                                class="mt-1 truncate text-xs text-muted-foreground"
                             >
                                 {{ logo.original_name }}
                             </p>
-                            <p v-else class="mt-1 text-xs text-slate-400">
+                            <p
+                                v-else
+                                class="mt-1 text-xs text-muted-foreground"
+                            >
                                 {{ t('employer.companyProfile.noLogo') }}
                             </p>
                         </div>
                         <label
-                            class="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl bg-white px-4 text-xs font-bold text-slate-800"
+                            class="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl bg-card px-4 text-xs font-bold text-foreground"
                         >
                             <Upload class="size-4" />
                             {{ t('employer.companyProfile.chooseLogo') }}
@@ -284,10 +311,10 @@ const submit = () => {
                         <article
                             v-for="medium in company.media"
                             :key="medium.id"
-                            class="flex items-center gap-3 rounded-xl border border-slate-200 p-3"
+                            class="flex items-center gap-3 rounded-xl border border-border p-3"
                         >
                             <span
-                                class="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-500"
+                                class="grid size-10 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground"
                             >
                                 <ImagePlus
                                     v-if="
@@ -311,7 +338,7 @@ const submit = () => {
                             <a
                                 v-if="medium.download_url"
                                 :href="medium.download_url"
-                                class="grid size-8 place-items-center rounded-lg text-slate-400 hover:bg-slate-100"
+                                class="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-muted"
                                 :aria-label="
                                     t('employer.companyProfile.downloadMedia', {
                                         name: medium.original_name,
@@ -324,13 +351,13 @@ const submit = () => {
                     </div>
                     <p
                         v-else
-                        class="mt-5 rounded-xl bg-slate-50 p-4 text-center text-sm text-slate-400"
+                        class="mt-5 rounded-xl bg-muted p-4 text-center text-sm text-muted-foreground"
                     >
                         {{ t('employer.companyProfile.noMedia') }}
                     </p>
 
                     <label
-                        class="mt-4 flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 p-5 text-sm font-bold text-slate-500 hover:border-blue-300"
+                        class="mt-4 flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border p-5 text-sm font-bold text-muted-foreground hover:border-blue-300"
                     >
                         <Upload class="size-4" />
                         {{ t('employer.companyProfile.chooseMedia') }}
@@ -349,7 +376,7 @@ const submit = () => {
                     </label>
                     <p
                         v-if="form.media.length"
-                        class="mt-2 text-xs text-slate-500"
+                        class="mt-2 text-xs text-muted-foreground"
                     >
                         {{ selectedMediaLabel }}
                     </p>
@@ -360,7 +387,9 @@ const submit = () => {
                 >
                     <div class="grid gap-5 sm:grid-cols-2">
                         <label>
-                            <span class="text-sm font-bold text-slate-700">
+                            <span
+                                class="text-sm font-bold text-muted-foreground"
+                            >
                                 {{ t('employer.companyProfile.fields.name') }} *
                             </span>
                             <input
@@ -370,7 +399,9 @@ const submit = () => {
                             />
                         </label>
                         <label>
-                            <span class="text-sm font-bold text-slate-700">
+                            <span
+                                class="text-sm font-bold text-muted-foreground"
+                            >
                                 {{
                                     t(
                                         'employer.companyProfile.fields.legalName',
@@ -380,7 +411,9 @@ const submit = () => {
                             <input v-model="form.legal_name" :class="input" />
                         </label>
                         <label>
-                            <span class="text-sm font-bold text-slate-700">
+                            <span
+                                class="text-sm font-bold text-muted-foreground"
+                            >
                                 {{
                                     t('employer.companyProfile.fields.industry')
                                 }}
@@ -393,7 +426,9 @@ const submit = () => {
                             />
                         </label>
                         <label>
-                            <span class="text-sm font-bold text-slate-700">
+                            <span
+                                class="text-sm font-bold text-muted-foreground"
+                            >
                                 {{
                                     t(
                                         'employer.companyProfile.fields.employeeCount',
@@ -408,7 +443,9 @@ const submit = () => {
                             />
                         </label>
                         <label>
-                            <span class="text-sm font-bold text-slate-700">
+                            <span
+                                class="text-sm font-bold text-muted-foreground"
+                            >
                                 {{
                                     t('employer.companyProfile.fields.website')
                                 }}
@@ -420,7 +457,9 @@ const submit = () => {
                             />
                         </label>
                         <label>
-                            <span class="text-sm font-bold text-slate-700">
+                            <span
+                                class="text-sm font-bold text-muted-foreground"
+                            >
                                 {{ t('employer.companyProfile.fields.phone') }}
                             </span>
                             <input
@@ -430,7 +469,9 @@ const submit = () => {
                             />
                         </label>
                         <label>
-                            <span class="text-sm font-bold text-slate-700">
+                            <span
+                                class="text-sm font-bold text-muted-foreground"
+                            >
                                 {{
                                     t('employer.companyProfile.fields.country')
                                 }}
@@ -444,7 +485,43 @@ const submit = () => {
                             />
                         </label>
                         <label>
-                            <span class="text-sm font-bold text-slate-700">
+                            <span
+                                class="text-sm font-bold text-muted-foreground"
+                                >{{
+                                    t(
+                                        'employer.companyProfile.fields.registeredCountry',
+                                    )
+                                }}
+                                *</span
+                            >
+                            <input
+                                v-model="form.registered_country_code"
+                                required
+                                maxlength="2"
+                                :class="input"
+                            />
+                        </label>
+                        <label>
+                            <span
+                                class="text-sm font-bold text-muted-foreground"
+                                >{{
+                                    t(
+                                        'employer.companyProfile.fields.defaultTargetCountry',
+                                    )
+                                }}
+                                *</span
+                            >
+                            <input
+                                v-model="form.default_target_country_code"
+                                required
+                                maxlength="2"
+                                :class="input"
+                            />
+                        </label>
+                        <label>
+                            <span
+                                class="text-sm font-bold text-muted-foreground"
+                            >
                                 {{ t('employer.companyProfile.fields.city') }} *
                             </span>
                             <input
@@ -463,7 +540,7 @@ const submit = () => {
                         v-model="form.description"
                         required
                         rows="7"
-                        class="erin-focus w-full rounded-xl border border-slate-200 p-4 text-sm leading-6"
+                        class="erin-focus w-full rounded-xl border border-border p-4 text-sm leading-6"
                     />
                 </SectionCard>
 
@@ -477,17 +554,17 @@ const submit = () => {
                         <label
                             v-for="benefit in benefit_options"
                             :key="benefit"
-                            class="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 p-3 text-sm font-semibold text-slate-700 hover:border-teal-300"
+                            class="flex cursor-pointer items-center gap-3 rounded-xl border border-border p-3 text-sm font-semibold text-muted-foreground hover:border-teal-300"
                         >
                             <input
                                 v-model="form.benefits[benefit]"
                                 type="checkbox"
-                                class="size-4 rounded border-slate-300"
+                                class="size-4 rounded border-border"
                             />
                             {{ benefitLabel(benefit) }}
                         </label>
                     </div>
-                    <p v-else class="text-sm text-slate-400">
+                    <p v-else class="text-sm text-muted-foreground">
                         {{ t('employer.companyProfile.noBenefits') }}
                     </p>
                 </SectionCard>
@@ -502,12 +579,12 @@ const submit = () => {
                         <article
                             v-for="(location, index) in form.locations"
                             :key="index"
-                            class="rounded-xl border border-slate-200 p-4"
+                            class="rounded-xl border border-border p-4"
                         >
                             <div class="grid gap-4 sm:grid-cols-2">
                                 <label>
                                     <span
-                                        class="text-xs font-bold text-slate-600"
+                                        class="text-xs font-bold text-muted-foreground"
                                     >
                                         {{
                                             t(
@@ -524,7 +601,7 @@ const submit = () => {
                                 </label>
                                 <label>
                                     <span
-                                        class="text-xs font-bold text-slate-600"
+                                        class="text-xs font-bold text-muted-foreground"
                                     >
                                         {{
                                             t(
@@ -541,7 +618,7 @@ const submit = () => {
                                 </label>
                                 <label>
                                     <span
-                                        class="text-xs font-bold text-slate-600"
+                                        class="text-xs font-bold text-muted-foreground"
                                     >
                                         {{
                                             t(
@@ -559,7 +636,7 @@ const submit = () => {
                                 </label>
                                 <label>
                                     <span
-                                        class="text-xs font-bold text-slate-600"
+                                        class="text-xs font-bold text-muted-foreground"
                                     >
                                         {{
                                             t(
@@ -574,7 +651,7 @@ const submit = () => {
                                 </label>
                                 <label class="sm:col-span-2">
                                     <span
-                                        class="text-xs font-bold text-slate-600"
+                                        class="text-xs font-bold text-muted-foreground"
                                     >
                                         {{
                                             t(
@@ -592,7 +669,7 @@ const submit = () => {
                                 class="mt-3 flex items-center justify-between gap-3"
                             >
                                 <label
-                                    class="flex items-center gap-2 text-xs font-semibold text-slate-600"
+                                    class="flex items-center gap-2 text-xs font-semibold text-muted-foreground"
                                 >
                                     <input
                                         v-model="location.is_headquarters"
@@ -617,13 +694,13 @@ const submit = () => {
                     </div>
                     <p
                         v-else
-                        class="rounded-xl bg-slate-50 p-5 text-center text-sm text-slate-400"
+                        class="rounded-xl bg-muted p-5 text-center text-sm text-muted-foreground"
                     >
                         {{ t('employer.companyProfile.noLocations') }}
                     </p>
                     <button
                         type="button"
-                        class="mt-4 inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 px-4 text-xs font-bold text-slate-700"
+                        class="mt-4 inline-flex h-10 items-center gap-2 rounded-xl border border-border px-4 text-xs font-bold text-muted-foreground"
                         @click="addLocation"
                     >
                         <Plus class="size-4" />
@@ -654,7 +731,9 @@ const submit = () => {
                 <SectionCard
                     :title="t('employer.companyProfile.secureMediaTitle')"
                 >
-                    <div class="space-y-3 text-xs leading-5 text-slate-500">
+                    <div
+                        class="space-y-3 text-xs leading-5 text-muted-foreground"
+                    >
                         <p class="flex gap-2">
                             <ShieldCheck
                                 class="size-4 shrink-0 text-[var(--erin-secondary)]"
@@ -667,7 +746,7 @@ const submit = () => {
                         </p>
                         <p class="flex gap-2">
                             <MapPin
-                                class="size-4 shrink-0 text-[var(--erin-primary)]"
+                                class="size-4 shrink-0 text-[var(--erin-primary-text)]"
                             />
                             {{ t('employer.companyProfile.signedLinksNotice') }}
                         </p>
@@ -677,7 +756,7 @@ const submit = () => {
                     v-if="canManageCompany"
                     type="submit"
                     :disabled="form.processing"
-                    class="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[var(--erin-primary)] text-sm font-bold text-white disabled:opacity-50"
+                    class="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[var(--erin-primary)] text-sm font-bold text-[var(--erin-primary-foreground)] disabled:opacity-50"
                 >
                     <Save class="size-4" />
                     {{ t('employer.companyProfile.saveProfile') }}

@@ -241,11 +241,21 @@ function configurePassingSecurityBaseline(): void
         'filesystems.disks.private.visibility' => 'private',
         'filesystems.disks.private.throw' => true,
         'filesystems.disks.private.key' => 'erin-app',
+        'filesystems.disks.private.secret' => 'storage-secret-must-not-appear',
+        'filesystems.disks.private.bucket' => 'erin-private',
         'operations.build.sha' => $buildSha,
         'operations.build.image_tag' => $buildSha,
         'operations.network.internal_subnet' => '172.30.0.0/24',
         'operations.network.trusted_proxies' => ['172.30.0.0/24'],
-        'operations.storage.minio_app_user' => 'erin-app',
+        'operations.storage.access_key_id' => 'erin-app',
+        'operations.storage.bucket' => 'erin-private',
+        'operations.storage.endpoint' => 'https://s3.eu-central-1.wannemueller.dev',
+        'operations.storage.bucket_scope_verified' => true,
+        'operations.storage.versioning_verified' => true,
+        'operations.storage.encryption_verified' => true,
+        'operations.storage.access_logging_verified' => true,
+        'operations.storage.offsite_copy_verified' => true,
+        'operations.storage.evidence_reference' => 'https://evidence.wannemueller.dev/storage/erin-private-2026-08-10',
         'fortify.limiters.login' => 'login',
         'fortify.limiters.two-factor' => 'two-factor',
         'fortify.limiters.passkeys' => 'passkeys',
@@ -552,7 +562,7 @@ it('passes the complete technical production security baseline', function () {
 
     $checks = app(SecurityBaselineAudit::class)->checks();
 
-    expect($checks)->toHaveCount(15)
+    expect($checks)->toHaveCount(16)
         ->and(collect($checks)->where('status', 'fail'))->toBeEmpty();
 })->group('ops');
 
@@ -566,6 +576,8 @@ it('fails insecure sessions, proxy trust, moving image tags, wildcard realtime o
         'services.livekit.url' => 'ws://livekit.internal',
         'services.livekit.region' => 'us',
         'services.livekit.e2ee_required' => false,
+        'services.mail_delivery.webhook_secret' => 'weak',
+        'services.mail_delivery.webhook_max_bytes' => 0,
     ]);
 
     $failed = collect(app(SecurityBaselineAudit::class)->checks())
@@ -578,6 +590,7 @@ it('fails insecure sessions, proxy trust, moving image tags, wildcard realtime o
         'proxy.trust_boundary',
         'reverb.abuse_protection',
         'livekit.security',
+        'integrations.webhook_hardening',
     );
 })->group('ops');
 
@@ -599,7 +612,7 @@ it('pins the Zammad webhook body limit and strips untrusted forwarded headers in
         ->not->toContain('$proxy_add_x_forwarded_for');
 })->group('ops');
 
-it('binds production images to the build SHA and provisions only bucket-scoped MinIO app access', function () {
+it('binds production images to the build SHA and requires external governed S3 access', function () {
     $compose = file_get_contents(base_path('compose.production.yaml'));
     $dockerfile = file_get_contents(base_path('docker/production/Dockerfile'));
     $entrypoint = file_get_contents(base_path('docker/production/entrypoint.sh'));
@@ -609,11 +622,16 @@ it('binds production images to the build SHA and provisions only bucket-scoped M
             'image: ${ERIN_APP_IMAGE:-erin-app}:${ERIN_APP_TAG:?ERIN_APP_TAG must be set}',
             'ERIN_BUILD_SHA: ${ERIN_BUILD_SHA:?ERIN_BUILD_SHA must be set}',
             'ERIN_GOVERNANCE_TRUST_ROOT_SHA256: ${ERIN_GOVERNANCE_TRUST_ROOT_SHA256:?ERIN_GOVERNANCE_TRUST_ROOT_SHA256 must be set}',
-            'AWS_ACCESS_KEY_ID: ${MINIO_APP_USER:?MINIO_APP_USER must be set}',
-            'mc admin policy create local erin-app-bucket',
-            'arn:aws:s3:::$${AWS_BUCKET}/*',
+            'AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?AWS_ACCESS_KEY_ID must be set}',
+            'AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?AWS_SECRET_ACCESS_KEY must be set}',
+            'AWS_ENDPOINT: ${AWS_ENDPOINT:?AWS_ENDPOINT must be set}',
         )
-        ->not->toContain('ERIN_APP_TAG:-latest');
+        ->not->toContain(
+            'ERIN_APP_TAG:-latest',
+            'minio/minio',
+            'minio/mc',
+            "\n  object-storage:",
+        );
 
     expect($dockerfile)->toBeString()
         ->toContain(

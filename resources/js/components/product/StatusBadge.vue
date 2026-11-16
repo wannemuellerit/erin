@@ -14,13 +14,13 @@ withDefaults(
 );
 
 const tones: Record<StatusTone, string> = {
-    blue: 'bg-blue-50 text-blue-700 ring-blue-600/10',
+    blue: 'bg-blue-50 text-[var(--erin-primary-text-hover)] ring-blue-600/10',
     teal: 'bg-teal-50 text-teal-700 ring-teal-600/10',
     orange: 'bg-orange-50 text-orange-700 ring-orange-600/10',
     green: 'bg-emerald-50 text-emerald-700 ring-emerald-600/10',
     yellow: 'bg-amber-50 text-amber-700 ring-amber-600/10',
     red: 'bg-red-50 text-red-700 ring-red-600/10',
-    slate: 'bg-slate-100 text-slate-600 ring-slate-500/10',
+    slate: 'bg-muted text-muted-foreground ring-border0/10',
     violet: 'bg-violet-50 text-violet-700 ring-violet-600/10',
 };
 

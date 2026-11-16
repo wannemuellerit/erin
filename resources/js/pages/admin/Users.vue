@@ -8,6 +8,10 @@ import {
     X,
 } from '@lucide/vue';
 import { reactive, ref } from 'vue';
+import AdminPagination from './_components/AdminPagination.vue';
+import { useAdminI18n } from './_i18n';
+import { cleanFilters, statusTone } from './_shared';
+import type { AdminPaginator } from './_shared';
 import FormField from '@/components/product/FormField.vue';
 import { Button } from '@/components/ui/button';
 import {
@@ -24,10 +28,6 @@ import PageHeader from '@/components/product/PageHeader.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
 import adminUsers from '@/routes/admin/users';
-import AdminPagination from './_components/AdminPagination.vue';
-import { useAdminI18n } from './_i18n';
-import { cleanFilters, statusTone } from './_shared';
-import type { AdminPaginator } from './_shared';
 
 type UserRow = {
     id: number;
@@ -252,25 +252,25 @@ function createCandidate(): void {
 
         <SectionCard flush>
             <form
-                class="grid gap-3 border-b border-slate-100 p-4 lg:grid-cols-[minmax(16rem,1fr)_12rem_12rem_12rem_auto]"
+                class="grid gap-3 border-b border-border p-4 lg:grid-cols-[minmax(16rem,1fr)_12rem_12rem_12rem_auto]"
                 @submit.prevent="applyFilters"
             >
                 <label class="relative">
                     <span class="sr-only">{{ t('users.searchLabel') }}</span>
                     <Search
-                        class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-slate-400"
+                        class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
                     />
                     <input
                         v-model="filters.search"
                         type="search"
                         :placeholder="t('users.searchPlaceholder')"
-                        class="erin-focus h-11 w-full rounded-xl border border-slate-200 bg-white pr-3 pl-10 text-sm"
+                        class="erin-focus h-11 w-full rounded-xl border border-border bg-card pr-3 pl-10 text-sm"
                     />
                 </label>
                 <select
                     v-model="filters.role"
                     :aria-label="t('users.roleFilter')"
-                    class="erin-focus h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                    class="erin-focus h-11 rounded-xl border border-border bg-card px-3 text-sm"
                 >
                     <option value="">{{ t('common.allRoles') }}</option>
                     <option v-for="role in roles" :key="role" :value="role">
@@ -280,7 +280,7 @@ function createCandidate(): void {
                 <select
                     v-model="filters.status"
                     :aria-label="t('users.statusFilter')"
-                    class="erin-focus h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                    class="erin-focus h-11 rounded-xl border border-border bg-card px-3 text-sm"
                 >
                     <option value="">{{ t('common.allStatuses') }}</option>
                     <option
@@ -294,7 +294,7 @@ function createCandidate(): void {
                 <select
                     v-model="filters.sort"
                     :aria-label="t('users.sorting')"
-                    class="erin-focus h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                    class="erin-focus h-11 rounded-xl border border-border bg-card px-3 text-sm"
                 >
                     <option value="newest">{{ t('users.newest') }}</option>
                     <option value="oldest">{{ t('users.oldest') }}</option>
@@ -312,7 +312,7 @@ function createCandidate(): void {
                     <button
                         type="button"
                         :aria-label="t('common.resetFilters')"
-                        class="erin-focus grid size-11 place-items-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50"
+                        class="erin-focus grid size-11 place-items-center rounded-xl border border-border text-muted-foreground hover:bg-muted"
                         @click="resetFilters"
                     >
                         <X class="size-4" />
@@ -321,10 +321,10 @@ function createCandidate(): void {
             </form>
 
             <div v-if="users.data.length > 0" class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-slate-100 text-left">
-                    <thead class="bg-slate-50/80">
+                <table class="min-w-full divide-y divide-border text-left">
+                    <thead class="bg-muted/80">
                         <tr
-                            class="text-[11px] font-bold tracking-wide text-slate-500 uppercase"
+                            class="text-[11px] font-bold tracking-wide text-muted-foreground uppercase"
                         >
                             <th class="px-5 py-3">
                                 {{ t('users.columns.user') }}
@@ -346,17 +346,17 @@ function createCandidate(): void {
                             </th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-100">
+                    <tbody class="divide-y divide-border">
                         <tr
                             v-for="user in users.data"
                             :key="user.id"
                             class="align-top"
                         >
                             <td class="px-5 py-4">
-                                <p class="text-sm font-bold text-slate-900">
+                                <p class="text-sm font-bold text-foreground">
                                     {{ user.name }}
                                 </p>
-                                <p class="mt-0.5 text-xs text-slate-500">
+                                <p class="mt-0.5 text-xs text-muted-foreground">
                                     {{ user.email }}
                                 </p>
                                 <div class="mt-2 flex flex-wrap gap-1.5">
@@ -372,15 +372,17 @@ function createCandidate(): void {
                                                 : 'yellow'
                                         "
                                     />
-                                    <span class="text-[11px] text-slate-600">
+                                    <span
+                                        class="text-[11px] text-muted-foreground"
+                                    >
                                         #{{ user.id }} ·
                                         {{ user.locale.toUpperCase() }}
                                     </span>
                                 </div>
                             </td>
-                            <td class="px-5 py-4 text-xs text-slate-600">
+                            <td class="px-5 py-4 text-xs text-muted-foreground">
                                 <template v-if="user.candidate_profile">
-                                    <p class="font-semibold text-slate-800">
+                                    <p class="font-semibold text-foreground">
                                         {{
                                             user.candidate_profile
                                                 .current_position ??
@@ -420,12 +422,12 @@ function createCandidate(): void {
                                 </template>
                             </td>
                             <td
-                                class="min-w-44 px-5 py-4 text-xs text-slate-600"
+                                class="min-w-44 px-5 py-4 text-xs text-muted-foreground"
                             >
                                 <div
                                     class="flex items-center justify-between gap-2"
                                 >
-                                    <span class="font-semibold text-slate-800">
+                                    <span class="font-semibold text-foreground">
                                         {{
                                             (
                                                 user.storage_usage.used_bytes /
@@ -437,14 +439,14 @@ function createCandidate(): void {
                                     </span>
                                     <button
                                         type="button"
-                                        class="erin-focus rounded-lg text-xs font-bold text-blue-600"
+                                        class="erin-focus rounded-lg text-xs font-bold text-[var(--erin-primary-text)]"
                                         @click="updateQuota(user)"
                                     >
                                         {{ t('users.changeStorageLimit') }}
                                     </button>
                                 </div>
                                 <div
-                                    class="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"
+                                    class="mt-2 h-2 overflow-hidden rounded-full bg-muted"
                                 >
                                     <div
                                         class="h-full rounded-full bg-teal-500"
@@ -473,10 +475,10 @@ function createCandidate(): void {
                                 </p>
                             </td>
                             <td
-                                class="px-5 py-4 text-xs whitespace-nowrap text-slate-500"
+                                class="px-5 py-4 text-xs whitespace-nowrap text-muted-foreground"
                             >
                                 <p>{{ formatDate(user.last_active_at) }}</p>
-                                <p class="mt-1 text-slate-600">
+                                <p class="mt-1 text-muted-foreground">
                                     {{
                                         t('users.createdAt', {
                                             date: formatDate(user.created_at),
@@ -485,7 +487,7 @@ function createCandidate(): void {
                                 </p>
                                 <Link
                                     :href="`/admin/audit?actor_id=${user.id}`"
-                                    class="erin-focus mt-2 inline-flex items-center gap-1.5 rounded-lg text-xs font-bold text-blue-600 hover:text-blue-700"
+                                    class="erin-focus mt-2 inline-flex items-center gap-1.5 rounded-lg text-xs font-bold text-[var(--erin-primary-text)] hover:text-[var(--erin-primary-text-hover)]"
                                 >
                                     <History class="size-3.5" />
                                     {{ t('users.showHistory') }}
@@ -500,7 +502,7 @@ function createCandidate(): void {
                                             name: user.name,
                                         })
                                     "
-                                    class="erin-focus h-9 min-w-36 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold disabled:opacity-60"
+                                    class="erin-focus h-9 min-w-36 rounded-lg border border-border bg-card px-2 text-xs font-semibold disabled:opacity-60"
                                     @change="updateRole(user, $event)"
                                 >
                                     <option
@@ -520,7 +522,7 @@ function createCandidate(): void {
                                 <select
                                     v-if="user.role === 'support'"
                                     :value="user.platform_role_id ?? ''"
-                                    class="erin-focus mt-2 h-9 min-w-36 rounded-lg border border-slate-200 bg-white px-2 text-xs"
+                                    class="erin-focus mt-2 h-9 min-w-36 rounded-lg border border-border bg-card px-2 text-xs"
                                     :aria-label="
                                         t('users.platformRoleFor', {
                                             name: user.name,
@@ -553,7 +555,7 @@ function createCandidate(): void {
                                             name: user.name,
                                         })
                                     "
-                                    class="erin-focus mt-2 block h-9 min-w-36 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold disabled:opacity-60"
+                                    class="erin-focus mt-2 block h-9 min-w-36 rounded-lg border border-border bg-card px-2 text-xs font-semibold disabled:opacity-60"
                                     @change="updateStatus(user, $event)"
                                 >
                                     <option

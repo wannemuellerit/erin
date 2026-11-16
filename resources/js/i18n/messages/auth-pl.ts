@@ -1,0 +1,43 @@
+export default {
+    confirmPasswordTitle: 'Potwierdź hasło',
+    confirmPasswordDescription:
+        'Jest to bezpieczna strefa. Proszę potwierdzić swoje hasło przed kontynuowaniem.',
+    confirmWithPasskey: 'Potwierdź za pomocą klucza',
+    confirming: 'Potwierdzam...',
+    orConfirmWithPassword: 'Lub potwierdzić za pomocą hasła',
+    confirmPasswordAction: 'Potwierdź hasło',
+    forgotPasswordTitle: 'Zapomniane hasło',
+    forgotPasswordDescription:
+        'Wpisz swój adres e-mail, aby otrzymać link do resetowania hasła.',
+    sendResetLink: 'Wyślij link do resetowania hasła',
+    orReturnTo: 'Albo wrócić do',
+    logIn: 'wpisz',
+    resetPasswordTitle: 'Zresetuj hasło',
+    resetPasswordDescription: 'Ustaw nowe hasło poniżej.',
+    resetPasswordAction: 'Zresetuj hasło',
+    verifyEmailTitle: 'Zweryfikuj adres e-mail',
+    verifyEmailDescription:
+        'Proszę zweryfikować swój adres e-mail za pomocą łącza, który właśnie Ci wysłaliśmy.',
+    verificationLinkSent:
+        'Nowy link weryfikacyjny został wysłany na Twój adres e-mail.',
+    resendVerification: 'Przywróć odnośnik weryfikacji',
+    logOut: 'Podpisz',
+    twoFactorTitle: 'Uwierzytelnianie dwóch czynników',
+    recoveryCodeTitle: 'Kod windykacji',
+    recoveryCodeDescription: 'Potwierdź dostęp jednym z kodów odzyskiwania.',
+    authenticationCodeTitle: 'Kod uwierzytelniania',
+    authenticationCodeDescription:
+        'Wprowadź sześciocyfrowy kod z aplikacji uwierzytelniającej.',
+    useAuthenticationCode: 'zaloguj się za pomocą kodu uwierzytelniającego',
+    useRecoveryCode: 'Podpis z kodem odzysku',
+    continueAction: 'Kontynuuj',
+    orYouCan: 'Alternatywnie, można',
+    recoveryCodePlaceholder: 'Wprowadź kod odzysku',
+    authenticationCodeLabel: 'Szesnastocyfrowy kod uwierzytelniający',
+    recoveryCodeLabel: 'Kod windykacji',
+    signInWithPasskey: 'Zaloguj się za pomocą klucza',
+    authenticating: 'Uwierzycielstwo...',
+    orContinueWithEmail: 'Albo kontynuuj z e-mailem',
+    showPassword: 'Pokaż hasło',
+    hidePassword: 'Ukryj hasło',
+};

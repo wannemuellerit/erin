@@ -69,17 +69,17 @@ jobs:
           persist-credentials: false
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
-          php-version: '8.4'
+          php-version: '8.5'
           extensions: redis, pdo_mysql, sodium
           tools: composer:v2
           coverage: none
 
       - name: Setup Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
 
       - name: Install PHP dependencies
@@ -135,10 +135,10 @@ jobs:
           persist-credentials: false
 
       - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Build production Nginx and PHP images
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: docker/production/Dockerfile
@@ -208,6 +208,17 @@ jobs:
       SCOUT_DRIVER: collection
       TELESCOPE_ENABLED: 'false'
       PLAYWRIGHT_BASE_URL: http://127.0.0.1:8000
+      BROADCAST_CONNECTION: reverb
+      REVERB_APP_ID: erin-e2e
+      REVERB_APP_KEY: erin-e2e-key
+      REVERB_APP_SECRET: erin-e2e-local-only-secret
+      REVERB_HOST: 127.0.0.1
+      REVERB_PORT: 8080
+      REVERB_SCHEME: http
+      VITE_REVERB_HOST: 127.0.0.1
+      VITE_REVERB_APP_KEY: erin-e2e-key
+      VITE_REVERB_PORT: 8080
+      VITE_REVERB_SCHEME: http
 
     steps:
       - name: Checkout code
@@ -216,17 +227,17 @@ jobs:
           persist-credentials: false
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
-          php-version: '8.4'
+          php-version: '8.5'
           extensions: redis, pdo_mysql, sodium
           tools: composer:v2
           coverage: none
 
       - name: Setup Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
 
       - name: Install PHP dependencies
@@ -235,18 +246,33 @@ jobs:
       - name: Install Node dependencies
         run: npm ci --no-audit --no-fund
 
-      - name: Prepare deterministic browser data
+      - name: Prepare browser application
         run: |
           cp .env.example .env
           php artisan key:generate --no-interaction
           php artisan migrate --force --no-interaction
+
+      - name: Start browser-test broadcasting server
+        run: |
+          php artisan reverb:start --host=127.0.0.1 --port=8080 > storage/logs/e2e-reverb.log 2>&1 &
+          for attempt in {1..30}; do
+            if php -r 'exit((int) ! @fsockopen("127.0.0.1", 8080));'; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat storage/logs/e2e-reverb.log
+          exit 1
+
+      - name: Prepare deterministic browser data
+        run: |
           php artisan db:seed --class='Database\Seeders\DomainCatalogSeeder' --force --no-interaction
           php artisan db:seed --class='Database\Seeders\DemoDataSeeder' --force --no-interaction
           php artisan db:seed --class='Database\Seeders\BrowserTestSeeder' --force --no-interaction
           php artisan wayfinder:generate --with-form
 
-      - name: Build production assets
-        run: npm run build
+      - name: Build browser test assets
+        run: npm run build -- --mode e2e
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
@@ -268,7 +294,7 @@ jobs:
 
       - name: Upload browser-test diagnostics
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: erin-playwright-diagnostics
           if-no-files-found: ignore
@@ -277,3 +303,4 @@ jobs:
             storage/framework/testing/playwright
             storage/framework/testing/playwright-report
             storage/logs/e2e-server.log
+            storage/logs/e2e-reverb.log

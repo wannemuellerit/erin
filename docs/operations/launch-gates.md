@@ -43,12 +43,13 @@ bash scripts/ops/release-gate.sh
 - Secure-, HttpOnly-, SameSite- und verschlüsselte Sessions;
 - explizite Proxy-CIDRs und von Nginx überschriebene Forwarded-Header;
 - Redis für Queue, Cache und Sessions;
-- privaten, fail-closed Storage mit bucket-begrenztem MinIO-App-Nutzer;
+- privaten, fail-closed Storage mit bucket-begrenztem Objektspeicher-App-Nutzer;
 - 2FA-Schutz des Adminbereichs und signierte sensible Downloads;
 - getrennte Rate-Limiter für Login, 2FA und Passkeys;
 - Authentifizierung, Staff-2FA und Autorisierung für Telescope;
 - OpenAI- und Dokument-KI-Datenkontrollen;
-- LiveKit mit WSS, EU-Pinning, E2EE und kurzlebigen Tokens;
+- selbst gehostetes LiveKit in Deutschland mit WSS, TURN/TLS, E2EE und
+  kurzlebigen Tokens;
 - Reverb mit expliziten Origins und terminierendem Rate-Limit.
 
 Die JSON-Ausgabe muss als unveränderliches CI-Artefakt oder in einem
@@ -92,7 +93,7 @@ der außerhalb von Faden aufbewahrten Freigabeevidenz.
 
 ## Backup-/Restore-Gate
 
-Eine verständliche Erklärung von RPO/RTO, Verschlüsselung, MySQL-/MinIO-Konsistenz,
+Eine verständliche Erklärung von RPO/RTO, Verschlüsselung, MySQL-/Objektspeicher-Konsistenz,
 Drillablauf und Evidenz steht in
 [backup-restore-drill.md](backup-restore-drill.md).
 

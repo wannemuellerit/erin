@@ -7,31 +7,31 @@ ships with a Docker-first development environment.
 
 ## Runtime containers
 
-| Service       | Purpose                                         | Host port       |
-| ------------- | ----------------------------------------------- | --------------- |
-| `laravel`     | Laravel development server, PHP 8.4             | `8000`          |
-| `vite`        | Vite development/HMR server, Node 22            | `5173`          |
-| `mysql`       | MySQL 8.4 LTS                                   | `3306`          |
-| `redis`       | Cache, queues and distributed locks             | `6379`          |
-| `queue`       | Redis-backed Laravel worker                     | -               |
-| `scheduler`   | Laravel scheduler                               | -               |
-| `reverb`      | Pusher-compatible WebSocket server              | `8080`          |
-| `meilisearch` | Full-text and faceted search                    | `7700`          |
-| `minio`       | Private S3-compatible object storage            | `9000`          |
-| `minio-init`  | Creates the private application bucket          | -               |
-| `clamav`      | Malware scanner for uploaded files              | internal `3310` |
-| `mailpit`     | Local SMTP inbox and web UI                     | `8025`          |
-| `setup`       | Composer install, key generation and migrations | -               |
-| `node-setup`  | Deterministic `npm ci` install                  | -               |
-| `stripe-cli`  | Optional local Stripe webhook forwarding        | -               |
+| Service          | Purpose                                           | Host port       |
+| ---------------- | ------------------------------------------------- | --------------- |
+| `laravel`        | Laravel development server, PHP 8.5               | `8000`          |
+| `vite`           | Vite development/HMR server, Node 24 LTS          | `5173`          |
+| `mysql`          | MySQL 8.4 LTS                                     | `3306`          |
+| `redis`          | Cache, queues and distributed locks               | `6379`          |
+| `horizon`        | Governed Redis workers and queue dashboard        | -               |
+| `scheduler`      | Laravel scheduler                                 | -               |
+| `reverb`         | Pusher-compatible WebSocket server                | `8080`          |
+| `livekit`        | Self-hosted WebRTC SFU for video and call chat    | `7880–7882`     |
+| `meilisearch`    | Full-text and faceted search                      | `7700`          |
+| `object-storage` | Private S3-compatible SeaweedFS development store | `8333`          |
+| `clamav`         | Malware scanner for uploaded files                | internal `3310` |
+| `mailpit`        | Local SMTP inbox and web UI                       | `8025`          |
+| `setup`          | Composer install, key generation and migrations   | -               |
+| `node-setup`     | Deterministic `npm ci` install                    | -               |
+| `stripe-cli`     | Optional local Stripe webhook forwarding          | -               |
 
 Persistent state is stored in named Docker volumes. Source code, `vendor` and
 `node_modules` are bind-mounted so the IDE and all containers use the same
 dependency state.
 
 The queue visibility timeout (`REDIS_QUEUE_RETRY_AFTER`) is deliberately longer
-than the worker timeout. Keep that invariant when increasing
-`queue:work --timeout`, otherwise a long-running job can be delivered twice.
+than every Horizon supervisor timeout. Keep that invariant when increasing a
+supervisor timeout, otherwise a long-running job can be delivered twice.
 
 ## Start
 
@@ -42,15 +42,16 @@ docker compose ps
 ```
 
 The first start installs dependencies, creates an application key, prepares
-local VAPID keys for browser push, prepares the private MinIO bucket and runs
-database migrations. Open:
+local VAPID keys for browser push, starts a private SeaweedFS development
+bucket and runs database migrations. Open:
 
 - Application: <http://localhost:8000>
 - Telescope: <http://localhost:8000/telescope>
 - Vite: <http://localhost:5173>
 - Reverb: `ws://localhost:8080/app/{key}`
+- LiveKit signaling: `ws://localhost:7880`
 - Meilisearch: <http://localhost:7700>
-- MinIO console: <http://localhost:9001>
+- SeaweedFS admin UI: <http://localhost:23646>
 - Mailpit: <http://localhost:8025>
 
 The credentials in `.env.example` belong only to the local containers. Replace
@@ -62,12 +63,12 @@ With `APP_DEMO_MODE=true`, the default seeder creates verified accounts for the
 Superadmin, two sample companies and ten sample candidates. Every demo account
 uses the password `password`:
 
-| Role | Email |
-| --- | --- |
-| Superadmin | `admin@wannemueller.dev` |
-| Müller Elektrotechnik | `unternehmen.mueller@wannemueller.dev` |
-| RheinCargo Logistik | `unternehmen.rheincargo@wannemueller.dev` |
-| Candidates 1–10 | `candidate01@wannemueller.dev` through `candidate10@wannemueller.dev` |
+| Role                  | Email                                                                 |
+| --------------------- | --------------------------------------------------------------------- |
+| Superadmin            | `admin@wannemueller.dev`                                              |
+| Müller Elektrotechnik | `unternehmen.mueller@wannemueller.dev`                                |
+| RheinCargo Logistik   | `unternehmen.rheincargo@wannemueller.dev`                             |
+| Candidates 1–10       | `candidate01@wannemueller.dev` through `candidate10@wannemueller.dev` |
 
 The login page lists all 13 demo accounts grouped by role and can insert the
 selected credentials automatically while demo mode is active. Demo credentials
@@ -147,16 +148,18 @@ docker compose --env-file .env.production -f compose.production.yaml up -d
 ```
 
 Nginx serves static assets, proxies PHP to PHP-FPM and forwards Reverb WebSocket
-paths internally. MySQL, Redis, Meilisearch, MinIO and ClamAV have no published
-ports. A public deployment still needs TLS/reverse-proxy configuration,
-off-host encrypted backups, monitoring and rotated secrets.
+paths internally. MySQL, Redis, Meilisearch and ClamAV have no published ports.
+Production deliberately uses a separately operated, versioned S3 bucket rather
+than a single object-storage container; it still needs TLS/reverse-proxy
+configuration, off-host encrypted backups, monitoring and rotated secrets.
 
 The production Redis service enables `requirepass` when `REDIS_PASSWORD` is
 set; the same value is used by Laravel and Reverb. PHP-FPM, Reverb and Nginx
 publish container healthchecks, and application processes start only after
-MySQL, Redis, Meilisearch, MinIO initialization and ClamAV are ready. The
-service worker is always served with explicit no-cache headers so browser-push
-updates are not pinned behind an immutable asset cache.
+MySQL, Redis, Meilisearch and ClamAV are ready. Application readiness also
+checks the configured external private storage. The service worker is always
+served with explicit no-cache headers so browser-push updates are not pinned
+behind an immutable asset cache.
 
 Wildcard proxy trust is rejected. `TRUSTED_PROXIES` must contain only the
 explicit internal Docker CIDR and any separately reviewed ingress proxy CIDRs.
@@ -171,7 +174,7 @@ Die Workflows sind bewusst in getrennte, diagnostizierbare Gates aufgeteilt:
 - `release-images`: SHA-getaggte Images, Provenienz und keyless Cosign-Signatur.
 - `deploy`: Attestierungsprüfung, Readiness, gesperrte Migration, Smoke-Test und
   automatischer App-Rollback.
-- `encrypted-backup`: alle sechs Stunden verschlüsseltes MySQL-/MinIO-Backup
+- `encrypted-backup`: alle sechs Stunden verschlüsseltes MySQL-/Objektspeicher-Backup
   in ein getrenntes Restic-Ziel mit Check und Retention.
 
 Die ausführbaren Abläufe und Entscheidungspunkte stehen in
@@ -181,6 +184,12 @@ und
 [`docs/operations/incident-runbooks.md`](docs/operations/incident-runbooks.md).
 
 ## Billing and external services
+
+Interviewtermine werden anbieterunabhängig als zeitlich begrenzt signierte
+`.ics`-Datei exportiert. Eine direkte Google-/Microsoft-Kalenderanbindung,
+OAuth, Provider-Webhooks und automatische Synchronisation gehören derzeit
+nicht zum Produktumfang. Hintergründe und Grenzen stehen in
+[`docs/adr/0008-ics-only-calendar-export.md`](docs/adr/0008-ics-only-calendar-export.md).
 
 Laravel Cashier uses Stripe Billing and Checkout. Faden deliberately maps
 Cashier to these project variables:
@@ -280,23 +289,26 @@ signature token as `ZAMMAD_WEBHOOK_SECRET`; Faden validates `X-Hub-Signature`
 and deduplicates deliveries by `X-Zammad-Delivery`. Internal Zammad notes stay
 staff-only, while public replies appear live in the shared Faden support chat.
 
-OpenAI and LiveKit are external managed services and therefore do not get local
-containers. Their placeholders live in `.env.example`. Sensitive-document AI
-is disabled by default until an approved EU endpoint and the required data
-controls are configured. LiveKit token signing uses `firebase/php-jwt`; browser
-clients use `livekit-client`.
+OpenAI remains an external managed service. LiveKit is self-hosted locally and
+is included as a pinned Apache-2.0 container; production uses the same server
+on German infrastructure with WSS, TURN/TLS and the documented public WebRTC
+ports. Sensitive-document AI is disabled by default until an approved EU
+endpoint and the required data controls are configured. LiveKit token signing
+uses `firebase/php-jwt`; browser clients use `livekit-client`. See
+[`docs/operations/livekit-self-hosting.md`](docs/operations/livekit-self-hosting.md).
 
-Scout is configured for Meilisearch, private files for MinIO/S3, and browser
+Scout is configured for Meilisearch, private files for S3-Objektspeicher, and browser
 push for VAPID. Uploaded documents must remain private and pass ClamAV before
 they are made available.
 
-### Horizon compatibility
+### Horizon queue operations
 
-The current stable Laravel Horizon release supports Illuminate through Laravel
-12, while this project runs Laravel 13. The stack therefore uses a
-production-capable Redis `queue:work` process instead of forcing an incompatible
-package. Replace the worker command with `php artisan horizon` once a stable,
-Laravel-13-compatible Horizon release is available.
+Laravel Horizon 5.48 runs the Redis queues through dedicated supervisors for
+default work, notifications, scans, imports, webhooks, AI and payments. The
+dashboard is available at `/horizon` only to verified Superadmins with confirmed
+two-factor authentication; sensitive serialized job payloads are redacted from
+its JSON responses. See [`docs/operations/horizon.md`](docs/operations/horizon.md)
+for deployment, monitoring and rollback.
 
 ## Reverb or Pusher Channels
 
@@ -306,7 +318,7 @@ does not need another container.
 
 To use Pusher Channels, copy the documented `PUSHER_*` variables from
 `.env.example`, set `BROADCAST_CONNECTION=pusher`, and restart Laravel, Vite
-and the queue worker. The `reverb` service can then be stopped.
+and Horizon. The `reverb` service can then be stopped.
 
 ## Ports and shutdown
 

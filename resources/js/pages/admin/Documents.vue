@@ -10,16 +10,16 @@ import {
     X,
 } from '@lucide/vue';
 import { computed, reactive, ref, watch } from 'vue';
+import AdminPagination from './_components/AdminPagination.vue';
+import { useAdminI18n } from './_i18n';
+import { cleanFilters, statusTone } from './_shared';
+import type { AdminPaginator } from './_shared';
 import EmptyState from '@/components/product/EmptyState.vue';
 import PageHeader from '@/components/product/PageHeader.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import StatusBadge from '@/components/product/StatusBadge.vue';
 import Textarea from '@/components/product/Textarea.vue';
 import adminDocuments from '@/routes/admin/documents';
-import AdminPagination from './_components/AdminPagination.vue';
-import { useAdminI18n } from './_i18n';
-import { cleanFilters, statusTone } from './_shared';
-import type { AdminPaginator } from './_shared';
 
 type DocumentRow = {
     id: number;
@@ -149,7 +149,7 @@ function submitReview(status: 'in_review' | 'verified' | 'rejected'): void {
 
         <SectionCard flush>
             <form
-                class="grid gap-3 border-b border-slate-100 p-4 lg:grid-cols-[minmax(16rem,1fr)_12rem_13rem_12rem_auto]"
+                class="grid gap-3 border-b border-border p-4 lg:grid-cols-[minmax(16rem,1fr)_12rem_13rem_12rem_auto]"
                 @submit.prevent="applyFilters"
             >
                 <label class="relative">
@@ -157,19 +157,19 @@ function submitReview(status: 'in_review' | 'verified' | 'rejected'): void {
                         t('documents.searchLabel')
                     }}</span>
                     <Search
-                        class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-slate-400"
+                        class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
                     />
                     <input
                         v-model="filters.search"
                         type="search"
                         :placeholder="t('documents.searchPlaceholder')"
-                        class="erin-focus h-11 w-full rounded-xl border border-slate-200 pr-3 pl-10 text-sm"
+                        class="erin-focus h-11 w-full rounded-xl border border-border pr-3 pl-10 text-sm"
                     />
                 </label>
                 <select
                     v-model="filters.status"
                     :aria-label="t('documents.status')"
-                    class="erin-focus h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                    class="erin-focus h-11 rounded-xl border border-border bg-card px-3 text-sm"
                 >
                     <option value="">{{ t('common.allStatuses') }}</option>
                     <option
@@ -183,7 +183,7 @@ function submitReview(status: 'in_review' | 'verified' | 'rejected'): void {
                 <select
                     v-model="filters.type"
                     :aria-label="t('documents.type')"
-                    class="erin-focus h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                    class="erin-focus h-11 rounded-xl border border-border bg-card px-3 text-sm"
                 >
                     <option value="">{{ t('documents.allTypes') }}</option>
                     <option v-for="type in types" :key="type" :value="type">
@@ -195,7 +195,7 @@ function submitReview(status: 'in_review' | 'verified' | 'rejected'): void {
                     type="text"
                     :placeholder="t('documents.scanResult')"
                     :aria-label="t('documents.scanResult')"
-                    class="erin-focus h-11 rounded-xl border border-slate-200 px-3 text-sm"
+                    class="erin-focus h-11 rounded-xl border border-border px-3 text-sm"
                 />
                 <div class="flex gap-2">
                     <button
@@ -207,7 +207,7 @@ function submitReview(status: 'in_review' | 'verified' | 'rejected'): void {
                     <button
                         type="button"
                         :aria-label="t('common.resetFilters')"
-                        class="erin-focus grid size-11 place-items-center rounded-xl border border-slate-200 text-slate-500"
+                        class="erin-focus grid size-11 place-items-center rounded-xl border border-border text-muted-foreground"
                         @click="resetFilters"
                     >
                         <X class="size-4" />
@@ -219,10 +219,8 @@ function submitReview(status: 'in_review' | 'verified' | 'rejected'): void {
                 v-if="documents.data.length > 0"
                 class="grid min-h-[34rem] xl:grid-cols-[22rem_minmax(0,1fr)]"
             >
-                <aside
-                    class="border-b border-slate-200 xl:border-r xl:border-b-0"
-                >
-                    <div class="divide-y divide-slate-100">
+                <aside class="border-b border-border xl:border-r xl:border-b-0">
+                    <div class="divide-y divide-border">
                         <button
                             v-for="document in documents.data"
                             :key="document.id"
@@ -231,19 +229,19 @@ function submitReview(status: 'in_review' | 'verified' | 'rejected'): void {
                             :class="
                                 selectedDocument?.id === document.id
                                     ? 'bg-blue-50'
-                                    : 'hover:bg-slate-50'
+                                    : 'hover:bg-muted'
                             "
                             @click="selectedId = document.id"
                         >
                             <div class="flex items-start gap-3">
                                 <span
-                                    class="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-blue-600 ring-1 ring-slate-200"
+                                    class="grid size-10 shrink-0 place-items-center rounded-xl bg-card text-[var(--erin-primary-text)] ring-1 ring-border"
                                 >
                                     <FileText class="size-4" />
                                 </span>
                                 <div class="min-w-0 flex-1">
                                     <p
-                                        class="truncate text-sm font-bold text-slate-800"
+                                        class="truncate text-sm font-bold text-foreground"
                                     >
                                         {{
                                             document.title ??
@@ -251,7 +249,7 @@ function submitReview(status: 'in_review' | 'verified' | 'rejected'): void {
                                         }}
                                     </p>
                                     <p
-                                        class="mt-1 truncate text-xs text-slate-500"
+                                        class="mt-1 truncate text-xs text-muted-foreground"
                                     >
                                         {{
                                             document.candidate_profile.user.name
@@ -265,7 +263,7 @@ function submitReview(status: 'in_review' | 'verified' | 'rejected'): void {
                                             :tone="statusTone(document.status)"
                                         />
                                         <span
-                                            class="text-[10px] text-slate-600"
+                                            class="text-[10px] text-muted-foreground"
                                         >
                                             #{{ document.id }}
                                         </span>
@@ -283,18 +281,22 @@ function submitReview(status: 'in_review' | 'verified' | 'rejected'): void {
                                 class="flex flex-col gap-3 sm:flex-row sm:justify-between"
                             >
                                 <div>
-                                    <p class="text-xs font-bold text-blue-600">
+                                    <p
+                                        class="text-xs font-bold text-[var(--erin-primary-text)]"
+                                    >
                                         {{ humanize(selectedDocument.type) }}
                                     </p>
                                     <h2
-                                        class="mt-1 text-xl font-bold text-slate-950"
+                                        class="mt-1 text-xl font-bold text-foreground"
                                     >
                                         {{
                                             selectedDocument.title ??
                                             selectedDocument.original_name
                                         }}
                                     </h2>
-                                    <p class="mt-1 text-sm text-slate-500">
+                                    <p
+                                        class="mt-1 text-sm text-muted-foreground"
+                                    >
                                         {{ selectedDocument.original_name }}
                                     </p>
                                 </div>
@@ -305,23 +307,23 @@ function submitReview(status: 'in_review' | 'verified' | 'rejected'): void {
                             </div>
 
                             <dl
-                                class="mt-6 grid gap-3 rounded-2xl bg-slate-50 p-4 sm:grid-cols-2"
+                                class="mt-6 grid gap-3 rounded-2xl bg-muted p-4 sm:grid-cols-2"
                             >
                                 <div>
                                     <dt
-                                        class="text-[10px] font-bold text-slate-600 uppercase"
+                                        class="text-[10px] font-bold text-muted-foreground uppercase"
                                     >
                                         {{ t('documents.professional') }}
                                     </dt>
                                     <dd
-                                        class="mt-1 text-sm font-semibold text-slate-800"
+                                        class="mt-1 text-sm font-semibold text-foreground"
                                     >
                                         {{
                                             selectedDocument.candidate_profile
                                                 .user.name
                                         }}
                                     </dd>
-                                    <dd class="text-xs text-slate-500">
+                                    <dd class="text-xs text-muted-foreground">
                                         {{
                                             selectedDocument.candidate_profile
                                                 .user.email
@@ -330,12 +332,12 @@ function submitReview(status: 'in_review' | 'verified' | 'rejected'): void {
                                 </div>
                                 <div>
                                     <dt
-                                        class="text-[10px] font-bold text-slate-600 uppercase"
+                                        class="text-[10px] font-bold text-muted-foreground uppercase"
                                     >
                                         {{ t('documents.profession') }}
                                     </dt>
                                     <dd
-                                        class="mt-1 text-sm font-semibold text-slate-800"
+                                        class="mt-1 text-sm font-semibold text-foreground"
                                     >
                                         {{
                                             selectedDocument.candidate_profile
@@ -346,11 +348,13 @@ function submitReview(status: 'in_review' | 'verified' | 'rejected'): void {
                                 </div>
                                 <div>
                                     <dt
-                                        class="text-[10px] font-bold text-slate-600 uppercase"
+                                        class="text-[10px] font-bold text-muted-foreground uppercase"
                                     >
                                         {{ t('documents.file') }}
                                     </dt>
-                                    <dd class="mt-1 text-sm text-slate-700">
+                                    <dd
+                                        class="mt-1 text-sm text-muted-foreground"
+                                    >
                                         {{ selectedDocument.mime_type }} ·
                                         {{
                                             formatBytes(
@@ -361,11 +365,13 @@ function submitReview(status: 'in_review' | 'verified' | 'rejected'): void {
                                 </div>
                                 <div>
                                     <dt
-                                        class="text-[10px] font-bold text-slate-600 uppercase"
+                                        class="text-[10px] font-bold text-muted-foreground uppercase"
                                     >
                                         {{ t('documents.uploaded') }}
                                     </dt>
-                                    <dd class="mt-1 text-sm text-slate-700">
+                                    <dd
+                                        class="mt-1 text-sm text-muted-foreground"
+                                    >
                                         {{
                                             formatDate(
                                                 selectedDocument.created_at,
@@ -375,11 +381,13 @@ function submitReview(status: 'in_review' | 'verified' | 'rejected'): void {
                                 </div>
                                 <div>
                                     <dt
-                                        class="text-[10px] font-bold text-slate-600 uppercase"
+                                        class="text-[10px] font-bold text-muted-foreground uppercase"
                                     >
                                         {{ t('documents.validUntil') }}
                                     </dt>
-                                    <dd class="mt-1 text-sm text-slate-700">
+                                    <dd
+                                        class="mt-1 text-sm text-muted-foreground"
+                                    >
                                         {{
                                             formatDate(
                                                 selectedDocument.expires_at,
@@ -389,17 +397,19 @@ function submitReview(status: 'in_review' | 'verified' | 'rejected'): void {
                                 </div>
                                 <div>
                                     <dt
-                                        class="text-[10px] font-bold text-slate-600 uppercase"
+                                        class="text-[10px] font-bold text-muted-foreground uppercase"
                                     >
                                         {{ t('documents.lastReview') }}
                                     </dt>
-                                    <dd class="mt-1 text-sm text-slate-700">
+                                    <dd
+                                        class="mt-1 text-sm text-muted-foreground"
+                                    >
                                         {{
                                             selectedDocument.verifier?.name ??
                                             '—'
                                         }}
                                     </dd>
-                                    <dd class="text-xs text-slate-500">
+                                    <dd class="text-xs text-muted-foreground">
                                         {{
                                             formatDate(
                                                 selectedDocument.verified_at,
@@ -466,17 +476,21 @@ function submitReview(status: 'in_review' | 'verified' | 'rejected'): void {
                         </section>
 
                         <aside
-                            class="h-fit rounded-2xl border border-slate-200 p-5"
+                            class="h-fit rounded-2xl border border-border p-5"
                         >
-                            <h3 class="font-bold text-slate-900">
+                            <h3 class="font-bold text-foreground">
                                 {{ t('documents.reviewDecision') }}
                             </h3>
-                            <p class="mt-1 text-xs leading-5 text-slate-500">
+                            <p
+                                class="mt-1 text-xs leading-5 text-muted-foreground"
+                            >
                                 {{ t('documents.reviewHint') }}
                             </p>
 
                             <label class="mt-5 block">
-                                <span class="text-xs font-bold text-slate-700">
+                                <span
+                                    class="text-xs font-bold text-muted-foreground"
+                                >
                                     {{ t('documents.rejectionReason') }}
                                 </span>
                                 <Textarea
@@ -519,7 +533,7 @@ function submitReview(status: 'in_review' | 'verified' | 'rejected'): void {
                                 <button
                                     type="button"
                                     :disabled="reviewForm.processing"
-                                    class="erin-focus h-10 rounded-xl border border-blue-200 text-xs font-bold text-blue-700 disabled:opacity-50"
+                                    class="erin-focus h-10 rounded-xl border border-blue-200 text-xs font-bold text-[var(--erin-primary-text-hover)] disabled:opacity-50"
                                     @click="submitReview('in_review')"
                                 >
                                     {{ t('documents.markInReview') }}

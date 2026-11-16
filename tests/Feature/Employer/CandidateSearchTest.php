@@ -14,6 +14,10 @@ use App\Models\User;
 use Database\Seeders\DomainCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
+use Laravel\Scout\Builder;
+use Laravel\Scout\EngineManager;
+use Laravel\Scout\Engines\CollectionEngine;
+use Meilisearch\Client;
 
 uses(RefreshDatabase::class);
 
@@ -55,9 +59,65 @@ it('paginates all published candidates instead of truncating the result to one h
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->where('candidates.total', 105)
+            ->where('published_count', 105)
             ->where('candidates.per_page', 24)
             ->has('candidates.data', 24));
 });
+
+it('browses live profiles without querying a stale external index', function () {
+    [$user, $company] = erinSearchEmployer();
+    CandidateProfile::factory()->count(3)->create();
+    CandidateProfile::factory()->create(['published_at' => null]);
+    config(['scout.driver' => 'meilisearch']);
+    $client = Mockery::mock(Client::class);
+    $client->shouldNotReceive('index');
+    app()->instance(Client::class, $client);
+
+    $this->actingAs($user)->withSession(['active_company_id' => $company->id])
+        ->get(route('employer.candidates.index'))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('published_count', 3)->where('candidates.total', 3)->has('candidates.data', 3));
+});
+
+it('returns zero real matches for an unmatched filter while retaining the published total', function () {
+    [$user, $company] = erinSearchEmployer();
+    CandidateProfile::factory()->count(2)->create(['current_country_code' => 'PL']);
+    $this->actingAs($user)->withSession(['active_company_id' => $company->id])
+        ->get(route('employer.candidates.index', ['country' => 'ES']))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('published_count', 2)->where('candidates.total', 0)->has('candidates.data', 0));
+});
+
+it('resets an out of range page instead of showing a contradictory empty result', function () {
+    [$user, $company] = erinSearchEmployer();
+    CandidateProfile::factory()->create();
+    $this->actingAs($user)->withSession(['active_company_id' => $company->id])
+        ->get(route('employer.candidates.index', ['page' => 9, 'per_page' => 12]))
+        ->assertRedirect(route('employer.candidates.index', ['page' => 1, 'per_page' => 12]));
+});
+
+it('recounts stale text search hits from live published profiles', function (bool $partial) {
+    [$user, $company] = erinSearchEmployer();
+    $match = CandidateProfile::factory()->create(['current_position' => 'Indexabgleich Elektriker']);
+    CandidateProfile::factory()->create(['current_position' => 'Indexabgleich Privat', 'published_at' => null]);
+    $indexed = $partial ? [$match] : [];
+    app(EngineManager::class)->extend('stale-test', fn () => new class($indexed) extends CollectionEngine
+    {
+        public function __construct(private array $indexed) {}
+
+        public function paginate(Builder $builder, $perPage, $page)
+        {
+            return ['results' => $this->indexed, 'total' => 4];
+        }
+    });
+    config(['scout.driver' => 'stale-test']);
+
+    $this->actingAs($user)->withSession(['active_company_id' => $company->id])
+        ->get(route('employer.candidates.index', ['search' => 'Indexabgleich']))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('published_count', 1)->where('candidates.total', 1)->has('candidates.data', 1)
+        ->where('candidates.data.0.id', $match->id));
+})->with([false, true]);
 
 it('combines residence profession skill experience work permit visa and completeness filters', function () {
     [$user, $company] = erinSearchEmployer();

@@ -5,14 +5,27 @@ export type MessageAttachment = {
     size_bytes?: number | null;
     scan_result?: string | null;
     download_url?: string | null;
+    duration_seconds?: number | null;
+    waveform?: number[] | null;
 };
 
 export type ConversationMessage = {
     id: number;
+    client_id?: string | null;
     sender?: { id: number; name: string } | null;
     sender_id?: number | null;
     type?: string;
     body?: string | null;
+    translations?: Record<
+        string,
+        {
+            status: string;
+            body?: string | null;
+            model?: string | null;
+            prompt_version?: string | null;
+        }
+    >;
+    delivery_status?: 'sending' | 'failed' | 'sent';
     created_at?: string | null;
     attachments?: MessageAttachment[];
 };
@@ -42,6 +55,14 @@ export type Interview = {
     ends_at?: string | null;
     timezone?: string;
     ics_url?: string | null;
+    can_join?: boolean;
+    attendances?: Array<{
+        user_id: number;
+        first_joined_at?: string | null;
+        last_left_at?: string | null;
+        total_seconds: number;
+        join_count: number;
+    }>;
     proposals?: InterviewProposal[];
     application?: {
         id: number;
@@ -77,6 +98,11 @@ export type InterviewCenterProps = {
     interviews?: Interview[];
     availability?: Availability[];
     timezone?: string;
+    applications?: Array<{
+        id: number;
+        job_title: string;
+        candidate_name: string;
+    }>;
 };
 
 export type ReferralCode = {
@@ -114,4 +140,21 @@ export type ReferralDashboardProps = {
     code?: ReferralCode | null;
     metrics?: ReferralMetrics;
     referrals?: Referral[];
+    payoutAccount?: {
+        id: number;
+        provider: string;
+        country_code: string;
+        currency_code: string;
+        status: string;
+        kyc_status: string;
+    } | null;
+    payoutIntents?: Array<{
+        public_id: string;
+        amount_cents: number;
+        currency_code: string;
+        status: string;
+        submitted_at?: string | null;
+        paid_at?: string | null;
+        failure_code?: string | null;
+    }>;
 };

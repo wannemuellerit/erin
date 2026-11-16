@@ -14,7 +14,7 @@ export function useLocalizedField() {
             return fallback;
         }
 
-        const preferredLocale = locale.value === 'en' ? 'en' : 'de';
+        const preferredLocale = locale.value === 'de' ? 'de' : 'en';
         const fallbackLocale = preferredLocale === 'de' ? 'en' : 'de';
         const candidates = [
             value[`${field}_${preferredLocale}`],

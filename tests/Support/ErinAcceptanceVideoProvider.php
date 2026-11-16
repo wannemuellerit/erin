@@ -34,6 +34,7 @@ final class ErinAcceptanceVideoProvider implements VideoProvider
             url: 'wss://video.example.test',
             roomName: $roomName,
             participantIdentity: $participantIdentity,
+            participantName: $participantName,
             token: 'signed-fake-video-token',
             e2eeKey: (string) ($metadata['e2ee_key'] ?? ''),
             expiresAt: now()->addMinutes(20)->toIso8601String(),

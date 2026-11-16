@@ -8,6 +8,7 @@ final readonly class VideoAccess
         public string $url,
         public string $roomName,
         public string $participantIdentity,
+        public string $participantName,
         public string $token,
         public string $e2eeKey,
         public string $expiresAt,

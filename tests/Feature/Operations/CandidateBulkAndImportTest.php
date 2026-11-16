@@ -2,8 +2,11 @@
 
 use App\Enums\CompanyMemberRole;
 use App\Enums\UserRole;
+use App\Jobs\ProcessCandidateBulkBatch;
 use App\Jobs\ProcessCandidateImport;
 use App\Models\ActivityEntry;
+use App\Models\CandidateBulkBatch;
+use App\Models\CandidateBulkBatchItem;
 use App\Models\CandidateImport;
 use App\Models\CandidateImportRow;
 use App\Models\CandidateProfile;
@@ -19,11 +22,13 @@ use App\Notifications\ActivityNotification;
 use App\Services\Activity\ActivityRecorder;
 use App\Services\Documents\ClamAvScanner;
 use App\Services\Imports\CandidateImportReader;
+use App\Services\Platform\ProductNotificationDispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use OpenSpout\Common\Entity\Cell;
 use OpenSpout\Common\Entity\Cell\FormulaCell;
 use OpenSpout\Common\Entity\Row;
@@ -75,6 +80,7 @@ function erinCandidateImport(
 
 it('bulk-invites at most one hundred published candidates without leaking their identity', function () {
     Notification::fake();
+    Queue::fake();
     ['user' => $owner, 'company' => $company] = erinBulkEmployer();
     ['user' => $foreignOwner, 'company' => $foreignCompany] = erinBulkEmployer();
     $job = JobPosting::factory()->create([
@@ -97,6 +103,7 @@ it('bulk-invites at most one hundred published candidates without leaking their 
     $this->actingAs($owner)
         ->withSession(['active_company_id' => $company->getKey()])
         ->post(route('employer.candidates.bulk.invite'), [
+            'idempotency_key' => (string) Str::uuid(),
             'candidate_ids' => range(1, 101),
             'job_posting_id' => $job->getKey(),
         ])
@@ -105,16 +112,24 @@ it('bulk-invites at most one hundred published candidates without leaking their 
     $this->actingAs($owner)
         ->withSession(['active_company_id' => $company->getKey()])
         ->post(route('employer.candidates.bulk.invite'), [
+            'idempotency_key' => (string) Str::uuid(),
             'candidate_ids' => [$published->getKey(), $hidden->getKey()],
             'job_posting_id' => $job->getKey(),
         ])
-        ->assertUnprocessable();
+        ->assertRedirect();
 
-    expect(JobInvitation::query()->count())->toBe(0);
+    $batch = CandidateBulkBatch::query()->sole();
+    (new ProcessCandidateBulkBatch($batch->getKey()))->handle(
+        app(ActivityRecorder::class),
+        app(ProductNotificationDispatcher::class),
+    );
+    expect(JobInvitation::query()->count())->toBe(1)
+        ->and(CandidateBulkBatchItem::query()->where('reason', 'not_available')->count())->toBe(1);
 
     $this->actingAs($owner)
         ->withSession(['active_company_id' => $company->getKey()])
         ->post(route('employer.candidates.bulk.invite'), [
+            'idempotency_key' => (string) Str::uuid(),
             'candidate_ids' => [$published->getKey()],
             'job_posting_id' => $foreignJob->getKey(),
         ])
@@ -123,6 +138,7 @@ it('bulk-invites at most one hundred published candidates without leaking their 
     $this->actingAs($owner)
         ->withSession(['active_company_id' => $company->getKey()])
         ->post(route('employer.candidates.bulk.invite'), [
+            'idempotency_key' => (string) Str::uuid(),
             'candidate_ids' => [$published->getKey()],
             'job_posting_id' => $job->getKey(),
             'message' => 'Wir möchten dich kennenlernen.',
@@ -151,6 +167,7 @@ it('bulk-invites at most one hundred published candidates without leaking their 
 
 it('sends bulk messages only through conversations of the active tenant and current participant', function () {
     Notification::fake();
+    Queue::fake();
     ['user' => $owner, 'company' => $company] = erinBulkEmployer();
     ['user' => $foreignOwner, 'company' => $foreignCompany] = erinBulkEmployer();
     $candidate = CandidateProfile::factory()->create();
@@ -209,6 +226,7 @@ it('sends bulk messages only through conversations of the active tenant and curr
     $this->actingAs($owner)
         ->withSession(['active_company_id' => $company->getKey()])
         ->post(route('employer.candidates.bulk.message'), [
+            'idempotency_key' => (string) Str::uuid(),
             'candidate_ids' => [
                 $candidate->getKey(),
                 $foreignCandidate->getKey(),
@@ -219,13 +237,19 @@ it('sends bulk messages only through conversations of the active tenant and curr
         ->assertRedirect()
         ->assertSessionHas('success');
 
+    $batch = CandidateBulkBatch::query()->sole();
+    (new ProcessCandidateBulkBatch($batch->getKey()))->handle(
+        app(ActivityRecorder::class),
+        app(ProductNotificationDispatcher::class),
+    );
+
     $message = Message::query()->sole();
 
     expect($message)
         ->conversation_id->toBe($conversation->getKey())
         ->sender_id->toBe($owner->getKey())
         ->body->toBe('Bitte sende uns deine aktuellen Unterlagen.')
-        ->and($message->metadata)->toBe(['bulk' => true])
+        ->and($message->metadata)->toMatchArray(['bulk' => true])
         ->and($foreignConversation->messages()->count())->toBe(0)
         ->and($unsharedConversation->messages()->count())->toBe(0)
         ->and(ActivityEntry::query()->where('event', 'candidate.bulk_message_sent')->count())
@@ -233,6 +257,95 @@ it('sends bulk messages only through conversations of the active tenant and curr
 
     Notification::assertSentTo($candidate->user, ActivityNotification::class);
     Notification::assertNotSentTo($foreignCandidate->user, ActivityNotification::class);
+});
+
+it('binds all-results bulk actions to an immutable filter snapshot and retries once', function () {
+    Notification::fake();
+    Queue::fake();
+    ['user' => $owner, 'company' => $company] = erinBulkEmployer();
+    $job = JobPosting::factory()->create([
+        'company_id' => $company->getKey(),
+        'created_by' => $owner->getKey(),
+    ]);
+    CandidateProfile::factory()->count(20)->create([
+        'current_position' => 'E2E Elektrik',
+        'published_at' => now(),
+    ]);
+    CandidateProfile::factory()->count(2)->create([
+        'current_position' => 'E2E Pflege',
+        'published_at' => now(),
+    ]);
+    $key = (string) Str::uuid();
+    $payload = [
+        'idempotency_key' => $key,
+        'selection_mode' => 'all_results',
+        'filter_snapshot' => ['search' => 'E2E Elektrik'],
+        'job_posting_id' => $job->getKey(),
+    ];
+
+    $this->actingAs($owner)->withSession(['active_company_id' => $company->getKey()])
+        ->post(route('employer.candidates.bulk.invite'), $payload)->assertRedirect();
+    $batch = CandidateBulkBatch::query()->sole();
+    (new ProcessCandidateBulkBatch($batch->getKey()))->handle(
+        app(ActivityRecorder::class),
+        app(ProductNotificationDispatcher::class),
+    );
+    $this->actingAs($owner)->withSession(['active_company_id' => $company->getKey()])
+        ->post(route('employer.candidates.bulk.invite'), $payload)->assertRedirect();
+
+    $batch->refresh();
+    expect($batch->selection_mode)->toBe('all_results')
+        ->and($batch->filter_snapshot)->toBe(['search' => 'E2E Elektrik'])
+        ->and($batch->total)->toBe(20)
+        ->and(JobInvitation::query()->count())->toBe(20)
+        ->and(CandidateBulkBatch::query()->count())->toBe(1);
+});
+
+it('reports concurrent changes and honours cancellation before queued bulk work', function () {
+    Queue::fake();
+    ['user' => $owner, 'company' => $company] = erinBulkEmployer();
+    $job = JobPosting::factory()->create([
+        'company_id' => $company->getKey(),
+        'created_by' => $owner->getKey(),
+    ]);
+    $candidate = CandidateProfile::factory()->create(['published_at' => now()]);
+
+    $this->actingAs($owner)->withSession(['active_company_id' => $company->getKey()])
+        ->post(route('employer.candidates.bulk.invite'), [
+            'idempotency_key' => (string) Str::uuid(),
+            'candidate_ids' => [$candidate->getKey()],
+            'job_posting_id' => $job->getKey(),
+        ])->assertRedirect();
+    $batch = CandidateBulkBatch::query()->sole();
+    $candidate->forceFill([
+        'current_position' => 'Zwischenzeitlich geändert',
+        'updated_at' => now()->addSecond(),
+    ])->saveQuietly();
+    (new ProcessCandidateBulkBatch($batch->getKey()))->handle(
+        app(ActivityRecorder::class),
+        app(ProductNotificationDispatcher::class),
+    );
+    expect($batch->refresh()->status)->toBe('completed_with_errors')
+        ->and($batch->items()->sole()->reason)->toBe('concurrent_change')
+        ->and(JobInvitation::query()->count())->toBe(0);
+
+    $candidate->touch();
+    $this->actingAs($owner)->withSession(['active_company_id' => $company->getKey()])
+        ->post(route('employer.candidates.bulk.invite'), [
+            'idempotency_key' => (string) Str::uuid(),
+            'candidate_ids' => [$candidate->getKey()],
+            'job_posting_id' => $job->getKey(),
+        ])->assertRedirect();
+    $cancelled = CandidateBulkBatch::query()->latest('id')->firstOrFail();
+    $this->actingAs($owner)->withSession(['active_company_id' => $company->getKey()])
+        ->post(route('employer.candidate-bulk-batches.cancel', $cancelled))->assertRedirect();
+    (new ProcessCandidateBulkBatch($cancelled->getKey()))->handle(
+        app(ActivityRecorder::class),
+        app(ProductNotificationDispatcher::class),
+    );
+    expect($cancelled->refresh()->status)->toBe('cancelled')
+        ->and($cancelled->items()->sole()->status)->toBe('cancelled')
+        ->and(JobInvitation::query()->count())->toBe(0);
 });
 
 it('previews CSV and XLSX uploads and validates unique column mappings per tenant', function () {
@@ -348,7 +461,7 @@ it('previews CSV and XLSX uploads and validates unique column mappings per tenan
                 'current_position' => 'E-Mail',
             ],
         ])
-        ->assertUnprocessable();
+        ->assertSessionHasErrors('mapping');
 
     $foreignImport = CandidateImport::query()->create([
         'company_id' => $foreignCompany->getKey(),
@@ -569,4 +682,49 @@ it('stops candidate imports after the five-hundredth data row', function () {
         ->and($import->fresh()?->total_rows)->toBe(0)
         ->and($import->fresh()?->imported_rows)->toBe(0)
         ->and($import->fresh()?->failed_rows)->toBe(0);
+});
+
+it('cancels queued imports idempotently without rolling back already reported rows', function () {
+    Storage::fake('private');
+    ['user' => $owner, 'company' => $company] = erinBulkEmployer();
+    $import = erinCandidateImport(
+        $company,
+        $owner,
+        "E-Mail,Position\nfirst@example.com,Pflege\nsecond@example.com,Elektrik\n",
+        ['email' => 'E-Mail', 'current_position' => 'Position'],
+    );
+    $import->update([
+        'status' => 'processing',
+        'total_rows' => 1,
+        'imported_rows' => 1,
+    ]);
+    CandidateImportRow::query()->create([
+        'candidate_import_id' => $import->getKey(),
+        'company_id' => $company->getKey(),
+        'row_number' => 2,
+        'email' => 'first@example.com',
+        'current_position' => 'Pflege',
+        'status' => 'imported',
+    ]);
+
+    $this->actingAs($owner)
+        ->withSession(['active_company_id' => $company->getKey()])
+        ->post(route('employer.candidate-imports.cancel', $import))
+        ->assertRedirect();
+    $this->actingAs($owner)
+        ->withSession(['active_company_id' => $company->getKey()])
+        ->post(route('employer.candidate-imports.cancel', $import))
+        ->assertRedirect();
+
+    (new ProcessCandidateImport($import->getKey()))->handle(
+        app(CandidateImportReader::class),
+        app(ActivityRecorder::class),
+    );
+
+    expect($import->refresh())
+        ->status->toBe('cancelled')
+        ->total_rows->toBe(1)
+        ->imported_rows->toBe(1)
+        ->and($import->rows()->count())->toBe(1)
+        ->and($import->cancelled_at)->not->toBeNull();
 });

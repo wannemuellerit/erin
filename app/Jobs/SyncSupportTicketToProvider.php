@@ -28,7 +28,10 @@ class SyncSupportTicketToProvider implements ShouldBeUnique, ShouldQueue
      */
     public array $backoff = [10, 30, 60, 120, 300];
 
-    public function __construct(public readonly int $ticketId) {}
+    public function __construct(public readonly int $ticketId)
+    {
+        $this->onQueue('webhooks');
+    }
 
     public function uniqueId(): string
     {
