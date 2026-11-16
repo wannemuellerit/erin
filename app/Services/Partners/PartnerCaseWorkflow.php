@@ -78,11 +78,17 @@ final class PartnerCaseWorkflow
 
     public function transfer(PartnerCase $case, ?User $actor = null): PartnerCase
     {
-        abort_unless($case->hasActiveConsent(), 422, __('Eine aktive, zweckgebundene Einwilligung ist erforderlich.'));
-        abort_if($case->organization === null || ! $case->organization->isOperational(), 422, __('Der Partner ist nicht freigegeben.'));
-        $key = hash('sha256', 'partner-case-transfer:'.$case->public_id.':'.$case->updated_at?->timestamp);
+        return DB::transaction(function () use ($case, $actor): PartnerCase {
+            $case = PartnerCase::query()->lockForUpdate()->findOrFail($case->getKey());
+            abort_unless($case->hasActiveConsent(), 422, __('Eine aktive, zweckgebundene Einwilligung ist erforderlich.'));
+            abort_if($case->organization === null || ! $case->organization->isOperational(), 422, __('Der Partner ist nicht freigegeben.'));
 
-        return DB::transaction(function () use ($case, $actor, $key): PartnerCase {
+            if ($case->external_reference !== null) {
+                return $case;
+            }
+
+            $partnerSwitch = $case->events()->where('event_type', 'partner_switched')->latest('id')->first();
+            $key = hash('sha256', 'partner-case-transfer:'.$case->public_id.':'.($partnerSwitch?->getKey() ?? 0));
             $receipt = PartnerIntegrationReceipt::query()->firstOrCreate(
                 ['partner_organization_id' => $case->partner_organization_id, 'provider' => $case->organization->integration_mode, 'idempotency_key' => $key],
                 ['partner_case_id' => $case->getKey(), 'direction' => 'outbound', 'payload_hash' => hash('sha256', $case->public_id), 'signature_valid' => true, 'status' => 'processing'],

@@ -118,17 +118,26 @@ it('shows candidates only their own cases and partners only explicitly assigned 
     expect(app(PartnerCaseAccess::class)->canView($partner, $assigned->fresh()))->toBeFalse();
 });
 
-it('transfers exactly once and revokes access and grants immediately on withdrawal', function () {
+it('transfers exactly once per partner selection and revokes access and grants immediately on withdrawal', function () {
     erinEnablePartnerService(PartnerServiceType::LanguageCourse);
     $organization = erinPartnerOrganization();
     $offering = erinPartnerOffering($organization);
     $candidate = User::factory()->create();
     $case = erinPartnerCase($candidate, $organization, $offering);
 
+    $this->travel(2)->seconds();
     $this->actingAs($candidate)->post("/candidate/services/{$case->public_id}/transfer")->assertRedirect();
     $this->actingAs($candidate)->post("/candidate/services/{$case->public_id}/transfer")->assertRedirect();
     expect(app(PartnerProvider::class)->transfers)->toHaveCount(1);
     expect(PartnerIntegrationReceipt::query()->count())->toBe(1);
+
+    $nextOffering = erinPartnerOffering($organization);
+    $this->actingAs($candidate)->post("/candidate/services/{$case->public_id}/switch", [
+        'offering_id' => $nextOffering->getKey(), 'consent' => true,
+    ])->assertRedirect();
+    $this->actingAs($candidate)->post("/candidate/services/{$case->public_id}/transfer")->assertRedirect();
+    expect(app(PartnerProvider::class)->transfers)->toHaveCount(2);
+    expect(PartnerIntegrationReceipt::query()->count())->toBe(2);
 
     $this->actingAs($candidate)->post("/candidate/services/{$case->public_id}/withdraw")->assertRedirect();
     expect($case->fresh())->withdrawn_at->not->toBeNull()->external_reference->toBeNull();
