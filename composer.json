@@ -18,7 +18,7 @@
         "laravel/cashier": "^16.6",
         "laravel/chisel": "^0.1.0",
         "laravel/fortify": "^1.37.2",
-        "laravel/framework": "^13.17",
+        "laravel/framework": "^13.30",
         "laravel/horizon": "^5.48.1",
         "laravel/reverb": "^1.10",
         "laravel/scout": "^11.3",
