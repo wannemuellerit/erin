@@ -128,9 +128,9 @@ const progress = computed(() =>
     Math.round((currentStep.value / props.onboarding.total_steps) * 100),
 );
 const input =
-    'erin-focus mt-1.5 h-11 w-full rounded-xl border border-slate-200 px-3.5 text-sm';
+    'erin-focus mt-1.5 h-11 w-full rounded-xl border border-border px-3.5 text-sm';
 const textarea =
-    'erin-focus mt-1.5 w-full rounded-xl border border-slate-200 p-3.5 text-sm';
+    'erin-focus mt-1.5 w-full rounded-xl border border-border p-3.5 text-sm';
 const candidateSteps = [
     { step: 2, icon: UserRound, label: 'onboarding.wizard.contact' },
     { step: 3, icon: BriefcaseBusiness, label: 'onboarding.wizard.profession' },
@@ -365,12 +365,12 @@ const setLanguageLevel = (id: number, level: string) => {
                             ? 'border-blue-300 bg-blue-50 text-blue-800'
                             : item.step < maximumReachable
                               ? 'border-emerald-200 bg-emerald-50'
-                              : 'border-slate-200'
+                              : 'border-border'
                     "
                     @click="currentStep = item.step"
                 >
                     <span
-                        class="grid size-8 place-items-center rounded-lg bg-white"
+                        class="grid size-8 place-items-center rounded-lg bg-card"
                     >
                         <Check
                             v-if="item.step < maximumReachable"
@@ -385,6 +385,7 @@ const setLanguageLevel = (id: number, level: string) => {
 
         <form
             v-if="role === 'candidate' && currentStep === 2"
+            data-test="candidate-onboarding-step-2"
             @submit.prevent="
                 contactForm.put('/onboarding/candidate/steps/2', {
                     preserveScroll: true,
@@ -395,7 +396,7 @@ const setLanguageLevel = (id: number, level: string) => {
             <SectionCard :title="t('onboarding.wizard.contact')">
                 <div class="grid gap-4 sm:grid-cols-2">
                     <label v-for="field in contactFields" :key="field">
-                        <span class="text-sm font-bold text-slate-700">{{
+                        <span class="text-sm font-bold text-muted-foreground">{{
                             t(`onboarding.wizard.fields.${field}`)
                         }}</span>
                         <input
@@ -423,6 +424,7 @@ const setLanguageLevel = (id: number, level: string) => {
 
         <form
             v-else-if="role === 'candidate' && currentStep === 3"
+            data-test="candidate-onboarding-step-3"
             @submit.prevent="
                 professionForm.put('/onboarding/candidate/steps/3', {
                     preserveScroll: true,
@@ -540,6 +542,7 @@ const setLanguageLevel = (id: number, level: string) => {
 
         <form
             v-else-if="role === 'candidate' && currentStep === 4"
+            data-test="candidate-onboarding-step-4"
             @submit.prevent="
                 historyForm.put('/onboarding/candidate/steps/4', {
                     preserveScroll: true,
@@ -551,7 +554,7 @@ const setLanguageLevel = (id: number, level: string) => {
                 <article
                     v-for="(experience, index) in historyForm.experiences"
                     :key="index"
-                    class="mb-4 rounded-xl border border-slate-200 p-4"
+                    class="mb-4 rounded-xl border border-border p-4"
                 >
                     <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                         <input
@@ -627,13 +630,13 @@ const setLanguageLevel = (id: number, level: string) => {
                 >
                     {{ t('candidate.profile.history.addExperience') }}
                 </Button>
-                <h3 class="mt-7 text-sm font-extrabold text-slate-900">
+                <h3 class="mt-7 text-sm font-extrabold text-foreground">
                     {{ t('candidate.profile.history.educationTitle') }}
                 </h3>
                 <article
                     v-for="(education, index) in historyForm.educations"
                     :key="`education-${index}`"
-                    class="mt-3 rounded-xl border border-slate-200 p-4"
+                    class="mt-3 rounded-xl border border-border p-4"
                 >
                     <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         <input
@@ -726,6 +729,7 @@ const setLanguageLevel = (id: number, level: string) => {
 
         <form
             v-else-if="role === 'candidate' && currentStep === 5"
+            data-test="candidate-onboarding-step-5"
             @submit.prevent="
                 skillForm.put('/onboarding/candidate/steps/5', {
                     preserveScroll: true,
@@ -744,7 +748,7 @@ const setLanguageLevel = (id: number, level: string) => {
                             :class="
                                 hasSkill(skill.id)
                                     ? 'border-teal-300 bg-teal-50 text-teal-700'
-                                    : 'border-slate-200'
+                                    : 'border-border'
                             "
                             @click="toggleSkill(skill.id)"
                         >
@@ -815,12 +819,12 @@ const setLanguageLevel = (id: number, level: string) => {
 
         <div v-else-if="role === 'candidate' && currentStep === 6">
             <SectionCard :title="t('onboarding.wizard.uploads')">
-                <p class="text-sm leading-6 text-slate-600">
+                <p class="text-sm leading-6 text-muted-foreground">
                     {{ t('onboarding.wizard.uploadNotice') }}
                 </p>
                 <div class="mt-5 grid gap-4 lg:grid-cols-2">
                     <form
-                        class="rounded-xl border border-slate-200 p-4"
+                        class="rounded-xl border border-border p-4"
                         @submit.prevent="
                             photoForm.post('/onboarding/candidate/photo', {
                                 forceFormData: true,
@@ -829,7 +833,7 @@ const setLanguageLevel = (id: number, level: string) => {
                             })
                         "
                     >
-                        <p class="text-sm font-extrabold text-slate-900">
+                        <p class="text-sm font-extrabold text-foreground">
                             {{ t('onboarding.wizard.profilePhoto') }}
                         </p>
                         <input
@@ -837,7 +841,7 @@ const setLanguageLevel = (id: number, level: string) => {
                             accept="image/jpeg,image/png"
                             required
                             :aria-label="t('onboarding.wizard.profilePhoto')"
-                            class="erin-focus mt-3 block w-full rounded-xl border border-slate-200 p-2 text-sm"
+                            class="erin-focus mt-3 block w-full rounded-xl border border-border p-2 text-sm"
                             @change="
                                 photoForm.photo =
                                     ($event.target as HTMLInputElement)
@@ -854,7 +858,7 @@ const setLanguageLevel = (id: number, level: string) => {
                         </Button>
                     </form>
                     <form
-                        class="rounded-xl border border-slate-200 p-4"
+                        class="rounded-xl border border-border p-4"
                         @submit.prevent="
                             documentForm.post(
                                 '/onboarding/candidate/documents',
@@ -867,7 +871,7 @@ const setLanguageLevel = (id: number, level: string) => {
                             )
                         "
                     >
-                        <p class="text-sm font-extrabold text-slate-900">
+                        <p class="text-sm font-extrabold text-foreground">
                             {{ t('candidate.profile.documents.uploadTitle') }}
                         </p>
                         <div class="mt-3 grid gap-3">
@@ -904,7 +908,7 @@ const setLanguageLevel = (id: number, level: string) => {
                                 :aria-label="
                                     t('candidate.profile.documents.file')
                                 "
-                                class="erin-focus block w-full rounded-xl border border-slate-200 p-2 text-sm"
+                                class="erin-focus block w-full rounded-xl border border-border p-2 text-sm"
                                 @change="
                                     documentForm.file =
                                         ($event.target as HTMLInputElement)
@@ -926,6 +930,7 @@ const setLanguageLevel = (id: number, level: string) => {
                 </div>
                 <form
                     class="mt-4"
+                    data-test="candidate-onboarding-step-6"
                     @submit.prevent="
                         uploadForm.put('/onboarding/candidate/steps/6', {
                             preserveScroll: true,
@@ -964,20 +969,21 @@ const setLanguageLevel = (id: number, level: string) => {
 
         <form
             v-else-if="role === 'candidate' && currentStep === 7"
+            data-test="candidate-onboarding-step-7"
             @submit.prevent="finishForm.put('/onboarding/candidate/steps/7')"
         >
             <SectionCard :title="t('onboarding.wizard.finish')">
                 <div class="mb-5">
-                    <h3 class="text-sm font-extrabold text-slate-900">
+                    <h3 class="text-sm font-extrabold text-foreground">
                         {{ t('candidate.profile.availability.title') }}
                     </h3>
-                    <p class="mt-1 text-sm text-slate-600">
+                    <p class="mt-1 text-sm text-muted-foreground">
                         {{ t('candidate.profile.availability.description') }}
                     </p>
                     <article
                         v-for="(slot, index) in finishForm.availability"
                         :key="index"
-                        class="mt-3 grid gap-3 rounded-xl border border-slate-200 p-3 sm:grid-cols-[1fr_1fr_1fr_auto]"
+                        class="mt-3 grid gap-3 rounded-xl border border-border p-3 sm:grid-cols-[1fr_1fr_1fr_auto]"
                     >
                         <select
                             v-model="slot.weekday"
@@ -1037,11 +1043,11 @@ const setLanguageLevel = (id: number, level: string) => {
                     </Button>
                     <InputError :message="finishForm.errors.availability" />
                 </div>
-                <p class="text-sm leading-6 text-slate-600">
+                <p class="text-sm leading-6 text-muted-foreground">
                     {{ t('onboarding.wizard.publishNotice') }}
                 </p>
                 <label
-                    class="mt-4 flex items-start gap-3 rounded-xl border border-slate-200 p-4 text-sm"
+                    class="mt-4 flex items-start gap-3 rounded-xl border border-border p-4 text-sm"
                 >
                     <input
                         v-model="finishForm.publish_profile"
@@ -1089,7 +1095,7 @@ const setLanguageLevel = (id: number, level: string) => {
                         :class="
                             planForm.plan_slug === plan.slug
                                 ? 'border-blue-400 bg-blue-50'
-                                : 'border-slate-200'
+                                : 'border-border'
                         "
                     >
                         <input
@@ -1106,7 +1112,7 @@ const setLanguageLevel = (id: number, level: string) => {
                                     : '–'
                             }}
                         </p>
-                        <p class="mt-2 text-xs text-slate-600">
+                        <p class="mt-2 text-xs text-muted-foreground">
                             {{ plan.term_months }}
                             {{ t('onboarding.wizard.months') }}
                         </p>

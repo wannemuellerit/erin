@@ -69,4 +69,10 @@ class Interview extends Model
     {
         return $this->hasMany(InterviewProposal::class);
     }
+
+    /** @return HasMany<InterviewAttendance, $this> */
+    public function attendances(): HasMany
+    {
+        return $this->hasMany(InterviewAttendance::class);
+    }
 }

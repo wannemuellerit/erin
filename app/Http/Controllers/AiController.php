@@ -8,12 +8,16 @@ use App\Enums\AiRunStatus;
 use App\Enums\UserRole;
 use App\Models\AiConsent;
 use App\Models\AiRun;
+use App\Models\Company;
+use App\Services\Audit\AuditLogger;
 use App\Services\Billing\EntitlementService;
 use App\Services\Companies\CurrentCompany;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -88,6 +92,7 @@ class AiController extends Controller
             'input' => ['required', 'array', 'max:30'],
             'input.*' => ['nullable'],
             'consent_id' => ['nullable', 'integer', 'exists:ai_consents,id'],
+            'request_key' => ['nullable', 'string', 'max:100'],
         ]);
         $task = $validated['task'];
         /** @var AiConsent|null $consent */
@@ -95,6 +100,7 @@ class AiController extends Controller
             ? AiConsent::query()
                 ->where('user_id', $user->getKey())
                 ->whereNull('withdrawn_at')
+                ->where('purpose', $task)
                 ->findOrFail($validated['consent_id'])
             : null;
         $requiresConsent = in_array($task, ['cv_improve', 'profile_improve'], true);
@@ -105,15 +111,23 @@ class AiController extends Controller
             ], 422);
         }
 
+        if ($requiresConsent && ! $provider->supportsSensitiveDocuments()) {
+            return response()->json([
+                'message' => __('Sensible KI-Verarbeitung ist ohne freigegebenen EU-Endpunkt deaktiviert.'),
+            ], 422);
+        }
+
         $company = null;
         if ($user->role === UserRole::Company) {
             $company = $currentCompany->forUser($user);
             abort_if($company === null, 403);
-            $entitlements->consumeAiCredits($company);
         }
 
         $prompt = $this->prompt($task);
         $runData = [
+            'request_key' => hash('sha256', $user->getKey().':'.(
+                $validated['request_key'] ?? $request->header('Idempotency-Key') ?? Str::uuid()
+            )),
             'user_id' => $user->getKey(),
             'company_id' => $company?->getKey(),
             'consent_id' => $consent?->getKey(),
@@ -130,9 +144,19 @@ class AiController extends Controller
             'requires_consent' => $requiresConsent,
             'started_at' => now(),
         ];
-        $run = $company
-            ? AiRun::query()->create($runData)
+        [$run, $created] = $company
+            ? $this->createCompanyRun((int) $company->getKey(), $runData, $entitlements)
             : $this->createCandidateRun((int) $user->getKey(), $runData);
+        if (! $created) {
+            return response()->json([
+                'run_id' => $run->getKey(),
+                'result' => $run->output,
+                'model' => $run->model,
+                'status' => $run->status->value,
+                'human_review_required' => true,
+                'deduplicated' => true,
+            ], $run->status === AiRunStatus::Completed ? 200 : 409);
+        }
 
         try {
             $response = $provider->respond(new AiRequest(
@@ -147,6 +171,7 @@ class AiController extends Controller
                 'output' => $response->result,
                 'input_tokens' => $response->inputTokens,
                 'output_tokens' => $response->outputTokens,
+                'cost_cents' => $this->estimateCostCents($response->inputTokens, $response->outputTokens),
                 'completed_at' => now(),
             ]);
 
@@ -157,10 +182,10 @@ class AiController extends Controller
                 'human_review_required' => true,
             ]);
         } catch (Throwable $exception) {
-            report($exception);
+            Log::warning('ai.run.failed', ['exception_class' => $exception::class, 'run_id' => $run->getKey()]);
             $run->update([
                 'status' => AiRunStatus::Failed,
-                'error_message' => $exception->getMessage(),
+                'error_message' => 'provider_request_failed',
                 'completed_at' => now(),
             ]);
 
@@ -198,13 +223,40 @@ class AiController extends Controller
         return back()->with('success', __('Die Einwilligung wurde widerrufen.'));
     }
 
+    public function review(Request $request, AiRun $run): RedirectResponse
+    {
+        abort_unless($run->user_id === $request->user()?->getKey(), 404);
+        $data = $request->validate([
+            'decision' => ['required', Rule::in(['accepted', 'rejected'])],
+        ]);
+        $run->update([
+            'review_decision' => $data['decision'],
+            'reviewed_by' => $request->user()?->getKey(),
+            'reviewed_at' => now(),
+        ]);
+        app(AuditLogger::class)->record(
+            'ai.suggestion_reviewed',
+            $run,
+            after: ['decision' => $data['decision'], 'purpose' => $run->purpose],
+            request: $request,
+            companyId: $run->company_id,
+        );
+
+        return back()->with('success', __('Die menschliche Prüfung wurde protokolliert.'));
+    }
+
     /**
      * @param  array<string, mixed>  $runData
+     * @return array{AiRun, bool}
      */
-    private function createCandidateRun(int $userId, array $runData): AiRun
+    private function createCandidateRun(int $userId, array $runData): array
     {
-        return DB::transaction(function () use ($userId, $runData): AiRun {
+        return DB::transaction(function () use ($userId, $runData): array {
             DB::table('users')->where('id', $userId)->lockForUpdate()->first();
+            $existing = AiRun::query()->where('request_key', $runData['request_key'])->first();
+            if ($existing !== null) {
+                return [$existing, false];
+            }
             $used = AiRun::query()
                 ->where('user_id', $userId)
                 ->whereNull('company_id')
@@ -213,8 +265,34 @@ class AiController extends Controller
                 ->count();
             abort_if($used >= 20, 422, __('Deine 20 monatlichen KI-Credits sind aufgebraucht.'));
 
-            return AiRun::query()->create($runData);
+            return [AiRun::query()->create($runData), true];
         });
+    }
+
+    /**
+     * @param  array<string, mixed>  $runData
+     * @return array{AiRun, bool}
+     */
+    private function createCompanyRun(int $companyId, array $runData, EntitlementService $entitlements): array
+    {
+        return DB::transaction(function () use ($companyId, $runData, $entitlements): array {
+            $company = Company::query()->lockForUpdate()->findOrFail($companyId);
+            $existing = AiRun::query()->where('request_key', $runData['request_key'])->first();
+            if ($existing !== null) {
+                return [$existing, false];
+            }
+            $entitlements->consumeAiCredits($company);
+
+            return [AiRun::query()->create($runData), true];
+        }, 3);
+    }
+
+    private function estimateCostCents(int $inputTokens, int $outputTokens): int
+    {
+        $input = (float) config('services.openai.input_cost_per_million_cents', 0);
+        $output = (float) config('services.openai.output_cost_per_million_cents', 0);
+
+        return (int) ceil(($inputTokens * $input + $outputTokens * $output) / 1_000_000);
     }
 
     /**

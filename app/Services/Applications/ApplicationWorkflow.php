@@ -76,6 +76,12 @@ final class ApplicationWorkflow
         return in_array($to, self::TRANSITIONS[$from->value] ?? [], true);
     }
 
+    /** @return list<ApplicationStatus> */
+    public function allowedTransitions(ApplicationStatus $from): array
+    {
+        return self::TRANSITIONS[$from->value] ?? [];
+    }
+
     public function assertCanTransition(ApplicationStatus $from, ApplicationStatus $to): void
     {
         if (! $this->canTransition($from, $to)) {

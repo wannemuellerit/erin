@@ -27,7 +27,10 @@ class ProcessSupportZammadWebhookInbox implements ShouldBeUnique, ShouldQueue
     /** @var list<int> */
     public array $backoff = [10, 30, 120, 300, 900];
 
-    public function __construct(public readonly int $inboxId) {}
+    public function __construct(public readonly int $inboxId)
+    {
+        $this->onQueue('webhooks');
+    }
 
     public function uniqueId(): string
     {

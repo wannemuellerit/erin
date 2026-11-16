@@ -17,8 +17,14 @@ class NotificationPreference extends Model
         'application',
         'interview',
         'message',
+        'document',
+        'visa',
+        'referral',
         'reminder',
         'support',
+        'billing',
+        'boost',
+        'company',
         'system',
     ];
 

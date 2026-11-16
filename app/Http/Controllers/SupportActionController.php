@@ -12,6 +12,9 @@ use App\Jobs\SyncSupportTicketToProvider;
 use App\Models\Feedback;
 use App\Models\JobApplication;
 use App\Models\ModerationCase;
+use App\Models\SupportChatMessage;
+use App\Models\SupportChatSession;
+use App\Models\SupportKnowledgeArticle;
 use App\Models\SupportTicket;
 use App\Notifications\ActivityNotification;
 use App\Services\Activity\ActivityRecorder;
@@ -66,6 +69,40 @@ class SupportActionController extends Controller
             return $serialized;
         });
         $requestedTicketId = $request->integer('ticket');
+        $chatSession = SupportChatSession::query()
+            ->where('user_id', $user->getKey())
+            ->when(
+                $companyId !== null,
+                fn ($query) => $query->where('company_id', $companyId),
+                fn ($query) => $query->whereNull('company_id'),
+            )
+            ->whereIn('status', ['active', 'handed_off'])
+            ->latest('last_activity_at')
+            ->with('messages')
+            ->first();
+        $chatMessages = $chatSession?->messages
+            ->sortBy('id')
+            ->map(function (SupportChatMessage $message): array {
+                $sources = SupportKnowledgeArticle::query()
+                    ->whereKey($message->source_article_ids ?? [])
+                    ->get(['id', 'title', 'source_url', 'version'])
+                    ->map(fn (SupportKnowledgeArticle $article): array => [
+                        'id' => $article->getKey(),
+                        'title' => $article->title,
+                        'url' => $article->source_url,
+                        'version' => $article->version,
+                    ])->all();
+
+                return [
+                    'id' => $message->getKey(),
+                    'author' => $message->author,
+                    'body' => $message->body,
+                    'sources' => $sources,
+                    'escalation_required' => $message->escalation_required,
+                    'feedback' => $message->feedback,
+                    'created_at' => $message->created_at?->toIso8601String(),
+                ];
+            })->values()->all() ?? [];
 
         return Inertia::render('Support', [
             'tickets' => $tickets,
@@ -77,6 +114,17 @@ class SupportActionController extends Controller
                 'enabled' => (bool) config('services.zammad.enabled'),
             ],
             'attachmentLimits' => $attachmentLimits->forFrontend(),
+            'chatbot' => [
+                'enabled' => (bool) config('support.chatbot.enabled', true),
+                'session' => $chatSession === null ? null : [
+                    'id' => $chatSession->getKey(),
+                    'locale' => $chatSession->locale,
+                    'status' => $chatSession->status,
+                    'ticket_id' => $chatSession->handed_off_ticket_id,
+                    'retention_expires_at' => $chatSession->retention_expires_at->toIso8601String(),
+                ],
+                'messages' => $chatMessages,
+            ],
         ]);
     }
 

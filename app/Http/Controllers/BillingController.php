@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Enums\CompanyMemberRole;
+use App\Enums\CountryOperation;
 use App\Models\Company;
+use App\Models\CompanyBillingInvoice;
 use App\Models\Plan;
 use App\Services\Billing\BillingPlanChangeManager;
 use App\Services\Billing\EntitlementService;
@@ -12,6 +14,7 @@ use App\Services\Billing\StripeAddonPriceRegistry;
 use App\Services\Billing\StripePurchaseSignature;
 use App\Services\Billing\SubscriptionChangePolicy;
 use App\Services\Companies\CurrentCompany;
+use App\Services\Countries\CountryLaunchGate;
 use App\Services\Platform\PlatformSettings;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -71,6 +74,34 @@ class BillingController extends Controller
                     ->where('stripe_price', config('services.stripe.seat_price_id'))
                     ->sum('quantity') ?? 0),
             ],
+            'invoices' => CompanyBillingInvoice::query()
+                ->where('company_id', $company->getKey())
+                ->latest('issued_at')
+                ->latest('id')
+                ->limit(24)
+                ->get()
+                ->map(fn (CompanyBillingInvoice $invoice): array => [
+                    ...$invoice->only([
+                        'id',
+                        'number',
+                        'status',
+                        'currency',
+                        'subtotal_cents',
+                        'discount_cents',
+                        'tax_cents',
+                        'total_cents',
+                        'amount_paid_cents',
+                        'amount_due_cents',
+                        'billing_reason',
+                        'hosted_invoice_url',
+                        'invoice_pdf_url',
+                        'promotion_codes',
+                        'customer_tax_ids',
+                        'billing_address',
+                    ]),
+                    'issued_at' => $invoice->issued_at?->toIso8601String(),
+                    'paid_at' => $invoice->paid_at?->toIso8601String(),
+                ]),
         ]);
     }
 
@@ -103,9 +134,13 @@ class BillingController extends Controller
         Plan $plan,
         CurrentCompany $currentCompany,
         PlanStripePriceRegistry $priceRegistry,
+        CountryLaunchGate $countries,
     ): Checkout|RedirectResponse {
         $company = $currentCompany->forRequest($request);
         $this->assertCanManage($request, $currentCompany);
+        if (filled($company->default_target_country_code)) {
+            $countries->assertEnabled(CountryOperation::Billing, $company->default_target_country_code);
+        }
 
         if (collect([
             $company->legal_name,
@@ -194,7 +229,14 @@ class BillingController extends Controller
         $this->assertCanManage($request, $currentCompany);
         abort_unless(filled($company->stripe_id), 422, __('Für dieses Unternehmen existiert noch kein Stripe-Konto.'));
 
-        return $company->redirectToBillingPortal(route('employer.billing'));
+        $configuration = config('services.stripe.billing_portal_configuration_id');
+
+        return $company->redirectToBillingPortal(
+            route('employer.billing'),
+            is_string($configuration) && $configuration !== ''
+                ? ['configuration' => $configuration]
+                : [],
+        );
     }
 
     public function changePlan(
@@ -303,6 +345,18 @@ class BillingController extends Controller
         abort_unless($settings->get('billing.visa_credit_enabled', false) && filled($priceId), 422, __('Der Zusatzkauf ist noch nicht konfiguriert.'));
         $addOnPrices->synchronizeConfiguredVisaPackage();
         $credits = (int) $validated['credits'];
+        $purchaseMetadata = [
+            'purchase_type' => 'visa_credits',
+            'company_id' => (string) $company->getKey(),
+            'credits' => (string) $credits,
+            'price_id' => $priceId,
+            'erin_signature_version' => StripePurchaseSignature::VERSION,
+            'erin_purchase_signature' => $purchaseSignature->sign(
+                (int) $company->getKey(),
+                $credits,
+                $priceId,
+            ),
+        ];
 
         return Checkout::customer($company)->create(
             [$priceId => $credits],
@@ -310,18 +364,8 @@ class BillingController extends Controller
                 'success_url' => route('employer.billing').'?purchase=success',
                 'cancel_url' => route('employer.billing'),
                 'invoice_creation' => ['enabled' => true],
-                'metadata' => [
-                    'purchase_type' => 'visa_credits',
-                    'company_id' => (string) $company->getKey(),
-                    'credits' => (string) $credits,
-                    'price_id' => $priceId,
-                    'erin_signature_version' => StripePurchaseSignature::VERSION,
-                    'erin_purchase_signature' => $purchaseSignature->sign(
-                        (int) $company->getKey(),
-                        $credits,
-                        $priceId,
-                    ),
-                ],
+                'metadata' => $purchaseMetadata,
+                'payment_intent_data' => ['metadata' => $purchaseMetadata],
             ],
         );
     }

@@ -23,25 +23,25 @@ withDefaults(
         <div class="flex min-w-0 gap-3.5">
             <div
                 v-if="icon"
-                class="mt-0.5 flex size-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 ring-1 ring-blue-100"
+                class="mt-0.5 flex size-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[var(--erin-primary-text)] ring-1 ring-blue-100"
             >
                 <component :is="icon" class="size-5" />
             </div>
             <div class="min-w-0">
                 <p
                     v-if="eyebrow"
-                    class="mb-1 text-xs font-bold tracking-[0.12em] text-blue-600 uppercase"
+                    class="mb-1 text-xs font-bold tracking-[0.12em] text-[var(--erin-primary-text)] uppercase"
                 >
                     {{ eyebrow }}
                 </p>
                 <h1
-                    class="text-2xl font-bold tracking-tight text-slate-950 sm:text-[1.75rem]"
+                    class="text-2xl font-bold tracking-tight text-foreground sm:text-[1.75rem]"
                 >
                     {{ title }}
                 </h1>
                 <p
                     v-if="description"
-                    class="mt-1.5 max-w-3xl text-sm leading-6 text-slate-500"
+                    class="mt-1.5 max-w-3xl text-sm leading-6 text-muted-foreground"
                 >
                     {{ description }}
                 </p>

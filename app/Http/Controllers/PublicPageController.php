@@ -27,7 +27,7 @@ class PublicPageController extends Controller
     {
         $configured = $settings->getPublic('public.contact', []);
         $contact = is_array($configured) ? $configured : [];
-        $locale = app()->getLocale() === 'en' ? 'en' : 'de';
+        $locale = app()->getLocale() === 'de' ? 'de' : 'en';
         $email = $this->validEmail($contact['email'] ?? null);
         $phone = $this->plainText($contact['phone'] ?? null);
         $address = $this->plainText($contact["address_{$locale}"] ?? null);
@@ -46,7 +46,7 @@ class PublicPageController extends Controller
     {
         $configured = $settings->getPublic("legal.{$document}", []);
         $legal = is_array($configured) ? $configured : [];
-        $locale = app()->getLocale() === 'en' ? 'en' : 'de';
+        $locale = app()->getLocale();
         $content = $this->plainText($legal["content_{$locale}"] ?? null);
         $published = ($legal['published'] ?? false) === true && $content !== null;
 

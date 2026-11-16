@@ -32,8 +32,8 @@ class NotificationPreferencesUpdateRequest extends FormRequest
             $rules["preferences.{$event}.database_enabled"] = ['required', 'boolean'];
             $rules["preferences.{$event}.email_enabled"] = ['required', 'boolean'];
             $rules["preferences.{$event}.push_enabled"] = ['required', 'boolean'];
-            $rules["preferences.{$event}.sms_enabled"] = ['required', 'declined'];
-            $rules["preferences.{$event}.whatsapp_enabled"] = ['required', 'declined'];
+            $rules["preferences.{$event}.sms_enabled"] = ['required', 'boolean'];
+            $rules["preferences.{$event}.whatsapp_enabled"] = ['required', 'boolean'];
         }
 
         return $rules;

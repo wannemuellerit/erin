@@ -255,7 +255,7 @@ it('sends each due reminder once and respects browser-push preferences', functio
                     'tag' => 'erin-reminder',
                     'data' => [
                         'event' => 'reminder.due',
-                        'url' => route('employer.productivity'),
+                        'url' => route('dashboard'),
                     ],
                 ]);
 
@@ -264,4 +264,62 @@ it('sends each due reminder once and respects browser-push preferences', functio
     );
 
     expect($due->fresh()?->notified_at)->not->toBeNull();
+});
+
+it('stores local deadlines DST-safely and creates recurring occurrences exactly once', function () {
+    $this->travelTo('2026-03-20 10:00:00');
+    ['user' => $owner, 'company' => $company] = erinReminderEmployer();
+
+    $this->actingAs($owner)
+        ->withSession(['active_company_id' => $company->getKey()])
+        ->post(route('employer.reminders.store'), [
+            'title' => 'Wöchentliche Unterlagenprüfung',
+            'priority' => 'normal',
+            'due_at' => '2026-03-28T09:00',
+            'timezone' => 'Europe/Berlin',
+            'recurrence' => 'weekly',
+            'recurrence_ends_at' => '2026-04-30T23:59',
+        ])->assertRedirect();
+
+    $reminder = RecruiterReminder::query()->sole();
+    expect($reminder->due_at->clone()->utc()->toIso8601String())->toBe('2026-03-28T08:00:00+00:00')
+        ->and($reminder->events()->where('event', 'created')->count())->toBe(1);
+
+    $payload = ['action' => 'complete'];
+    $this->actingAs($owner)->withSession(['active_company_id' => $company->getKey()])
+        ->patch(route('employer.reminders.update', $reminder), $payload)->assertRedirect();
+    $this->actingAs($owner)->withSession(['active_company_id' => $company->getKey()])
+        ->patch(route('employer.reminders.update', $reminder), $payload)->assertRedirect();
+
+    expect(RecruiterReminder::query()->where('series_uuid', $reminder->series_uuid)->count())->toBe(2)
+        ->and(RecruiterReminder::query()->whereNull('completed_at')->sole()->due_at->clone()->utc()->toIso8601String())
+        ->toBe('2026-04-04T07:00:00+00:00')
+        ->and($reminder->events()->where('event', 'complete')->count())->toBe(1)
+        ->and(ActivityEntry::query()->where('event', 'reminder.complete')->count())->toBe(1);
+});
+
+it('snoozes reminders with immutable history and resets due delivery', function () {
+    $this->travelTo('2026-03-20 10:00:00');
+    ['user' => $owner, 'company' => $company] = erinReminderEmployer();
+    $reminder = RecruiterReminder::query()->create([
+        'company_id' => $company->getKey(),
+        'creator_id' => $owner->getKey(),
+        'assignee_id' => $owner->getKey(),
+        'title' => 'Zurückrufen',
+        'priority' => 'normal',
+        'timezone' => 'Europe/Berlin',
+        'due_at' => now()->addHour(),
+        'notified_at' => now(),
+    ]);
+
+    $this->actingAs($owner)
+        ->withSession(['active_company_id' => $company->getKey()])
+        ->patch(route('employer.reminders.update', $reminder), [
+            'action' => 'snooze',
+            'snoozed_until' => '2026-03-29T09:00',
+        ])->assertRedirect();
+
+    expect($reminder->refresh()->due_at->clone()->utc()->toIso8601String())->toBe('2026-03-29T07:00:00+00:00')
+        ->and($reminder->notified_at)->toBeNull()
+        ->and($reminder->events()->where('event', 'snooze')->sole()->before)->not->toBeNull();
 });
