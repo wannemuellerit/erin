@@ -20,19 +20,19 @@ x-php-service: &php-service
     CACHE_STORE: redis
     SESSION_DRIVER: redis
     QUEUE_CONNECTION: redis
-    REDIS_QUEUE_RETRY_AFTER: 180
+    REDIS_QUEUE_RETRY_AFTER: 960
     APP_MAINTENANCE_DRIVER: cache
     APP_MAINTENANCE_STORE: redis
     MAIL_MAILER: smtp
     MAIL_HOST: mailpit
     MAIL_PORT: 1025
     FILESYSTEM_DISK: s3
-    AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-erin}
-    AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-erin-local-password}
+    AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-erin-local-access-key}
+    AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-erin-local-secret-key}
     AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-eu-central-1}
     AWS_BUCKET: ${AWS_BUCKET:-erin-private}
-    AWS_ENDPOINT: http://minio:9000
-    AWS_URL: http://localhost:${MINIO_FORWARD_PORT:-9000}/${AWS_BUCKET:-erin-private}
+    AWS_ENDPOINT: http://object-storage:8333
+    AWS_URL: http://localhost:${OBJECT_STORAGE_FORWARD_PORT:-8333}/${AWS_BUCKET:-erin-private}
     AWS_USE_PATH_STYLE_ENDPOINT: "true"
     SCOUT_DRIVER: meilisearch
     SCOUT_QUEUE: "true"
@@ -40,6 +40,13 @@ x-php-service: &php-service
     MEILISEARCH_KEY: ${MEILISEARCH_KEY:-erin-local-master-key-change-me}
     CLAMAV_HOST: clamav
     CLAMAV_PORT: 3310
+    LIVEKIT_URL: ${LIVEKIT_URL:-ws://localhost:7880}
+    LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-erin-local-livekit-key}
+    LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-erin-local-livekit-secret-change-me}
+    LIVEKIT_ALLOW_INSECURE_LOCAL: "true"
+    LIVEKIT_TOKEN_TTL_MINUTES: 10
+    LIVEKIT_E2EE_REQUIRED: "true"
+    LIVEKIT_REGION: eu
     APP_DEMO_MODE: ${APP_DEMO_MODE:-true}
   volumes:
     - .:/var/www/html
@@ -74,7 +81,14 @@ services:
   redis:
     image: redis:7.4-alpine
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes",
+        "--maxmemory-policy",
+        "noeviction",
+      ]
     ports:
       - "${REDIS_FORWARD_PORT:-6379}:6379"
     volumes:
@@ -86,7 +100,7 @@ services:
       retries: 20
 
   meilisearch:
-    image: getmeili/meilisearch:v1.16.0
+    image: getmeili/meilisearch:v1.45.1@sha256:ac40212f9e5a7526d8007586e3e46fb0441d29dd36c7b02fa2341d2c9a1f6493
     restart: unless-stopped
     environment:
       MEILI_ENV: development
@@ -102,40 +116,33 @@ services:
       timeout: 5s
       retries: 20
 
-  minio:
-    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+  object-storage:
+    image: chrislusf/seaweedfs:4.40@sha256:52194fba4fecd0083c842158b3a902ba6e04a63619b2b0efcd08007bdb6a4602
     restart: unless-stopped
-    command: ["server", "/data", "--console-address", ":9001"]
+    command: ["mini", "-dir=/data", "-ip.bind=0.0.0.0"]
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-erin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-erin-local-password}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-erin-local-access-key}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-erin-local-secret-key}
+      S3_BUCKET: ${AWS_BUCKET:-erin-private}
     ports:
-      - "${MINIO_FORWARD_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_FORWARD_PORT:-9001}:9001"
+      - "${OBJECT_STORAGE_FORWARD_PORT:-8333}:8333"
+      - "${OBJECT_STORAGE_ADMIN_FORWARD_PORT:-23646}:23646"
     volumes:
-      - minio-data:/data
+      - object-storage-data:/data
     healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:9000/minio/health/ready"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "-q",
+          "-O",
+          "/dev/null",
+          "http://localhost:9333/cluster/status",
+        ]
       interval: 10s
       timeout: 5s
       retries: 20
-
-  minio-init:
-    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
-    restart: "no"
-    depends_on:
-      minio:
-        condition: service_healthy
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-erin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-erin-local-password}
-      AWS_BUCKET: ${AWS_BUCKET:-erin-private}
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - >
-        mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}" &&
-        mc mb --ignore-existing "local/$${AWS_BUCKET}" &&
-        mc anonymous set none "local/$${AWS_BUCKET}"
+      start_period: 20s
 
   clamav:
     image: clamav/clamav:1.4
@@ -152,7 +159,7 @@ services:
       start_period: 90s
 
   mailpit:
-    image: axllent/mailpit:v1.27
+    image: axllent/mailpit:v1.30.7@sha256:d5ecbb067db3705fa953d79e1b7f81ef84038df67aba6c52825d8c02a1ea748a
     restart: unless-stopped
     environment:
       MP_DATABASE: /data/mailpit.db
@@ -161,6 +168,49 @@ services:
       - "${MAILPIT_FORWARD_PORT:-8025}:8025"
     volumes:
       - mailpit-data:/data
+
+  livekit:
+    image: livekit/livekit-server:v1.13.1@sha256:2c6869d2d5ff6c9c0166f47be1c92dad6928bfecfa5e4060a6ece48db8accfa3
+    restart: unless-stopped
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY:-erin-local-livekit-key}: ${LIVEKIT_API_SECRET:-erin-local-livekit-secret-change-me}"
+      LIVEKIT_CONFIG: |
+        port: 7880
+        log_level: info
+        rtc:
+          tcp_port: 7881
+          udp_port: 7882
+          use_external_ip: false
+          node_ip: 127.0.0.1
+        redis:
+          address: redis:6379
+        room:
+          max_participants: 2
+        webhook:
+          api_key: "${LIVEKIT_API_KEY:-erin-local-livekit-key}"
+          urls:
+            - http://laravel:8000/integrations/livekit/webhook
+    ports:
+      - "${LIVEKIT_FORWARD_PORT:-7880}:7880"
+      - "${LIVEKIT_RTC_TCP_FORWARD_PORT:-7881}:7881/tcp"
+      - "${LIVEKIT_RTC_UDP_FORWARD_PORT:-7882}:7882/udp"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://127.0.0.1:7880",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
 
   setup:
     <<: *php-service
@@ -173,7 +223,7 @@ services:
         condition: service_healthy
 
   node-setup:
-    image: node:22-bookworm-slim
+    image: node:24-bookworm-slim
     working_dir: /var/www/html
     user: "${UID:-1000}:${GID:-1000}"
     command: ["sh", "docker/node/setup.sh"]
@@ -189,27 +239,23 @@ services:
     depends_on:
       setup:
         condition: service_completed_successfully
-      minio-init:
-        condition: service_completed_successfully
+      object-storage:
+        condition: service_healthy
       clamav:
         condition: service_healthy
       meilisearch:
         condition: service_healthy
+      livekit:
+        condition: service_healthy
     healthcheck:
-      test:
-        [
-          "CMD",
-          "php",
-          "-r",
-          "exit((int) ! @fsockopen('127.0.0.1', 8000));",
-        ]
+      test: ["CMD", "php", "-r", "exit((int) ! @fsockopen('127.0.0.1', 8000));"]
       interval: 10s
       timeout: 5s
       retries: 20
       start_period: 20s
 
   vite:
-    image: node:22-bookworm-slim
+    image: node:24-bookworm-slim
     working_dir: /var/www/html
     user: "${UID:-1000}:${GID:-1000}"
     command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
@@ -225,28 +271,51 @@ services:
       setup:
         condition: service_completed_successfully
 
+  horizon:
+    <<: *php-service
+    command: ["php", "artisan", "horizon"]
+    stop_grace_period: 930s
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      object-storage:
+        condition: service_healthy
+      clamav:
+        condition: service_healthy
+      meilisearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "php", "artisan", "horizon:status"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+
   queue:
     <<: *php-service
+    profiles: ["queue-fallback"]
     command:
       [
         "php",
         "artisan",
         "queue:work",
         "redis",
-        "--queue=high,default,low",
+        "--queue=payments,webhooks,notifications,scans,imports,ai,default",
         "--tries=3",
-        "--timeout=120",
+        "--timeout=900",
         "--sleep=1",
         "--max-time=3600",
       ]
-    stop_grace_period: 150s
+    stop_grace_period: 930s
     depends_on:
       setup:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
-      minio-init:
-        condition: service_completed_successfully
+      object-storage:
+        condition: service_healthy
       clamav:
         condition: service_healthy
       meilisearch:
@@ -265,6 +334,8 @@ services:
   reverb:
     <<: *php-service
     command: ["php", "artisan", "reverb:start", "--host=0.0.0.0", "--port=8080"]
+    environment:
+      REVERB_ALLOWED_ORIGINS: "${REVERB_ALLOWED_ORIGINS:-localhost,127.0.0.1},laravel"
     ports:
       - "${REVERB_FORWARD_PORT:-8080}:8080"
     depends_on:
@@ -273,13 +344,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test:
-        [
-          "CMD",
-          "php",
-          "-r",
-          "exit((int) ! @fsockopen('127.0.0.1', 8080));",
-        ]
+      test: ["CMD", "php", "-r", "exit((int) ! @fsockopen('127.0.0.1', 8080));"]
       interval: 10s
       timeout: 5s
       retries: 20
@@ -302,23 +367,17 @@ services:
     depends_on:
       setup:
         condition: service_completed_successfully
-      minio-init:
-        condition: service_completed_successfully
+      object-storage:
+        condition: service_healthy
     healthcheck:
-      test:
-        [
-          "CMD",
-          "php",
-          "-r",
-          "exit((int) ! @fsockopen('127.0.0.1', 9000));",
-        ]
+      test: ["CMD", "php", "-r", "exit((int) ! @fsockopen('127.0.0.1', 9000));"]
       interval: 10s
       timeout: 5s
       retries: 20
       start_period: 10s
 
   nginx:
-    image: nginx:1.28-alpine
+    image: nginx:1.30.1-alpine@sha256:c819f83c54b0361f5557601bf5eb4943d09360e7a7fdf426afc466570f45874d
     profiles: ["production"]
     restart: unless-stopped
     ports:
@@ -397,6 +456,7 @@ services:
     command: ["npm", "run", "test:e2e"]
     environment:
       PLAYWRIGHT_BASE_URL: http://laravel:8000
+      PLAYWRIGHT_OUTPUT_DIR: storage/framework/testing/playwright-${UID:-1000}
     volumes:
       - .:/var/www/html
     init: true
@@ -413,6 +473,6 @@ volumes:
   mysql-data:
   redis-data:
   meilisearch-data:
-  minio-data:
+  object-storage-data:
   clamav-data:
   mailpit-data:

@@ -26,7 +26,7 @@ const emit = defineEmits<{
         :value="modelValue"
         :class="
             cn(
-                'erin-focus min-h-28 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm leading-6 text-slate-900 placeholder:text-slate-400 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400',
+                'erin-focus min-h-28 w-full rounded-xl border border-border bg-card px-3.5 py-3 text-sm leading-6 text-foreground placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground',
                 props.class,
             )
         "

@@ -41,6 +41,17 @@ class RecruitingAnalyticsService
             ->filter(fn (?float $days): bool => $days !== null);
 
         return [
+            'definitions' => [
+                'grain' => 'company_application',
+                'timezone' => 'UTC',
+                'applications' => 'count(distinct application_id) by applied_at',
+                'interviews' => 'applications with at least one interview',
+                'hires' => 'applications whose canonical status is hired',
+                'interview_rate' => 'interviewed applications / applications * 100',
+                'hire_rate' => 'hired applications / applications * 100',
+                'average_days_to_hire' => 'average(decided_at - applied_at) for hired applications',
+                'exclusions' => ['deleted tenant data', 'applications outside the selected UTC period'],
+            ],
             'period' => [
                 'from' => $from->toDateString(),
                 'to' => $to->toDateString(),

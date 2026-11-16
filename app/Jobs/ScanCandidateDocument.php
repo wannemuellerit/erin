@@ -21,7 +21,10 @@ class ScanCandidateDocument implements ShouldQueue
      */
     public array $backoff = [30, 120, 300, 900];
 
-    public function __construct(public readonly int $documentId) {}
+    public function __construct(public readonly int $documentId)
+    {
+        $this->onQueue('scans');
+    }
 
     public function handle(ClamAvScanner $scanner): void
     {

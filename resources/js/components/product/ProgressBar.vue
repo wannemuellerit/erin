@@ -30,12 +30,12 @@ const tones = {
             v-if="label || showValue"
             class="mb-2 flex items-center justify-between gap-3 text-xs"
         >
-            <span class="font-medium text-slate-600">{{ label }}</span>
-            <span v-if="showValue" class="font-bold text-slate-900"
+            <span class="font-medium text-muted-foreground">{{ label }}</span>
+            <span v-if="showValue" class="font-bold text-foreground"
                 >{{ safeValue }} %</span
             >
         </div>
-        <div class="h-2 overflow-hidden rounded-full bg-slate-100">
+        <div class="h-2 overflow-hidden rounded-full bg-muted">
             <div
                 class="h-full rounded-full transition-[width] duration-700"
                 :class="tones[tone]"

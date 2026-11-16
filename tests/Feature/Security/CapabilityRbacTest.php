@@ -132,7 +132,10 @@ it('transfers company ownership atomically and prevents admins from doing it', f
         ->assertForbidden();
 
     $this->actingAs($owner)
-        ->withSession(['active_company_id' => $company->getKey()])
+        ->withSession([
+            'active_company_id' => $company->getKey(),
+            'auth.password_confirmed_at' => time(),
+        ])
         ->post(route('employer.team.transfer-ownership', $targetMembership))
         ->assertRedirect();
 

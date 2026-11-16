@@ -12,6 +12,7 @@ use App\Enums\CompanyStatus;
 use App\Enums\InterviewStatus;
 use App\Enums\UserRole;
 use App\Listeners\SyncStripePurchase;
+use App\Models\AiConsent;
 use App\Models\AiRun;
 use App\Models\CandidateProfile;
 use App\Models\Company;
@@ -125,19 +126,29 @@ it('records a fake AI result, consumes one company credit, and never changes the
     ]);
     $provider = new ErinAcceptanceAiProvider;
     $this->app->instance(AiProvider::class, $provider);
+    config([
+        'services.openai.input_cost_per_million_cents' => 1_000_000,
+        'services.openai.output_cost_per_million_cents' => 2_000_000,
+    ]);
 
-    $this->actingAs($owner)
+    $payload = [
+        'task' => 'applications_summarize',
+        'request_key' => 'acceptance-ai-request-1',
+        'input' => [
+            'application_id' => $application->getKey(),
+            'facts' => ['Berufserfahrung vorhanden', 'Deutsch B1'],
+        ],
+    ];
+    $response = $this->actingAs($owner)
         ->postJson(route('ai.run'), [
-            'task' => 'applications_summarize',
-            'input' => [
-                'application_id' => $application->getKey(),
-                'facts' => ['Berufserfahrung vorhanden', 'Deutsch B1'],
-            ],
+            ...$payload,
         ])
         ->assertOk()
         ->assertJsonPath('model', 'fake-recruiting-model')
         ->assertJsonPath('result.title', 'Neutrale Zusammenfassung')
         ->assertJsonPath('human_review_required', true);
+    $this->actingAs($owner)->postJson(route('ai.run'), $payload)
+        ->assertOk()->assertJsonPath('deduplicated', true);
 
     $run = AiRun::query()->sole();
     $usage = CompanyUsagePeriod::query()->sole();
@@ -155,8 +166,19 @@ it('records a fake AI result, consumes one company credit, and never changes the
         ])
         ->and($run->input_tokens)->toBe(41)
         ->and($run->output_tokens)->toBe(17)
+        ->and($run->cost_cents)->toBe(75)
         ->and($usage->ai_credits_used)->toBe(1)
         ->and($application->refresh()->status)->toBe(ApplicationStatus::InReview);
+
+    $this->actingAs($owner)->post(route('ai.runs.review', $run), [
+        'decision' => 'accepted',
+    ])->assertRedirect();
+    expect($run->fresh())->review_decision->toBe('accepted')
+        ->reviewed_by->toBe($owner->getKey());
+    $this->assertDatabaseHas('audit_logs', [
+        'event' => 'ai.suggestion_reviewed',
+        'auditable_id' => $run->getKey(),
+    ]);
 });
 
 it('blocks CV and profile AI tasks without an active purpose consent', function () {
@@ -174,6 +196,35 @@ it('blocks CV and profile AI tasks without an active purpose consent', function 
             ->assertUnprocessable()
             ->assertJsonStructure(['message']);
     }
+
+    expect($provider->calls)->toBe(0)
+        ->and(AiRun::query()->count())->toBe(0);
+});
+
+it('blocks mismatched consent and non-EU sensitive processing before the provider call', function () {
+    $candidate = User::factory()->create(['role' => UserRole::Candidate]);
+    CandidateProfile::factory()->create(['user_id' => $candidate->getKey()]);
+    $provider = new ErinAcceptanceAiProvider;
+    $this->app->instance(AiProvider::class, $provider);
+    $consent = AiConsent::query()->create([
+        'user_id' => $candidate->getKey(),
+        'purpose' => 'profile_improve',
+        'version' => 'test',
+        'data_categories' => ['profile_text'],
+        'granted_at' => now(),
+    ]);
+
+    $this->actingAs($candidate)->postJson(route('ai.run'), [
+        'task' => 'cv_improve',
+        'input' => ['text' => 'CV'],
+        'consent_id' => $consent->getKey(),
+    ])->assertNotFound();
+
+    $this->actingAs($candidate)->postJson(route('ai.run'), [
+        'task' => 'profile_improve',
+        'input' => ['text' => 'Profile'],
+        'consent_id' => $consent->getKey(),
+    ])->assertUnprocessable();
 
     expect($provider->calls)->toBe(0)
         ->and(AiRun::query()->count())->toBe(0);

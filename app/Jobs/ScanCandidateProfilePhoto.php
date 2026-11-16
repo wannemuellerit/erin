@@ -24,7 +24,9 @@ class ScanCandidateProfilePhoto implements ShouldQueue
     public function __construct(
         public readonly int $profileId,
         public readonly string $quarantinePath,
-    ) {}
+    ) {
+        $this->onQueue('scans');
+    }
 
     public function handle(
         ClamAvScanner $scanner,

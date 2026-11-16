@@ -3,9 +3,16 @@ import { useI18n } from 'vue-i18n';
 
 export function useFormatters() {
     const { locale } = useI18n();
-    const intlLocale = computed(() =>
-        locale.value === 'en' ? 'en-GB' : 'de-DE',
-    );
+    const intlLocales: Record<string, string> = {
+        de: 'de-DE',
+        en: 'en-GB',
+        pl: 'pl-PL',
+        ro: 'ro-RO',
+        hr: 'hr-HR',
+        es: 'es-ES',
+        pt: 'pt-PT',
+    };
+    const intlLocale = computed(() => intlLocales[locale.value] ?? 'en-GB');
 
     const formatDate = (
         value: string | number | Date | null | undefined,

@@ -1,4 +1,4 @@
-# Was Schritt 4 bedeutet: verschlüsselter DB-/MinIO-Restore-Drill
+# Was Schritt 4 bedeutet: verschlüsselter DB-/Objektspeicher-Restore-Drill
 
 Der reguläre Produktionsjob
 [`scripts/ops/offsite-backup.sh`](../../scripts/ops/offsite-backup.sh) erstellt
@@ -11,7 +11,7 @@ prüft bei jedem Lauf einen Teil der Daten und setzt eine gestaffelte
 
 Ein Backup ist erst belastbar, wenn nachgewiesen wurde, dass es in einer
 isolierten Umgebung vollständig und rechtzeitig wiederhergestellt werden kann.
-Das bloße Vorhandensein einer `.sql`-Datei oder eines MinIO-Volumes reicht
+Das bloße Vorhandensein einer `.sql`-Datei oder eines Objektspeicher-Volumes reicht
 nicht.
 
 ## RPO und RTO in einfachen Worten
@@ -29,14 +29,14 @@ Für den Drill werden Ziel und tatsächlich erreichter Wert getrennt erfasst:
 | System | Ziel-RPO | Erreichtes RPO | Ziel-RTO | Erreichtes RTO |
 |---|---:|---:|---:|---:|
 | MySQL | vorab festlegen | messen | vorab festlegen | messen |
-| MinIO/S3 | vorab festlegen | messen | vorab festlegen | messen |
+| S3-Objektspeicher | vorab festlegen | messen | vorab festlegen | messen |
 
 Das Gate bleibt rot, wenn ein erreichter Wert über seinem Ziel liegt.
 
-## Warum MySQL und MinIO gemeinsam zählen
+## Warum MySQL und Objektspeicher gemeinsam zählen
 
 MySQL enthält unter anderem Dokumentmetadaten, Status und Berechtigungen.
-MinIO/S3 enthält die eigentlichen privaten Dateien. Ein wiederhergestellter
+S3-Objektspeicher enthält die eigentlichen privaten Dateien. Ein wiederhergestellter
 Datenbankeintrag ohne zugehöriges Objekt ist unbrauchbar; ein Objekt ohne
 Metadaten und Zugriffskontrolle ebenfalls.
 
@@ -67,9 +67,9 @@ Konsistenzverfahren verwenden und vollständig in beide Richtungen prüfen:
 
 Der lokale Drill liest ausschließlich die mit `compose.yaml` gestartete
 `local`- oder `testing`-Umgebung. Er verweigert Produktions-Compose-Dateien,
-erstellt keine Host-Portfreigaben und startet MySQL sowie MinIO in einem
+erstellt keine Host-Portfreigaben und startet MySQL sowie Objektspeicher in einem
 internen Docker-Netz mit flüchtigen `tmpfs`-Dateisystemen. Vor MySQL-Dump und
-MinIO-Mirror aktiviert er den Maintenance-Modus, stoppt Queue und Scheduler
+Objektspeicher-Mirror aktiviert er den Maintenance-Modus, stoppt Queue und Scheduler
 kontrolliert und pausiert den Laravel-Schreibpfad. Ein Exit-Trap stellt diesen
 Zustand auch bei einem Fehler wieder her:
 
@@ -80,7 +80,7 @@ ERIN_RESTORE_DRILL_CONFIRM=LOCAL_ISOLATED_DOCKER_ONLY \
 
 Dabei erzeugt der Drill einen zufälligen ephemeren Master-Key und leitet per
 HMAC-SHA256 mit getrennten Domain-Labels einen Verschlüsselungs- und einen
-MAC-Key ab. MySQL und MinIO werden mit AES-256-CBC und PBKDF2-HMAC-SHA256 mit
+MAC-Key ab. MySQL und Objektspeicher werden mit AES-256-CBC und PBKDF2-HMAC-SHA256 mit
 mindestens 600.000 Iterationen verschlüsselt. Für jedes Ciphertext-Artefakt
 wird anschließend ein HMAC-SHA256 im Encrypt-then-MAC-Verfahren berechnet und
 **vor jeder Entschlüsselung** verifiziert. Master-, Verschlüsselungs- und
@@ -109,7 +109,7 @@ Der Drill prüft zusätzlich folgende Negativfälle:
 - manipuliertes Ciphertext-Artefakt wird durch den HMAC vor der Entschlüsselung
   abgewiesen;
 - ein manipulierter HMAC-Sidecar wird abgewiesen;
-- ein absichtlich entferntes MinIO-Objekt erzeugt einen Manifestfehler;
+- ein absichtlich entferntes Objektspeicher-Objekt erzeugt einen Manifestfehler;
 - eine Nicht-ID-Änderung und eine gelöschte Datenbankzeile verändern den
   kanonischen Datenhash;
 - eine fehlende Datenbankreferenz, ein verwaistes Storage-Objekt und ein
@@ -117,10 +117,10 @@ Der Drill prüft zusätzlich folgende Negativfälle:
 
 Vor dem Datenbank-Dump wird außerdem ein eindeutiger Drill-Canary als
 Audit-Ereignis geschrieben. Dessen Metadaten enthalten den Pfad eines zweiten,
-ebenfalls temporären MinIO-Canarys. Damit beweist jeder erfolgreiche Lauf
+ebenfalls temporären Objektspeicher-Canarys. Damit beweist jeder erfolgreiche Lauf
 positiv mindestens eine echte DB→Objekt-Referenz; der separate
 Manifest-Negativcanary bleibt bewusst ohne Datenbankreferenz und wird erst
-nach dem DB↔MinIO-Abgleich berücksichtigt. Der Drill prüft nach dem Restore
+nach dem DB↔Objektspeicher-Abgleich berücksichtigt. Der Drill prüft nach dem Restore
 exakte ID und Zeit, Datensatzanzahlen, SHA-256-Manifeste der zentralen
 Geschäftstabellen sowie den vollständigen Daten- und Strukturhash. Datenbank-
 und Objekt-Canary werden anschließend aus der Quelle entfernt.
@@ -148,7 +148,7 @@ direkt als Produktionsfreigabe eingetragen werden.
 ### Echter Produktions-Drill
 
 1. Incident-Startzeit und freigegebenen Drill-Owner protokollieren.
-2. Neueste laut RPO zulässige MySQL- und MinIO-Sicherung identifizieren.
+2. Neueste laut RPO zulässige MySQL- und Objektspeicher-Sicherung identifizieren.
 3. Prüfsummen, Signaturen, Verschlüsselung und Backupalter prüfen.
 4. Vollständig getrennte Restore-Umgebung ohne produktive ausgehende
    Nachrichten oder Webhooks bereitstellen.
@@ -161,7 +161,7 @@ direkt als Produktionsfreigabe eingetragen werden.
      /sicherer/temporärer/pfad/erin-YYYYMMDDTHHMMSSZ.sql
    ```
 
-6. MinIO/S3 inklusive benötigter Versionen in einen isolierten Bucket
+6. S3-Objektspeicher inklusive benötigter Versionen in einen isolierten Bucket
    wiederherstellen. Niemals den Produktions-Bucket überschreiben.
 7. Anwendung mit Restore-Daten und deaktivierten externen Integrationen
    starten.
@@ -234,7 +234,7 @@ eine neu erzeugte temporäre Datenbank, prüft die Migrationstabelle und löscht
 die Datenbank anschließend.
 
 `scripts/ops/local-encrypted-restore-drill.sh` ergänzt Verschlüsselung,
-isolierten MySQL-/MinIO-Restore, RPO-/RTO-Messung, Manifestvergleich,
+isolierten MySQL-/Objektspeicher-Restore, RPO-/RTO-Messung, Manifestvergleich,
 Negativkontrollen, sichere Bereinigung und maschinenlesbare Evidenz.
 
 Keines dieser Skripte ersetzt eine verschlüsselte externe Produktionsablage,

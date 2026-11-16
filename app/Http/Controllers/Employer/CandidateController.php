@@ -20,9 +20,12 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Laravel\Scout\Builder as SearchBuilder;
+use Laravel\Scout\Engines\CollectionEngine;
 
 class CandidateController extends Controller
 {
@@ -30,7 +33,7 @@ class CandidateController extends Controller
         Request $request,
         CurrentCompany $currentCompany,
         CandidateMatchService $matching,
-    ): Response {
+    ): Response|RedirectResponse {
         $company = $currentCompany->forRequest($request);
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:200'],
@@ -53,6 +56,7 @@ class CandidateController extends Controller
             'job' => ['nullable', 'integer', 'required_if:view,ai'],
             'sort' => ['nullable', Rule::in(['published_desc', 'experience_desc', 'availability_asc', 'salary_asc'])],
             'per_page' => ['nullable', 'integer', Rule::in([12, 24, 48])],
+            'page' => ['nullable', 'integer', 'min:1'],
         ]);
         $selectedJob = isset($filters['job'])
             ? $company->jobPostings()->with(['skills', 'languages'])->findOrFail((int) $filters['job'])
@@ -161,8 +165,13 @@ class CandidateController extends Controller
         }
 
         $perPage = (int) ($filters['per_page'] ?? 24);
+        // Browsing/filtering must not depend on an eventually consistent index.
+        $databaseListing = blank($filters['search'] ?? null);
         if (($filters['view'] ?? 'all') === 'ai' && $selectedJob !== null) {
-            $ranked = $search->take(1000)->get()
+            $profiles = $databaseListing
+                ? $hydrate(CandidateProfile::query())->orderBy('id')->limit(1000)->get()
+                : $search->take(1000)->get();
+            $ranked = $profiles
                 ->map(fn (CandidateProfile $profile): array => $this->anonymized(
                     $profile,
                     $matching->for($profile, $selectedJob),
@@ -179,8 +188,41 @@ class CandidateController extends Controller
                 ['path' => $request->url(), 'query' => $request->query()],
             );
         } else {
-            /** @var LengthAwarePaginator<int, CandidateProfile> $paginated */
-            $paginated = $search->paginate($perPage);
+            if ($databaseListing) {
+                $query = $hydrate(CandidateProfile::query());
+                match ($sort) {
+                    'experience_desc' => $query->orderByDesc('experience_years'),
+                    'availability_asc' => $query->orderBy('available_from'),
+                    'salary_asc' => $query->orderBy('salary_expectation_cents'),
+                    default => $query->orderByDesc('published_at'),
+                };
+                $paginated = $query->orderBy('id')->paginate($perPage);
+            } else {
+                /** @var LengthAwarePaginator<int, CandidateProfile> $paginated */
+                $paginated = $search->paginate($perPage);
+                $expected = min($perPage, max(0, $paginated->total() - ($paginated->currentPage() - 1) * $perPage));
+                if ($paginated->count() !== $expected) {
+                    // Stale/withdrawn index documents must not produce phantom totals.
+                    Log::warning('Candidate search index differs from live profiles; using database fallback.', [
+                        'index_total' => $paginated->total(),
+                        'returned' => $paginated->count(),
+                    ]);
+                    $fallback = new SearchBuilder(new CandidateProfile, (string) $filters['search'], function ($query) use ($hydrate, $sort): void {
+                        $query = $hydrate($query);
+                        match ($sort) {
+                            'experience_desc' => $query->orderByDesc('experience_years'),
+                            'availability_asc' => $query->orderBy('available_from'),
+                            'salary_asc' => $query->orderBy('salary_expectation_cents'),
+                            default => $query->orderByDesc('published_at'),
+                        };
+                        $query->orderBy('id');
+                    });
+                    $result = (new CollectionEngine)->paginate($fallback, $perPage, $paginated->currentPage());
+                    $paginated = new LengthAwarePaginator($result['results'], $result['total'], $perPage, $paginated->currentPage(), [
+                        'path' => $request->url(), 'query' => $request->query(),
+                    ]);
+                }
+            }
             $candidates = $paginated->through(
                 fn (CandidateProfile $profile): array => $this->anonymized(
                     $profile,
@@ -190,7 +232,12 @@ class CandidateController extends Controller
             )->withQueryString();
         }
 
+        if ($candidates->currentPage() > $candidates->lastPage()) {
+            return redirect()->route('employer.candidates.index', [...$request->query(), 'page' => 1]);
+        }
+
         return Inertia::render('employer/Candidates', [
+            'published_count' => CandidateProfile::query()->published()->count(),
             'candidates' => $candidates,
             'jobs' => $company->jobPostings()
                 ->select(['id', 'title', 'status'])
