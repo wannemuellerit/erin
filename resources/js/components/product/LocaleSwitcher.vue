@@ -105,7 +105,7 @@ function chooseLocale(nextLocale: SupportedLocale): void {
                         ? 'bg-white text-blue-700 shadow-sm'
                         : 'text-slate-500 hover:bg-white/70 hover:text-slate-900'
                 "
-                :aria-label="language.label"
+                :aria-label="`${language.code.toUpperCase()} ${language.label}`"
                 :aria-pressed="locale === language.code"
                 :aria-busy="pendingLocale === language.code"
                 :disabled="pendingLocale !== null"

@@ -627,7 +627,9 @@ test.describe('Onboarding und Abrechnung', () => {
         await page.getByLabel('Aktuelles Land (ISO)').fill('PL');
         await page.getByLabel('Aktuelle Stadt').fill('Wrocław');
         await page.getByLabel('Telefonnummer').fill('+49 170 1234567');
-        await page.getByRole('button', { name: 'Speichern und weiter' }).click();
+        await page
+            .getByRole('button', { name: 'Speichern und weiter' })
+            .click();
 
         await page.getByLabel('Berufsfeld').selectOption({ index: 1 });
         await page.getByLabel('Wunschposition').fill('Elektriker');
@@ -637,11 +639,11 @@ test.describe('Onboarding und Abrechnung', () => {
             .fill(
                 'Ich bin ausgebildeter Elektriker mit fünf Jahren Berufserfahrung und möchte langfristig in einem deutschen Industriebetrieb arbeiten.',
             );
-        await page.getByRole('button', { name: 'Speichern und weiter' }).click();
-
         await page
-            .getByPlaceholder('Arbeitgeber *')
-            .fill('E2E Elektrotechnik');
+            .getByRole('button', { name: 'Speichern und weiter' })
+            .click();
+
+        await page.getByPlaceholder('Arbeitgeber *').fill('E2E Elektrotechnik');
         await page.getByPlaceholder('Position *').fill('Elektriker');
         await page.locator('input[type="date"]').first().fill('2020-01-01');
         await page
@@ -651,22 +653,30 @@ test.describe('Onboarding und Abrechnung', () => {
         await page
             .getByPlaceholder('Abschluss *')
             .fill('Elektroniker für Betriebstechnik');
-        await page.getByRole('button', { name: 'Speichern und weiter' }).click();
+        await page
+            .getByRole('button', { name: 'Speichern und weiter' })
+            .click();
 
         await page
             .getByRole('button', { name: /Industrie|Elektr/i })
             .first()
             .click();
         await page.locator('input[type="checkbox"]').first().check();
-        await page.getByRole('button', { name: 'Speichern und weiter' }).click();
+        await page
+            .getByRole('button', { name: 'Speichern und weiter' })
+            .click();
 
         await page
             .getByText(
                 'Ich habe verstanden, dass Dokumente separat freigegeben werden und nicht öffentlich abrufbar sind.',
             )
             .click();
-        await page.getByRole('button', { name: 'Speichern und weiter' }).click();
-        await page.getByRole('button', { name: 'Einrichtung abschließen' }).click();
+        await page
+            .getByRole('button', { name: 'Speichern und weiter' })
+            .click();
+        await page
+            .getByRole('button', { name: 'Einrichtung abschließen' })
+            .click();
 
         await expect(page).toHaveURL(/\/candidate\/profile$/);
     });
@@ -680,7 +690,9 @@ test.describe('Onboarding und Abrechnung', () => {
         await expectNoSeriousAccessibilityViolations(page);
 
         await page.getByText('Basic', { exact: true }).click();
-        await page.getByRole('button', { name: 'Speichern und weiter' }).click();
+        await page
+            .getByRole('button', { name: 'Speichern und weiter' })
+            .click();
         await page
             .getByLabel('Rechtlicher Firmenname')
             .fill('E2E Onboarding GmbH');
@@ -784,7 +796,7 @@ test.describe('Englische Oberfläche', () => {
             }),
         ).toBeVisible();
         await page
-            .getByRole('button', { name: 'Englisch', exact: true })
+            .getByRole('button', { name: 'EN Englisch', exact: true })
             .click();
 
         await expect(
@@ -811,7 +823,7 @@ test.describe('Englische Oberfläche', () => {
         await page.goto('/');
 
         await page
-            .getByRole('button', { name: 'Englisch', exact: true })
+            .getByRole('button', { name: 'EN Englisch', exact: true })
             .click();
         await expect(
             page.getByRole('heading', {
@@ -821,7 +833,9 @@ test.describe('Englische Oberfläche', () => {
         ).toBeVisible();
 
         await page.goto('/login');
-        await page.getByRole('button', { name: 'German', exact: true }).click();
+        await page
+            .getByRole('button', { name: 'DE German', exact: true })
+            .click();
 
         await expect(
             page.getByRole('heading', {
@@ -841,7 +855,7 @@ test.describe('Englische Oberfläche', () => {
     }) => {
         await page.goto('/login');
         await page
-            .getByRole('button', { name: 'Englisch', exact: true })
+            .getByRole('button', { name: 'EN Englisch', exact: true })
             .click();
         await page
             .getByLabel('Email address', { exact: true })
@@ -868,7 +882,7 @@ test.describe('Englische Oberfläche', () => {
     }) => {
         await page.goto('/login');
         await page
-            .getByRole('button', { name: 'Englisch', exact: true })
+            .getByRole('button', { name: 'EN Englisch', exact: true })
             .click();
         await page
             .getByLabel('Email address', { exact: true })
@@ -907,7 +921,7 @@ test.describe('Mobile Abnahme', () => {
             page.getByRole('group', { name: 'Sprache', exact: true }),
         ).toBeVisible();
         await page
-            .getByRole('button', { name: 'Englisch', exact: true })
+            .getByRole('button', { name: 'EN Englisch', exact: true })
             .click();
         await expect(
             page.getByRole('heading', {
@@ -927,7 +941,7 @@ test.describe('Mobile Abnahme', () => {
             page.getByRole('group', { name: 'Sprache', exact: true }),
         ).toBeVisible();
         await page
-            .getByRole('button', { name: 'Englisch', exact: true })
+            .getByRole('button', { name: 'EN Englisch', exact: true })
             .click();
 
         await expect(
