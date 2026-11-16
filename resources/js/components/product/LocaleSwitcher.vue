@@ -98,7 +98,7 @@ function chooseLocale(nextLocale: SupportedLocale): void {
                         ? 'bg-card text-[var(--erin-primary-text-hover)] shadow-sm'
                         : 'text-muted-foreground hover:bg-card/70 hover:text-foreground'
                 "
-                :aria-label="language.label"
+                :aria-label="`${language.code.toUpperCase()} ${language.label}`"
                 :aria-pressed="locale === language.code"
                 :aria-busy="pendingLocale === language.code"
                 :disabled="pendingLocale !== null"

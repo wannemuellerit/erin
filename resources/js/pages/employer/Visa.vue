@@ -245,11 +245,6 @@ const updateStepDeadline = (step: VisaStep, dueAt: string) => {
                         :data-test="`employer-visa-details-${visaCase.id}`"
                         class="grid w-full gap-4 p-4 text-left hover:bg-muted lg:grid-cols-[1.1fr_1fr_0.75fr_auto] lg:items-center"
                         :aria-expanded="expandedCaseId === visaCase.id"
-                        :aria-label="
-                            t('employer.visa.toggleCase', {
-                                name: candidateName(visaCase),
-                            })
-                        "
                         @click="
                             expandedCaseId =
                                 expandedCaseId === visaCase.id
