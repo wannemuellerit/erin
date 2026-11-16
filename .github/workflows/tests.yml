@@ -271,8 +271,8 @@ jobs:
           php artisan db:seed --class='Database\Seeders\BrowserTestSeeder' --force --no-interaction
           php artisan wayfinder:generate --with-form
 
-      - name: Build production assets
-        run: npm run build
+      - name: Build browser test assets
+        run: npm run build -- --mode e2e
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium

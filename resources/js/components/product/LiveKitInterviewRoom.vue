@@ -176,7 +176,10 @@ const join = async () => {
         participantIdentity.value = access.participantIdentity;
         participantName.value = access.participantName;
 
-        if (import.meta.env.DEV && window.__ERIN_LIVEKIT_ROOM_MOCK__) {
+        if (
+            (import.meta.env.DEV || import.meta.env.MODE === 'e2e') &&
+            window.__ERIN_LIVEKIT_ROOM_MOCK__
+        ) {
             const mockedRoom = window.__ERIN_LIVEKIT_ROOM_MOCK__({
                 url: access.url,
                 token: access.token,
