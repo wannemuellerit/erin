@@ -41,6 +41,12 @@ class Plan extends Model
             'is_enterprise' => 'boolean',
             'is_active' => 'boolean',
             'price_cents' => 'integer',
+            'term_months' => 'integer',
+            'active_jobs_limit' => 'integer',
+            'seat_limit' => 'integer',
+            'ai_credits_monthly' => 'integer',
+            'job_boosts_per_term' => 'integer',
+            'visa_credits_per_term' => 'integer',
         ];
     }
 

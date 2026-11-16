@@ -1,10 +1,13 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:8000';
+const chromiumExecutable = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE;
 
 export default defineConfig({
     testDir: './tests/Browser',
-    outputDir: './storage/framework/testing/playwright',
+    outputDir:
+        process.env.PLAYWRIGHT_OUTPUT_DIR ??
+        './storage/framework/testing/playwright',
     // Die Rollenflows teilen bewusst Demo-Konten und verändern Onboarding-Zustände.
     // Innerhalb einer Spec müssen sie deshalb deterministisch nacheinander laufen.
     fullyParallel: false,
@@ -43,7 +46,12 @@ export default defineConfig({
             use: {
                 ...devices['Desktop Chrome'],
                 launchOptions: {
-                    args: ['--host-resolver-rules=MAP localhost vite'],
+                    ...(chromiumExecutable
+                        ? { executablePath: chromiumExecutable }
+                        : {}),
+                    args: [
+                        '--host-resolver-rules=MAP localhost:8080 reverb:8080, MAP localhost vite',
+                    ],
                 },
                 viewport: {
                     width: 1440,

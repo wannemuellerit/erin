@@ -5,13 +5,16 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Requests\Admin\StoreFeatureFlagRequest;
 use App\Http\Requests\Admin\UpdateFeatureFlagRequest;
 use App\Models\FeatureFlag;
+use App\Services\Platform\FeatureFlagResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class FeatureFlagController extends AdminController
 {
-    public function store(StoreFeatureFlagRequest $request): RedirectResponse
-    {
+    public function store(
+        StoreFeatureFlagRequest $request,
+        FeatureFlagResolver $flags,
+    ): RedirectResponse {
         $flag = FeatureFlag::query()->create([
             ...$request->validated(),
             'updated_by' => $request->user()?->getKey(),
@@ -30,6 +33,7 @@ class FeatureFlagController extends AdminController
                 'conditions',
             ]),
         );
+        $flags->forget();
 
         return back()->with('success', __('Das Feature Flag wurde angelegt.'));
     }
@@ -37,6 +41,7 @@ class FeatureFlagController extends AdminController
     public function update(
         UpdateFeatureFlagRequest $request,
         FeatureFlag $featureFlag,
+        FeatureFlagResolver $flags,
     ): RedirectResponse {
         $fields = [
             'name',
@@ -59,6 +64,7 @@ class FeatureFlagController extends AdminController
             $before,
             $featureFlag->only($fields),
         );
+        $flags->forget();
 
         return back()->with('success', __('Das Feature Flag wurde aktualisiert.'));
     }
@@ -66,6 +72,7 @@ class FeatureFlagController extends AdminController
     public function destroy(
         Request $request,
         FeatureFlag $featureFlag,
+        FeatureFlagResolver $flags,
     ): RedirectResponse {
         $before = $featureFlag->only([
             'key',
@@ -83,6 +90,7 @@ class FeatureFlagController extends AdminController
             $before,
         );
         $featureFlag->delete();
+        $flags->forget();
 
         return back()->with('success', __('Das Feature Flag wurde gelöscht.'));
     }

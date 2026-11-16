@@ -124,6 +124,10 @@ class DashboardController extends Controller
             ]);
         }
 
+        if ($user->role === UserRole::Partner) {
+            return redirect()->route('partner.cases.index');
+        }
+
         return Inertia::render('Dashboard', [
             'dashboard' => [
                 'kind' => 'admin',
@@ -150,7 +154,7 @@ class DashboardController extends Controller
             'body_en' => 'After a successful visa package, we support the registration of new employees with BARMER.',
             'url' => null,
         ]);
-        $language = $locale === 'en' ? 'en' : 'de';
+        $language = $locale === 'de' ? 'de' : 'en';
 
         return [
             'enabled' => (bool) ($notice['enabled'] ?? true),

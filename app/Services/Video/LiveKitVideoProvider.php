@@ -55,6 +55,7 @@ final class LiveKitVideoProvider implements VideoProvider
             url: $url,
             roomName: $roomName,
             participantIdentity: $participantIdentity,
+            participantName: $participantName,
             token: $token,
             e2eeKey: $e2eeKey,
             expiresAt: $expiresAt->toIso8601String(),

@@ -41,7 +41,7 @@ it('fails closed when reconciliation finds multiple matching Zammad tickets', fu
         'is_internal' => false,
         'delivery_status' => 'sending',
     ]);
-    $ticketMarker = 'Erin operation ticket:'.$ticket->number;
+    $ticketMarker = 'Faden operation ticket:'.$ticket->number;
     $messageMarker = app(ZammadMessageMarker::class)->for($openingMessage);
 
     Http::fake([
@@ -178,7 +178,7 @@ it('fails closed when ticket details contradict the requested Zammad ticket ID',
                     '954' => [
                         'id' => 954,
                         'number' => '9954',
-                        'note' => 'Erin operation ticket:'.$ticket->number,
+                        'note' => 'Faden operation ticket:'.$ticket->number,
                     ],
                 ],
             ],

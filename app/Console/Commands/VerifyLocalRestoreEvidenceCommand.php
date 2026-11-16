@@ -16,8 +16,8 @@ class VerifyLocalRestoreEvidenceCommand extends Command
     public function handle(LocalRestoreEvidenceValidator $validator): int
     {
         $path = $this->argument('path');
-        if (! is_string($path)) {
-            $this->error('Der Evidenzpfad muss eine Zeichenfolge sein.');
+        if (! is_string($path) || $path === '') {
+            $this->error('Der Evidenzpfad muss als nicht leere Zeichenkette angegeben werden.');
 
             return self::INVALID;
         }

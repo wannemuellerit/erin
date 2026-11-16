@@ -13,11 +13,11 @@ use App\Models\JobInvitation;
 use App\Models\JobMedia;
 use App\Models\JobPosting;
 use App\Models\Referral;
-use App\Notifications\ActivityNotification;
 use App\Services\Activity\ActivityRecorder;
 use App\Services\Applications\ApplicationWorkflow;
 use App\Services\Audit\AuditLogger;
 use App\Services\Matching\CandidateMatchService;
+use App\Services\Platform\ProductNotificationDispatcher;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -46,13 +46,18 @@ class MarketplaceController extends Controller
                 'skills:id,slug,name_de,name_en',
                 'languages:id,code,name_de,name_en',
                 'screeningQuestions',
+                'translations:id,job_posting_id,locale,title,position,description',
             ])
             ->when($request->filled('search'), function ($query) use ($request): void {
                 $term = '%'.str_replace(['%', '_'], ['\\%', '\\_'], (string) $request->string('search')).'%';
                 $query->where(fn ($builder) => $builder
                     ->where('title', 'like', $term)
                     ->orWhere('position', 'like', $term)
-                    ->orWhere('description', 'like', $term));
+                    ->orWhere('description', 'like', $term)
+                    ->orWhereHas('translations', fn ($translations) => $translations
+                        ->where('title', 'like', $term)
+                        ->orWhere('position', 'like', $term)
+                        ->orWhere('description', 'like', $term)));
             })
             ->when($request->filled('employment_type'), fn ($query) => $query
                 ->where('employment_type', (string) $request->string('employment_type')))
@@ -62,13 +67,15 @@ class MarketplaceController extends Controller
             ->latest('published_at')
             ->limit(100)
             ->get()
-            ->map(function (JobPosting $job) use ($matching, $profile, $appliedJobIds): array {
+            ->map(function (JobPosting $job) use ($matching, $profile, $appliedJobIds, $request): array {
+                $match = $matching->for($profile, $job);
+                $job->useTranslation($request->getLocale());
                 $data = $job->toArray();
                 $data['company'] = $this->serializeCompany($job->company);
 
                 return [
                     ...$data,
-                    'match' => $matching->for($profile, $job),
+                    'match' => $match,
                     'already_applied' => $appliedJobIds->contains($job->getKey()),
                 ];
             })
@@ -104,11 +111,14 @@ class MarketplaceController extends Controller
             'skills',
             'languages',
             'screeningQuestions',
+            'translations:id,job_posting_id,locale,title,position,description',
             'media' => fn ($query) => $query
                 ->where('scan_result', 'clean')
                 ->orderBy('original_name'),
         ]);
 
+        $match = $matching->for($profile, $job);
+        $job->useTranslation($request->getLocale());
         $data = $job->toArray();
         $data['company'] = $this->serializeCompany($job->company, includeTrustMetrics: true);
         $data['media'] = $job->media->map(fn (JobMedia $medium): array => [
@@ -126,7 +136,7 @@ class MarketplaceController extends Controller
         return Inertia::render('candidate/JobShow', [
             'job' => [
                 ...$data,
-                'match' => $matching->for($profile, $job),
+                'match' => $match,
                 'already_applied' => $profile->applications()
                     ->where('job_posting_id', $job->getKey())
                     ->exists(),
@@ -221,23 +231,27 @@ class MarketplaceController extends Controller
         });
 
         foreach ($job->company->users()->wherePivotNotNull('accepted_at')->get() as $member) {
-            $member->notify(new ActivityNotification([
-                'event' => 'application.created',
-                'title' => __('Neue Bewerbung'),
-                'message' => __('Für „:job“ ist eine neue Bewerbung eingegangen.', ['job' => $job->title]),
-                'translations' => [
-                    'de' => [
-                        'title' => 'Neue Bewerbung',
-                        'message' => sprintf('Für „%s“ ist eine neue Bewerbung eingegangen.', $job->title),
+            app(ProductNotificationDispatcher::class)->dispatch(
+                $member,
+                'application.created',
+                "application:{$application->getKey()}:created",
+                [
+                    'title' => __('Neue Bewerbung'),
+                    'message' => __('Für „:job“ ist eine neue Bewerbung eingegangen.', ['job' => $job->title]),
+                    'translations' => [
+                        'de' => [
+                            'title' => 'Neue Bewerbung',
+                            'message' => sprintf('Für „%s“ ist eine neue Bewerbung eingegangen.', $job->title),
+                        ],
+                        'en' => [
+                            'title' => 'New application',
+                            'message' => sprintf('A new application was submitted for “%s”.', $job->title),
+                        ],
                     ],
-                    'en' => [
-                        'title' => 'New application',
-                        'message' => sprintf('A new application was submitted for “%s”.', $job->title),
-                    ],
+                    'url' => route('employer.pipeline', ['job' => $job->getKey()]),
+                    'application_id' => $application->getKey(),
                 ],
-                'url' => route('employer.pipeline', ['job' => $job->getKey()]),
-                'application_id' => $application->getKey(),
-            ]));
+            );
         }
 
         $audit->record('application.created', $application, after: [
@@ -280,7 +294,21 @@ class MarketplaceController extends Controller
                     'jobPosting.company.logoMedia:id,company_id,type,disk,path,original_name,mime_type,size_bytes,scan_result',
                     'statusHistory',
                     'interviews',
-                    'visaCase.steps',
+                    'visaCase.steps' => fn ($query) => $query
+                        ->whereIn('visibility', ['candidate', 'shared'])
+                        ->with([
+                            'responsibleUser:id,name',
+                            'tasks' => fn ($tasks) => $tasks
+                                ->whereIn('visibility', ['candidate', 'shared'])
+                                ->with('assignee:id,name'),
+                        ]),
+                    'visaCase.documents' => fn ($query) => $query
+                        ->whereIn('visibility', ['candidate', 'shared'])
+                        ->with('document:id,type,status,scan_result,expires_at,verified_at'),
+                    'visaCase.events' => fn ($query) => $query
+                        ->whereIn('visibility', ['candidate', 'shared'])
+                        ->latest()
+                        ->limit(30),
                 ])
                 ->latest('applied_at')
                 ->get()

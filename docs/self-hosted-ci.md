@@ -10,8 +10,10 @@ jobs before service containers start, avoiding port and tool-install conflicts.
 The completion hook clears temporary global registry credentials. The
 `VPS runner smoke test` workflow checks the connection and Docker explicitly.
 
-All jobs in `tests.yml` and `security.yml` use the VPS for trusted events.
-Timeouts allow for the shared host's serial queue. Release-image publication and
+Jobs in `tests.yml`, the dependency audit and the container scan use the VPS
+for trusted events. CodeQL and Gitleaks stay on GitHub-hosted runners because
+their extraction and path assumptions failed on the VPS. Timeouts allow for
+the shared host's serial queue. Release-image publication and
 Dependabot auto-merge keep their existing GitHub-hosted runners. Deployment and
 backup continue to require their separate `erin` and environment labels, which
 this CI runner deliberately does not have.

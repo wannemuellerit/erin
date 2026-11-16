@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
 /**
@@ -21,13 +23,18 @@ use Illuminate\Support\Carbon;
  */
 class RecruiterReminder extends Model
 {
+    use SoftDeletes;
+
     protected $guarded = ['id'];
 
     protected function casts(): array
     {
         return [
             'due_at' => 'datetime',
+            'recurrence_ends_at' => 'datetime',
+            'snoozed_until' => 'datetime',
             'completed_at' => 'datetime',
+            'discarded_at' => 'datetime',
             'notified_at' => 'datetime',
         ];
     }
@@ -94,6 +101,12 @@ class RecruiterReminder extends Model
      */
     public function scopeOpen(Builder $query): Builder
     {
-        return $query->whereNull('completed_at');
+        return $query->whereNull('completed_at')->whereNull('discarded_at');
+    }
+
+    /** @return HasMany<RecruiterReminderEvent, $this> */
+    public function events(): HasMany
+    {
+        return $this->hasMany(RecruiterReminderEvent::class);
     }
 }

@@ -24,6 +24,16 @@ type VisaStep = {
     completed_at?: string | null;
     responsible_user_id?: number | null;
     responsible_user?: { id: number; name: string } | null;
+    notes?: string | null;
+    blocker?: string | null;
+    completion_evidence?: string | null;
+    tasks?: Array<{
+        id: number;
+        title: string;
+        status: string;
+        due_at?: string | null;
+        assignee?: { id: number; name: string } | null;
+    }>;
 };
 
 type VisaCase = {
@@ -45,11 +55,31 @@ type VisaCase = {
         job_posting?: { id: number; title: string } | null;
     } | null;
     steps?: VisaStep[];
+    documents?: Array<{
+        id: number;
+        purpose?: string | null;
+        translation_status: string;
+        review_status: string;
+        document?: {
+            id: number;
+            type: string;
+            status: string;
+            scan_result?: string | null;
+            expires_at?: string | null;
+        };
+    }>;
 };
 
-const props = withDefaults(defineProps<{ cases?: VisaCase[] }>(), {
-    cases: () => [],
-});
+const props = withDefaults(
+    defineProps<{
+        cases?: VisaCase[];
+        responsible_users?: Array<{ id: number; name: string }>;
+    }>(),
+    {
+        cases: () => [],
+        responsible_users: () => [],
+    },
+);
 const { t } = useI18n();
 const { can } = useCapabilities();
 const canManageVisa = computed(() => can('visa.manage'));
@@ -140,6 +170,9 @@ const updateStepStatus = (step: VisaStep, status: string) => {
             status,
             due_at: step.due_at ?? null,
             responsible_user_id: step.responsible_user_id ?? null,
+            notes: step.notes ?? null,
+            blocker: step.blocker ?? null,
+            completion_evidence: step.completion_evidence ?? null,
         },
         { preserveScroll: true },
     );
@@ -151,6 +184,9 @@ const updateStepDeadline = (step: VisaStep, dueAt: string) => {
             status: step.status,
             due_at: dueAt || null,
             responsible_user_id: step.responsible_user_id ?? null,
+            notes: step.notes ?? null,
+            blocker: step.blocker ?? null,
+            completion_evidence: step.completion_evidence ?? null,
         },
         { preserveScroll: true },
     );
@@ -201,11 +237,13 @@ const updateStepDeadline = (step: VisaStep, dueAt: string) => {
                 <article
                     v-for="visaCase in cases"
                     :key="visaCase.id"
-                    class="overflow-hidden rounded-xl border border-slate-200"
+                    :data-test="`employer-visa-case-${visaCase.id}`"
+                    class="overflow-hidden rounded-xl border border-border"
                 >
                     <button
                         type="button"
-                        class="grid w-full gap-4 p-4 text-left hover:bg-slate-50 lg:grid-cols-[1.1fr_1fr_0.75fr_auto] lg:items-center"
+                        :data-test="`employer-visa-details-${visaCase.id}`"
+                        class="grid w-full gap-4 p-4 text-left hover:bg-muted lg:grid-cols-[1.1fr_1fr_0.75fr_auto] lg:items-center"
                         :aria-expanded="expandedCaseId === visaCase.id"
                         :aria-label="
                             t('employer.visa.toggleCase', {
@@ -221,7 +259,7 @@ const updateStepDeadline = (step: VisaStep, dueAt: string) => {
                     >
                         <span class="flex items-center gap-3">
                             <span
-                                class="grid size-11 place-items-center rounded-xl bg-blue-50 text-xs font-extrabold text-[var(--erin-primary)]"
+                                class="grid size-11 place-items-center rounded-xl bg-blue-50 text-xs font-extrabold text-[var(--erin-primary-text)]"
                             >
                                 {{
                                     candidateName(visaCase)
@@ -231,11 +269,11 @@ const updateStepDeadline = (step: VisaStep, dueAt: string) => {
                             </span>
                             <span>
                                 <span
-                                    class="block text-sm font-bold text-slate-900"
+                                    class="block text-sm font-bold text-foreground"
                                 >
                                     {{ candidateName(visaCase) }}
                                 </span>
-                                <span class="text-xs text-slate-400">
+                                <span class="text-xs text-muted-foreground">
                                     #VI-{{ visaCase.id }} ·
                                     {{
                                         visaCase.candidate_profile
@@ -249,10 +287,10 @@ const updateStepDeadline = (step: VisaStep, dueAt: string) => {
                         </span>
                         <span>
                             <span class="mb-2 flex justify-between text-xs">
-                                <span class="font-bold text-slate-600">
+                                <span class="font-bold text-muted-foreground">
                                     {{ t('employer.visa.progress') }}
                                 </span>
-                                <span class="text-slate-400">
+                                <span class="text-muted-foreground">
                                     {{ visaCase.progress }} %
                                 </span>
                             </span>
@@ -269,7 +307,7 @@ const updateStepDeadline = (step: VisaStep, dueAt: string) => {
                             />
                             <span
                                 v-if="visaCase.target_start_date"
-                                class="mt-1.5 block text-[10px] text-slate-400"
+                                class="mt-1.5 block text-[10px] text-muted-foreground"
                             >
                                 {{
                                     t('employer.visa.targetDate', {
@@ -281,7 +319,7 @@ const updateStepDeadline = (step: VisaStep, dueAt: string) => {
                             </span>
                         </span>
                         <ChevronDown
-                            class="size-4 text-slate-400 transition"
+                            class="size-4 text-muted-foreground transition"
                             :class="{
                                 'rotate-180': expandedCaseId === visaCase.id,
                             }"
@@ -290,21 +328,23 @@ const updateStepDeadline = (step: VisaStep, dueAt: string) => {
 
                     <div
                         v-if="expandedCaseId === visaCase.id"
-                        class="border-t border-slate-200 bg-slate-50 p-4"
+                        class="border-t border-border bg-muted p-4"
                     >
                         <div v-if="visaCase.steps?.length" class="space-y-2">
                             <div
                                 v-for="step in visaCase.steps"
                                 :key="step.id"
-                                class="grid gap-3 rounded-xl bg-white p-3 ring-1 ring-slate-200 sm:grid-cols-[1fr_12rem_10rem]"
+                                class="grid gap-3 rounded-xl bg-card p-3 ring-1 ring-border sm:grid-cols-2 lg:grid-cols-[1fr_11rem_10rem_12rem]"
                             >
                                 <div>
-                                    <p class="text-xs font-bold text-slate-800">
+                                    <p
+                                        class="text-xs font-bold text-foreground"
+                                    >
                                         {{ step.title }}
                                     </p>
                                     <p
                                         v-if="step.responsible_user"
-                                        class="mt-1 text-[10px] text-slate-400"
+                                        class="mt-1 text-[10px] text-muted-foreground"
                                     >
                                         {{
                                             t('employer.visa.responsible', {
@@ -317,7 +357,8 @@ const updateStepDeadline = (step: VisaStep, dueAt: string) => {
                                 <select
                                     v-if="canManageVisa"
                                     :value="step.status"
-                                    class="h-9 rounded-lg border border-slate-200 px-2 text-xs"
+                                    :aria-label="`${step.title}: ${stepLabel(step.status)}`"
+                                    class="h-9 rounded-lg border border-border px-2 text-xs"
                                     @change="
                                         updateStepStatus(
                                             step,
@@ -357,7 +398,7 @@ const updateStepDeadline = (step: VisaStep, dueAt: string) => {
                                     v-if="canManageVisa"
                                     :value="step.due_at?.slice(0, 10) ?? ''"
                                     type="date"
-                                    class="h-9 rounded-lg border border-slate-200 px-2 text-xs"
+                                    class="h-9 rounded-lg border border-border px-2 text-xs"
                                     :aria-label="t('employer.visa.deadline')"
                                     @change="
                                         updateStepDeadline(
@@ -369,7 +410,7 @@ const updateStepDeadline = (step: VisaStep, dueAt: string) => {
                                 />
                                 <span
                                     v-else
-                                    class="self-center text-xs text-slate-500"
+                                    class="self-center text-xs text-muted-foreground"
                                 >
                                     {{
                                         step.due_at
@@ -377,23 +418,100 @@ const updateStepDeadline = (step: VisaStep, dueAt: string) => {
                                             : '—'
                                     }}
                                 </span>
+                                <select
+                                    v-if="canManageVisa"
+                                    v-model.number="step.responsible_user_id"
+                                    :aria-label="
+                                        t('employer.visa.responsiblePerson')
+                                    "
+                                    class="h-9 rounded-lg border border-border px-2 text-xs"
+                                    @change="
+                                        updateStepStatus(step, step.status)
+                                    "
+                                >
+                                    <option :value="null">—</option>
+                                    <option
+                                        v-for="user in responsible_users"
+                                        :key="user.id"
+                                        :value="user.id"
+                                    >
+                                        {{ user.name }}
+                                    </option>
+                                </select>
+                                <input
+                                    v-if="canManageVisa"
+                                    v-model="step.completion_evidence"
+                                    :placeholder="
+                                        t('employer.visa.completionEvidence')
+                                    "
+                                    class="h-9 rounded-lg border border-border px-2 text-xs sm:col-span-2 lg:col-span-2"
+                                    @change="
+                                        updateStepStatus(step, step.status)
+                                    "
+                                />
+                                <input
+                                    v-if="canManageVisa"
+                                    v-model="step.blocker"
+                                    :placeholder="t('employer.visa.blocker')"
+                                    class="h-9 rounded-lg border border-border px-2 text-xs sm:col-span-2 lg:col-span-2"
+                                    @change="
+                                        updateStepStatus(step, step.status)
+                                    "
+                                />
+                                <div
+                                    v-if="step.tasks?.length"
+                                    class="space-y-1 sm:col-span-2 lg:col-span-4"
+                                >
+                                    <p
+                                        class="text-[10px] font-extrabold text-muted-foreground uppercase"
+                                    >
+                                        {{ t('employer.visa.tasksTitle') }}
+                                    </p>
+                                    <p
+                                        v-for="task in step.tasks"
+                                        :key="task.id"
+                                        class="text-xs text-muted-foreground"
+                                    >
+                                        {{ task.title }} ·
+                                        {{ stepLabel(task.status) }} ·
+                                        {{
+                                            task.due_at
+                                                ? formatDate(task.due_at)
+                                                : '—'
+                                        }}
+                                    </p>
+                                </div>
                             </div>
                         </div>
-                        <p
-                            v-else
-                            class="py-6 text-center text-sm text-slate-400"
+                        <div
+                            v-if="visaCase.documents?.length"
+                            class="mt-4 rounded-xl bg-card p-3 ring-1 ring-border"
                         >
-                            {{ t('employer.visa.noSteps') }}
-                        </p>
+                            <p
+                                class="text-[10px] font-extrabold text-muted-foreground uppercase"
+                            >
+                                {{ t('employer.visa.documentsTitle') }}
+                            </p>
+                            <p
+                                v-for="assignment in visaCase.documents"
+                                :key="assignment.id"
+                                class="mt-2 text-xs text-muted-foreground"
+                            >
+                                {{ assignment.document?.type }} ·
+                                {{ assignment.document?.status }} ·
+                                {{ assignment.document?.scan_result ?? '—' }} ·
+                                {{ assignment.translation_status }}
+                            </p>
+                        </div>
                     </div>
                 </article>
             </div>
             <div v-else class="py-14 text-center">
-                <Plane class="mx-auto size-9 text-slate-300" />
+                <Plane class="mx-auto size-9 text-muted-foreground" />
                 <h2 class="mt-4 font-bold">
                     {{ t('employer.visa.emptyTitle') }}
                 </h2>
-                <p class="mt-2 text-sm text-slate-500">
+                <p class="mt-2 text-sm text-muted-foreground">
                     {{ t('employer.visa.emptyDescription') }}
                 </p>
             </div>
@@ -412,7 +530,7 @@ const updateStepDeadline = (step: VisaStep, dueAt: string) => {
                     :key="visaCase.id"
                     class="mb-5 min-w-[760px] last:mb-0"
                 >
-                    <p class="mb-3 text-xs font-bold text-slate-700">
+                    <p class="mb-3 text-xs font-bold text-muted-foreground">
                         {{ candidateName(visaCase) }}
                     </p>
                     <div class="flex items-center">
@@ -428,12 +546,12 @@ const updateStepDeadline = (step: VisaStep, dueAt: string) => {
                                         ['completed', 'not_required'].includes(
                                             step.status,
                                         )
-                                            ? 'bg-teal-500 text-white'
+                                            ? 'bg-teal-500 text-[#0f172a]'
                                             : step.status === 'in_progress'
-                                              ? 'bg-[var(--erin-primary)] text-white ring-4 ring-blue-100'
+                                              ? 'bg-[var(--erin-primary)] text-[var(--erin-primary-foreground)] ring-4 ring-blue-100'
                                               : step.status === 'blocked'
                                                 ? 'bg-red-500 text-white'
-                                                : 'bg-slate-100 text-slate-400'
+                                                : 'bg-muted text-muted-foreground'
                                     "
                                 >
                                     <Check
@@ -448,14 +566,14 @@ const updateStepDeadline = (step: VisaStep, dueAt: string) => {
                                     <span v-else>{{ index + 1 }}</span>
                                 </span>
                                 <p
-                                    class="mt-2 max-w-24 text-[9px] font-bold text-slate-500"
+                                    class="mt-2 max-w-24 text-[9px] font-bold text-muted-foreground"
                                 >
                                     {{ step.title }}
                                 </p>
                             </div>
                             <div
                                 v-if="index < (visaCase.steps?.length ?? 0) - 1"
-                                class="mb-5 h-px flex-1 bg-slate-200"
+                                class="mb-5 h-px flex-1 bg-border"
                             />
                         </div>
                     </div>

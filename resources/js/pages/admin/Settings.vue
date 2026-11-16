@@ -11,12 +11,12 @@ import {
     Trash2,
 } from '@lucide/vue';
 import { computed, reactive } from 'vue';
+import { useAdminI18n } from './_i18n';
 import FormField from '@/components/product/FormField.vue';
 import PageHeader from '@/components/product/PageHeader.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
 import Textarea from '@/components/product/Textarea.vue';
 import adminSettings from '@/routes/admin/settings';
-import { useAdminI18n } from './_i18n';
 
 type DashboardNotice = {
     enabled: boolean;
@@ -101,6 +101,34 @@ const colorKeys = Object.keys(props.defaults);
 const themeForm = useForm({
     colors: { ...props.colors },
 });
+
+const readableTextColor = (background: string): '#0f172a' | '#ffffff' => {
+    const hex = background.trim().replace(/^#/, '');
+    const normalized =
+        hex.length === 3
+            ? hex
+                  .split('')
+                  .map((character) => character.repeat(2))
+                  .join('')
+            : hex;
+
+    if (!/^[\da-f]{6}$/i.test(normalized)) {
+        return '#0f172a';
+    }
+
+    const channels = [0, 2, 4].map((offset) => {
+        const value =
+            Number.parseInt(normalized.slice(offset, offset + 2), 16) / 255;
+
+        return value <= 0.04045
+            ? value / 12.92
+            : ((value + 0.055) / 1.055) ** 2.4;
+    });
+    const luminance =
+        0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+
+    return (luminance + 0.05) / 0.05 >= 4.5 ? '#0f172a' : '#ffffff';
+};
 
 const platformForm = useForm({
     dashboard_notice: {
@@ -324,9 +352,9 @@ function deletePlatformRole(roleId: number): void {
                     <label
                         v-for="key in colorKeys"
                         :key="key"
-                        class="rounded-xl border border-slate-200 p-3"
+                        class="rounded-xl border border-border p-3"
                     >
-                        <span class="text-xs font-bold text-slate-600">
+                        <span class="text-xs font-bold text-muted-foreground">
                             {{ humanize(key) }}
                         </span>
                         <div class="mt-2 flex items-center gap-2">
@@ -340,7 +368,7 @@ function deletePlatformRole(roleId: number): void {
                                 type="text"
                                 maxlength="7"
                                 pattern="^#[0-9A-Fa-f]{6}$"
-                                class="erin-focus h-10 min-w-0 flex-1 rounded-lg border border-slate-200 px-3 font-mono text-xs uppercase"
+                                class="erin-focus h-10 min-w-0 flex-1 rounded-lg border border-border px-3 font-mono text-xs uppercase"
                             />
                         </div>
                         <p
@@ -353,7 +381,7 @@ function deletePlatformRole(roleId: number): void {
                 </div>
 
                 <div
-                    class="mt-5 rounded-2xl border border-slate-200 p-5"
+                    class="mt-5 rounded-2xl border border-border p-5"
                     :style="{
                         backgroundColor: themeForm.colors.background,
                         color: themeForm.colors.text,
@@ -374,6 +402,9 @@ function deletePlatformRole(roleId: number): void {
                             class="rounded-lg px-4 py-2 text-xs font-bold text-white"
                             :style="{
                                 backgroundColor: themeForm.colors.primary,
+                                color: readableTextColor(
+                                    themeForm.colors.primary,
+                                ),
                             }"
                         >
                             {{ t('settings.primaryPreview') }}
@@ -382,6 +413,9 @@ function deletePlatformRole(roleId: number): void {
                             class="rounded-lg px-4 py-2 text-xs font-bold text-white"
                             :style="{
                                 backgroundColor: themeForm.colors.secondary,
+                                color: readableTextColor(
+                                    themeForm.colors.secondary,
+                                ),
                             }"
                         >
                             {{ t('settings.secondaryPreview') }}
@@ -390,6 +424,9 @@ function deletePlatformRole(roleId: number): void {
                             class="rounded-lg px-4 py-2 text-xs font-bold text-white"
                             :style="{
                                 backgroundColor: themeForm.colors.accent,
+                                color: readableTextColor(
+                                    themeForm.colors.accent,
+                                ),
                             }"
                         >
                             {{ t('settings.accentPreview') }}
@@ -398,11 +435,11 @@ function deletePlatformRole(roleId: number): void {
                 </div>
 
                 <div
-                    class="mt-5 flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between"
+                    class="mt-5 flex flex-col gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between"
                 >
                     <button
                         type="button"
-                        class="erin-focus inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 text-xs font-bold text-slate-600"
+                        class="erin-focus inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border px-4 text-xs font-bold text-muted-foreground"
                         @click="resetColors"
                     >
                         <RotateCcw class="size-4" />
@@ -434,37 +471,37 @@ function deletePlatformRole(roleId: number): void {
                 :description="t('settings.noticeDescription')"
             >
                 <label
-                    class="flex items-center gap-3 text-sm font-semibold text-slate-700"
+                    class="flex items-center gap-3 text-sm font-semibold text-muted-foreground"
                 >
                     <input
                         v-model="platformForm.dashboard_notice.enabled"
                         type="checkbox"
-                        class="size-4 rounded border-slate-300 text-blue-600"
+                        class="size-4 rounded border-border text-[var(--erin-primary-text)]"
                     />
                     {{ t('settings.showNotice') }}
                 </label>
 
                 <div class="mt-5 grid gap-4 sm:grid-cols-2">
                     <label>
-                        <span class="text-xs font-bold text-slate-600">
+                        <span class="text-xs font-bold text-muted-foreground">
                             {{ t('settings.germanTitle') }}
                         </span>
                         <input
                             v-model="platformForm.dashboard_notice.title_de"
-                            class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                            class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-border px-3 text-sm"
                         />
                     </label>
                     <label>
-                        <span class="text-xs font-bold text-slate-600">
+                        <span class="text-xs font-bold text-muted-foreground">
                             {{ t('settings.englishTitle') }}
                         </span>
                         <input
                             v-model="platformForm.dashboard_notice.title_en"
-                            class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                            class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-border px-3 text-sm"
                         />
                     </label>
                     <label>
-                        <span class="text-xs font-bold text-slate-600">
+                        <span class="text-xs font-bold text-muted-foreground">
                             {{ t('settings.germanBody') }}
                         </span>
                         <Textarea
@@ -474,7 +511,7 @@ function deletePlatformRole(roleId: number): void {
                         />
                     </label>
                     <label>
-                        <span class="text-xs font-bold text-slate-600">
+                        <span class="text-xs font-bold text-muted-foreground">
                             {{ t('settings.englishBody') }}
                         </span>
                         <Textarea
@@ -485,14 +522,14 @@ function deletePlatformRole(roleId: number): void {
                     </label>
                 </div>
                 <label class="mt-4 block">
-                    <span class="text-xs font-bold text-slate-600">
+                    <span class="text-xs font-bold text-muted-foreground">
                         {{ t('settings.targetUrl') }}
                     </span>
                     <input
                         v-model="platformForm.dashboard_notice.url"
                         type="url"
                         placeholder="https://…"
-                        class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                        class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-border px-3 text-sm"
                     />
                 </label>
             </SectionCard>
@@ -514,7 +551,7 @@ function deletePlatformRole(roleId: number): void {
                             type="number"
                             min="0"
                             max="3650"
-                            class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                            class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                         />
                     </FormField>
                     <FormField
@@ -529,7 +566,7 @@ function deletePlatformRole(roleId: number): void {
                             type="number"
                             min="0"
                             max="3650"
-                            class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                            class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                         />
                     </FormField>
                     <FormField
@@ -544,7 +581,7 @@ function deletePlatformRole(roleId: number): void {
                             type="number"
                             min="0"
                             max="3650"
-                            class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                            class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                         />
                     </FormField>
                     <FormField
@@ -557,7 +594,7 @@ function deletePlatformRole(roleId: number): void {
                             type="number"
                             min="0"
                             max="3650"
-                            class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                            class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                         />
                     </FormField>
                     <FormField
@@ -570,7 +607,7 @@ function deletePlatformRole(roleId: number): void {
                             type="number"
                             min="1"
                             max="720"
-                            class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                            class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                         />
                     </FormField>
                     <FormField
@@ -592,7 +629,7 @@ function deletePlatformRole(roleId: number): void {
                             type="number"
                             min="50"
                             max="100"
-                            class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                            class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                         />
                     </FormField>
                 </div>
@@ -603,9 +640,9 @@ function deletePlatformRole(roleId: number): void {
                 :description="t('settings.billingDescription')"
             >
                 <div class="space-y-5">
-                    <div class="rounded-xl border border-slate-200 p-4">
+                    <div class="rounded-xl border border-border p-4">
                         <label
-                            class="flex items-center justify-between gap-4 text-sm font-semibold text-slate-700"
+                            class="flex items-center justify-between gap-4 text-sm font-semibold text-muted-foreground"
                         >
                             <span>{{ t('settings.visaEnabled') }}</span>
                             <input
@@ -613,11 +650,13 @@ function deletePlatformRole(roleId: number): void {
                                     platformForm.billing.visa_credit_enabled
                                 "
                                 type="checkbox"
-                                class="size-4 rounded border-slate-300 text-blue-600"
+                                class="size-4 rounded border-border text-[var(--erin-primary-text)]"
                             />
                         </label>
                         <label class="mt-3 block">
-                            <span class="text-xs font-bold text-slate-600">
+                            <span
+                                class="text-xs font-bold text-muted-foreground"
+                            >
                                 {{ t('settings.visaPrice') }}
                             </span>
                             <input
@@ -626,14 +665,14 @@ function deletePlatformRole(roleId: number): void {
                                 "
                                 type="number"
                                 min="1"
-                                class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                                class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-border px-3 text-sm"
                             />
                         </label>
                     </div>
 
-                    <div class="rounded-xl border border-slate-200 p-4">
+                    <div class="rounded-xl border border-border p-4">
                         <label
-                            class="flex items-center justify-between gap-4 text-sm font-semibold text-slate-700"
+                            class="flex items-center justify-between gap-4 text-sm font-semibold text-muted-foreground"
                         >
                             <span>{{ t('settings.seatEnabled') }}</span>
                             <input
@@ -641,11 +680,13 @@ function deletePlatformRole(roleId: number): void {
                                     platformForm.billing.seat_addon_enabled
                                 "
                                 type="checkbox"
-                                class="size-4 rounded border-slate-300 text-blue-600"
+                                class="size-4 rounded border-border text-[var(--erin-primary-text)]"
                             />
                         </label>
                         <label class="mt-3 block">
-                            <span class="text-xs font-bold text-slate-600">
+                            <span
+                                class="text-xs font-bold text-muted-foreground"
+                            >
                                 {{ t('settings.seatPrice') }}
                             </span>
                             <input
@@ -654,14 +695,14 @@ function deletePlatformRole(roleId: number): void {
                                 "
                                 type="number"
                                 min="1"
-                                class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                                class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-border px-3 text-sm"
                             />
                         </label>
                     </div>
 
                     <label class="block">
                         <span
-                            class="flex items-center gap-2 text-xs font-bold text-slate-600"
+                            class="flex items-center gap-2 text-xs font-bold text-muted-foreground"
                         >
                             <CircleDollarSign class="size-4 text-teal-600" />
                             {{ t('settings.referralCommission') }}
@@ -672,7 +713,7 @@ function deletePlatformRole(roleId: number): void {
                             "
                             type="number"
                             min="0"
-                            class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                            class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-border px-3 text-sm"
                         />
                     </label>
                 </div>
@@ -688,7 +729,7 @@ function deletePlatformRole(roleId: number): void {
                     >
                         <HardDrive class="size-5" />
                     </span>
-                    <p class="text-xs leading-5 text-slate-500">
+                    <p class="text-xs leading-5 text-muted-foreground">
                         {{ t('settings.uploadsHint') }}
                     </p>
                 </div>
@@ -705,7 +746,7 @@ function deletePlatformRole(roleId: number): void {
                             type="number"
                             min="1"
                             max="100"
-                            class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                            class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                         />
                     </FormField>
                     <FormField
@@ -720,7 +761,7 @@ function deletePlatformRole(roleId: number): void {
                             type="number"
                             min="10"
                             max="102400"
-                            class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                            class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                         />
                     </FormField>
                 </div>
@@ -738,7 +779,7 @@ function deletePlatformRole(roleId: number): void {
                     <input
                         v-model="platformForm.dashboard_ad.enabled"
                         type="checkbox"
-                        class="size-4 rounded border-slate-300 text-blue-600"
+                        class="size-4 rounded border-border text-[var(--erin-primary-text)]"
                     />
                 </div>
                 <div class="mt-5 grid gap-4 sm:grid-cols-2">
@@ -749,7 +790,7 @@ function deletePlatformRole(roleId: number): void {
                         <input
                             id="ad-campaign-name"
                             v-model="platformForm.dashboard_ad.campaign_name"
-                            class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                            class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                         />
                     </FormField>
                     <FormField
@@ -760,7 +801,7 @@ function deletePlatformRole(roleId: number): void {
                         <select
                             id="ad-audience"
                             v-model="platformForm.dashboard_ad.audience"
-                            class="erin-focus h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                            class="erin-focus h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"
                         >
                             <option value="all">
                                 {{ t('settings.adAudienceAll') }}
@@ -783,7 +824,7 @@ function deletePlatformRole(roleId: number): void {
                             v-model="platformForm.dashboard_ad.url"
                             type="url"
                             placeholder="https://…"
-                            class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                            class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                         />
                     </FormField>
                     <FormField
@@ -794,7 +835,7 @@ function deletePlatformRole(roleId: number): void {
                         <input
                             id="ad-title-de"
                             v-model="platformForm.dashboard_ad.title_de"
-                            class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                            class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                         />
                     </FormField>
                     <FormField
@@ -805,7 +846,7 @@ function deletePlatformRole(roleId: number): void {
                         <input
                             id="ad-title-en"
                             v-model="platformForm.dashboard_ad.title_en"
-                            class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                            class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                         />
                     </FormField>
                     <FormField
@@ -837,7 +878,7 @@ function deletePlatformRole(roleId: number): void {
                         <input
                             id="ad-cta-de"
                             v-model="platformForm.dashboard_ad.cta_label_de"
-                            class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                            class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                         />
                     </FormField>
                     <FormField
@@ -847,7 +888,7 @@ function deletePlatformRole(roleId: number): void {
                         <input
                             id="ad-cta-en"
                             v-model="platformForm.dashboard_ad.cta_label_en"
-                            class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                            class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                         />
                     </FormField>
                     <FormField id="ad-starts" :label="t('settings.adStartsAt')">
@@ -855,7 +896,7 @@ function deletePlatformRole(roleId: number): void {
                             id="ad-starts"
                             v-model="platformForm.dashboard_ad.starts_at"
                             type="datetime-local"
-                            class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                            class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                         />
                     </FormField>
                     <FormField
@@ -867,41 +908,41 @@ function deletePlatformRole(roleId: number): void {
                             id="ad-ends"
                             v-model="platformForm.dashboard_ad.ends_at"
                             type="datetime-local"
-                            class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                            class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                         />
                     </FormField>
                 </div>
                 <div class="mt-5 grid grid-cols-3 gap-3">
-                    <div class="rounded-xl bg-slate-50 p-3 text-center">
-                        <p class="text-lg font-extrabold text-slate-900">
+                    <div class="rounded-xl bg-muted p-3 text-center">
+                        <p class="text-lg font-extrabold text-foreground">
                             {{ dashboard_ad_stats.impressions }}
                         </p>
-                        <p class="text-xs text-slate-500">
+                        <p class="text-xs text-muted-foreground">
                             {{ t('settings.adImpressions') }}
                         </p>
                     </div>
-                    <div class="rounded-xl bg-slate-50 p-3 text-center">
-                        <p class="text-lg font-extrabold text-slate-900">
+                    <div class="rounded-xl bg-muted p-3 text-center">
+                        <p class="text-lg font-extrabold text-foreground">
                             {{ dashboard_ad_stats.clicks }}
                         </p>
-                        <p class="text-xs text-slate-500">
+                        <p class="text-xs text-muted-foreground">
                             {{ t('settings.adClicks') }}
                         </p>
                     </div>
-                    <div class="rounded-xl bg-slate-50 p-3 text-center">
-                        <p class="text-lg font-extrabold text-slate-900">
+                    <div class="rounded-xl bg-muted p-3 text-center">
+                        <p class="text-lg font-extrabold text-foreground">
                             {{ dashboard_ad_stats.ctr }} %
                         </p>
-                        <p class="text-xs text-slate-500">
+                        <p class="text-xs text-muted-foreground">
                             {{ t('settings.adCtr') }}
                         </p>
                     </div>
                 </div>
                 <div
                     v-if="dashboard_ad.campaign_id"
-                    class="mt-5 rounded-xl border border-slate-200 p-4"
+                    class="mt-5 rounded-xl border border-border p-4"
                 >
-                    <p class="text-xs font-bold text-slate-700">
+                    <p class="text-xs font-bold text-muted-foreground">
                         {{ t('settings.adArtwork') }}
                     </p>
                     <img
@@ -957,25 +998,25 @@ function deletePlatformRole(roleId: number): void {
             :description="t('settings.skillTaxonomyDescription')"
         >
             <form
-                class="grid gap-3 rounded-xl bg-slate-50 p-4 lg:grid-cols-[1fr_1fr_2fr_auto]"
+                class="grid gap-3 rounded-xl bg-muted p-4 lg:grid-cols-[1fr_1fr_2fr_auto]"
                 @submit.prevent="createSkill"
             >
                 <input
                     v-model="skillCreateForm.name_de"
                     required
-                    class="erin-focus h-10 rounded-xl border border-slate-200 px-3 text-sm"
+                    class="erin-focus h-10 rounded-xl border border-border px-3 text-sm"
                     :placeholder="t('settings.skillNameDe')"
                 />
                 <input
                     v-model="skillCreateForm.name_en"
                     required
-                    class="erin-focus h-10 rounded-xl border border-slate-200 px-3 text-sm"
+                    class="erin-focus h-10 rounded-xl border border-border px-3 text-sm"
                     :placeholder="t('settings.skillNameEn')"
                 />
                 <select
                     v-model="skillCreateForm.occupation_ids"
                     multiple
-                    class="erin-focus min-h-10 rounded-xl border border-slate-200 px-3 text-sm"
+                    class="erin-focus min-h-10 rounded-xl border border-border px-3 text-sm"
                 >
                     <option
                         v-for="occupation in occupations"
@@ -997,23 +1038,23 @@ function deletePlatformRole(roleId: number): void {
                 <article
                     v-for="skill in skills"
                     :key="skill.id"
-                    class="grid gap-3 rounded-xl border border-slate-200 p-4 lg:grid-cols-[1fr_1fr_2fr_auto]"
+                    class="grid gap-3 rounded-xl border border-border p-4 lg:grid-cols-[1fr_1fr_2fr_auto]"
                 >
                     <input
                         v-model="skillForms[skill.id].name_de"
-                        class="erin-focus h-10 rounded-xl border border-slate-200 px-3 text-sm"
+                        class="erin-focus h-10 rounded-xl border border-border px-3 text-sm"
                         :aria-label="t('settings.skillNameDe')"
                     />
                     <input
                         v-model="skillForms[skill.id].name_en"
-                        class="erin-focus h-10 rounded-xl border border-slate-200 px-3 text-sm"
+                        class="erin-focus h-10 rounded-xl border border-border px-3 text-sm"
                         :aria-label="t('settings.skillNameEn')"
                     />
                     <div>
                         <select
                             v-model="skillForms[skill.id].occupation_ids"
                             multiple
-                            class="erin-focus min-h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                            class="erin-focus min-h-10 w-full rounded-xl border border-border px-3 text-sm"
                         >
                             <option
                                 v-for="occupation in occupations"
@@ -1024,7 +1065,7 @@ function deletePlatformRole(roleId: number): void {
                             </option>
                         </select>
                         <label
-                            class="mt-2 inline-flex items-center gap-2 text-xs font-bold text-slate-600"
+                            class="mt-2 inline-flex items-center gap-2 text-xs font-bold text-muted-foreground"
                         >
                             <input
                                 v-model="skillForms[skill.id].is_active"
@@ -1062,14 +1103,16 @@ function deletePlatformRole(roleId: number): void {
             <div
                 class="mb-5 flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4"
             >
-                <ShieldCheck class="mt-0.5 size-5 shrink-0 text-blue-600" />
+                <ShieldCheck
+                    class="mt-0.5 size-5 shrink-0 text-[var(--erin-primary-text)]"
+                />
                 <p class="text-xs leading-5 text-blue-900">
                     {{ t('settings.platformRolesHint') }}
                 </p>
             </div>
 
             <form
-                class="rounded-xl bg-slate-50 p-4"
+                class="rounded-xl bg-muted p-4"
                 @submit.prevent="createPlatformRole"
             >
                 <div class="grid gap-3 sm:grid-cols-[1fr_auto]">
@@ -1083,11 +1126,11 @@ function deletePlatformRole(roleId: number): void {
                             id="platform-role-name"
                             v-model="platformRoleCreateForm.name"
                             required
-                            class="erin-focus h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                            class="erin-focus h-10 w-full rounded-xl border border-border px-3 text-sm"
                         />
                     </FormField>
                     <label
-                        class="flex items-center gap-2 self-end pb-2 text-xs font-bold text-slate-600"
+                        class="flex items-center gap-2 self-end pb-2 text-xs font-bold text-muted-foreground"
                     >
                         <input
                             v-model="platformRoleCreateForm.is_active"
@@ -1097,14 +1140,14 @@ function deletePlatformRole(roleId: number): void {
                     </label>
                 </div>
                 <fieldset class="mt-4">
-                    <legend class="text-xs font-bold text-slate-600">
+                    <legend class="text-xs font-bold text-muted-foreground">
                         {{ t('settings.platformRoleCapabilities') }}
                     </legend>
                     <div class="mt-2 flex flex-wrap gap-3">
                         <label
                             v-for="capability in platformCapabilities"
                             :key="capability"
-                            class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
+                            class="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground"
                         >
                             <input
                                 type="checkbox"
@@ -1143,16 +1186,16 @@ function deletePlatformRole(roleId: number): void {
                 <article
                     v-for="role in platform_roles"
                     :key="role.id"
-                    class="rounded-xl border border-slate-200 p-4"
+                    class="rounded-xl border border-border p-4"
                 >
                     <div class="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
                         <input
                             v-model="platformRoleForms[role.id].name"
                             :aria-label="t('settings.platformRoleName')"
-                            class="erin-focus h-10 rounded-xl border border-slate-200 px-3 text-sm"
+                            class="erin-focus h-10 rounded-xl border border-border px-3 text-sm"
                         />
                         <label
-                            class="inline-flex items-center gap-2 text-xs font-bold text-slate-600"
+                            class="inline-flex items-center gap-2 text-xs font-bold text-muted-foreground"
                         >
                             <input
                                 v-model="platformRoleForms[role.id].is_active"
@@ -1161,7 +1204,7 @@ function deletePlatformRole(roleId: number): void {
                             {{ t('settings.platformRoleActive') }}
                         </label>
                         <span
-                            class="self-center rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600"
+                            class="self-center rounded-lg bg-muted px-3 py-2 text-xs font-bold text-muted-foreground"
                         >
                             {{
                                 t('settings.platformRoleAssignments', {
@@ -1171,14 +1214,14 @@ function deletePlatformRole(roleId: number): void {
                         </span>
                     </div>
                     <fieldset class="mt-4">
-                        <legend class="text-xs font-bold text-slate-600">
+                        <legend class="text-xs font-bold text-muted-foreground">
                             {{ t('settings.platformRoleCapabilities') }}
                         </legend>
                         <div class="mt-2 flex flex-wrap gap-3">
                             <label
                                 v-for="capability in platformCapabilities"
                                 :key="capability"
-                                class="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700"
+                                class="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted-foreground"
                             >
                                 <input
                                     type="checkbox"
@@ -1218,7 +1261,7 @@ function deletePlatformRole(roleId: number): void {
                 </article>
                 <p
                     v-if="platform_roles.length === 0"
-                    class="rounded-xl border border-dashed border-slate-200 p-5 text-center text-sm text-slate-500"
+                    class="rounded-xl border border-dashed border-border p-5 text-center text-sm text-muted-foreground"
                 >
                     {{ t('settings.noPlatformRoles') }}
                 </p>

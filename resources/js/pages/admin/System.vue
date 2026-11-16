@@ -14,6 +14,15 @@ import {
     Trash2,
 } from '@lucide/vue';
 import { computed, ref, watch } from 'vue';
+import AdminPagination from './_components/AdminPagination.vue';
+import SystemLoginHistory from './_components/SystemLoginHistory.vue';
+import SystemMatchScoreVersions from './_components/SystemMatchScoreVersions.vue';
+import SystemOverview from './_components/SystemOverview.vue';
+import { useAdminI18n } from './_i18n';
+import type { AdminPaginator } from './_shared';
+import { statusTone } from './_shared';
+import { localeNames, supportedLocales } from '@/i18n';
+import type { SupportedLocale } from '@/i18n';
 import EmptyState from '@/components/product/EmptyState.vue';
 import PageHeader from '@/components/product/PageHeader.vue';
 import SectionCard from '@/components/product/SectionCard.vue';
@@ -23,12 +32,6 @@ import adminAccessList from '@/routes/admin/access-list';
 import adminEmailTemplates from '@/routes/admin/email-templates';
 import adminFeatureFlags from '@/routes/admin/feature-flags';
 import adminGdprRequests from '@/routes/admin/gdpr-requests';
-import AdminPagination from './_components/AdminPagination.vue';
-import SystemLoginHistory from './_components/SystemLoginHistory.vue';
-import SystemOverview from './_components/SystemOverview.vue';
-import { useAdminI18n } from './_i18n';
-import type { AdminPaginator } from './_shared';
-import { statusTone } from './_shared';
 
 type JsonConditions =
     Record<string, FormDataConvertible> | FormDataConvertible[] | null;
@@ -133,7 +136,7 @@ type AccessListEntryRow = {
 type EmailTemplateRow = {
     id: number;
     key: string;
-    locale: 'de' | 'en';
+    locale: SupportedLocale;
     subject: string;
     body_html: string;
     body_text: string | null;
@@ -151,11 +154,9 @@ type EmailTemplateRow = {
 type EmailTemplateGroup = {
     key: string;
     is_active: boolean;
-    de: EmailTemplateRow | null;
-    en: EmailTemplateRow | null;
     updated_at: string;
     updater: EmailTemplateRow['updater'];
-};
+} & Partial<Record<SupportedLocale, EmailTemplateRow | null>>;
 
 const props = defineProps<{
     feature_flags: FeatureFlagRow[];
@@ -165,6 +166,14 @@ const props = defineProps<{
     gdpr_types: Array<'export' | 'delete'>;
     access_list_entries: AccessListEntryRow[];
     email_templates: EmailTemplateRow[];
+    match_score_versions: Array<{
+        id: number;
+        version: string;
+        weights: Record<string, number>;
+        status: string;
+        activation_reason: string | null;
+        activated_at: string | null;
+    }>;
     gdpr: {
         open: number;
         overdue: number;
@@ -187,6 +196,12 @@ const props = defineProps<{
         livekit: boolean;
         recent_failed_webhooks: number;
     };
+    maintenance: {
+        active: boolean;
+        translations: Record<SupportedLocale, string>;
+        expected_end_at: string | null;
+        started_at: string | null;
+    };
 }>();
 
 const page = usePage();
@@ -194,6 +209,48 @@ const isSuperAdmin = computed(
     () => String(page.props.auth.user.role) === 'super_admin',
 );
 const { t, formatDate, humanize } = useAdminI18n();
+
+const maintenanceForm = useForm({
+    active: props.maintenance.active,
+    translations: { ...props.maintenance.translations },
+    expected_end_at: toLocalDateTime(props.maintenance.expected_end_at),
+});
+const firstMaintenanceError = computed(
+    () => Object.values(maintenanceForm.errors)[0] as string | undefined,
+);
+
+const platformNotificationForm = useForm({
+    submission_key: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    audience: 'all',
+    translations: Object.fromEntries(
+        supportedLocales.map((locale) => [locale, { title: '', message: '' }]),
+    ) as Record<SupportedLocale, { title: string; message: string }>,
+    url: '/dashboard',
+});
+const firstPlatformNotificationError = computed(
+    () =>
+        Object.values(platformNotificationForm.errors)[0] as string | undefined,
+);
+
+function sendPlatformNotification(): void {
+    platformNotificationForm.post('/admin/system/platform-notifications', {
+        preserveScroll: true,
+        onSuccess: () => {
+            for (const locale of supportedLocales) {
+                platformNotificationForm.translations[locale].title = '';
+                platformNotificationForm.translations[locale].message = '';
+            }
+
+            platformNotificationForm.submission_key = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        },
+    });
+}
+
+function saveMaintenanceMode(): void {
+    maintenanceForm.patch('/admin/system/maintenance', {
+        preserveScroll: true,
+    });
+}
 
 const selectedGdprId = ref<number | null>(
     props.gdpr_requests.data[0]?.id ?? null,
@@ -383,8 +440,9 @@ const emailTemplateGroups = computed<EmailTemplateGroup[]>(() => {
         const existing = groups.get(template.key) ?? {
             key: template.key,
             is_active: template.is_active,
-            de: null,
-            en: null,
+            ...Object.fromEntries(
+                supportedLocales.map((locale) => [locale, null]),
+            ),
             updated_at: template.updated_at,
             updater: template.updater,
         };
@@ -416,22 +474,48 @@ const selectedTemplate = computed(
 const templateForm = useForm({
     key: '',
     is_active: true,
-    translations: {
-        de: {
-            subject: '',
-            body_html: '',
-            body_text: '',
-        },
-        en: {
-            subject: '',
-            body_html: '',
-            body_text: '',
-        },
-    },
+    translations: Object.fromEntries(
+        supportedLocales.map((locale) => [
+            locale,
+            { subject: '', body_html: '', body_text: '' },
+        ]),
+    ) as Record<
+        SupportedLocale,
+        { subject: string; body_html: string; body_text: string }
+    >,
 });
 const firstTemplateError = computed(
     () => Object.values(templateForm.errors)[0] as string | undefined,
 );
+const templateTestForm = useForm({
+    key: '',
+    locale: 'de' as SupportedLocale,
+    email: String(page.props.auth.user.email ?? ''),
+});
+
+function previewTemplate(locale: SupportedLocale): void {
+    if (!selectedTemplate.value) {
+        return;
+    }
+
+    window.open(
+        `/admin/system/email-templates/${encodeURIComponent(selectedTemplate.value.key)}/preview?locale=${locale}`,
+        '_blank',
+        'noopener,noreferrer',
+    );
+}
+
+function sendTemplateTest(locale: SupportedLocale): void {
+    if (!selectedTemplate.value) {
+        return;
+    }
+
+    templateTestForm.key = selectedTemplate.value.key;
+    templateTestForm.locale = locale;
+    templateTestForm.post('/admin/system/email-templates/test', {
+        preserveScroll: true,
+    });
+}
 
 watch(
     selectedTemplate,
@@ -449,12 +533,15 @@ function populateTemplateForm(template: EmailTemplateGroup): void {
     templateForm.clearErrors();
     templateForm.key = template.key;
     templateForm.is_active = template.is_active;
-    templateForm.translations.de.subject = template.de?.subject ?? '';
-    templateForm.translations.de.body_html = template.de?.body_html ?? '';
-    templateForm.translations.de.body_text = template.de?.body_text ?? '';
-    templateForm.translations.en.subject = template.en?.subject ?? '';
-    templateForm.translations.en.body_html = template.en?.body_html ?? '';
-    templateForm.translations.en.body_text = template.en?.body_text ?? '';
+
+    for (const locale of supportedLocales) {
+        templateForm.translations[locale].subject =
+            template[locale]?.subject ?? '';
+        templateForm.translations[locale].body_html =
+            template[locale]?.body_html ?? '';
+        templateForm.translations[locale].body_text =
+            template[locale]?.body_text ?? '';
+    }
 }
 
 function editTemplate(template: EmailTemplateGroup): void {
@@ -693,6 +780,189 @@ function deleteFlag(flag: FeatureFlagRow): void {
             </p>
         </div>
 
+        <SectionCard
+            :title="t('system.maintenance.title')"
+            :description="t('system.maintenance.description')"
+        >
+            <form
+                v-if="isSuperAdmin"
+                class="grid gap-4 lg:grid-cols-2"
+                @submit.prevent="saveMaintenanceMode"
+            >
+                <label class="flex items-center gap-3 lg:col-span-2">
+                    <input
+                        v-model="maintenanceForm.active"
+                        type="checkbox"
+                        class="erin-focus size-4 rounded border-border"
+                    />
+                    <span class="text-sm font-bold text-foreground">{{
+                        t('system.maintenance.active')
+                    }}</span>
+                </label>
+                <label
+                    v-for="locale in supportedLocales"
+                    :key="`maintenance-${locale}`"
+                >
+                    <span class="text-xs font-bold text-muted-foreground">{{
+                        t('system.maintenance.fieldMessage', {
+                            locale: localeNames[locale],
+                        })
+                    }}</span>
+                    <Textarea
+                        v-model="maintenanceForm.translations[locale]"
+                        rows="3"
+                        class="mt-1.5"
+                    />
+                </label>
+                <label>
+                    <span class="text-xs font-bold text-muted-foreground">{{
+                        t('system.maintenance.expectedEnd')
+                    }}</span>
+                    <input
+                        v-model="maintenanceForm.expected_end_at"
+                        type="datetime-local"
+                        class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-border px-3 text-sm"
+                    />
+                </label>
+                <div class="flex items-end gap-3">
+                    <a
+                        href="/status"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="erin-focus inline-flex h-10 items-center rounded-xl border border-border px-4 text-xs font-bold text-muted-foreground"
+                        >{{ t('system.maintenance.statusPage') }}</a
+                    >
+                    <button
+                        type="submit"
+                        :disabled="maintenanceForm.processing"
+                        class="erin-focus inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-5 text-xs font-bold text-white disabled:opacity-50"
+                    >
+                        <Save class="size-4" />
+                        {{ t('system.maintenance.save') }}
+                    </button>
+                </div>
+                <p
+                    v-if="firstMaintenanceError"
+                    class="text-xs text-red-600 lg:col-span-2"
+                >
+                    {{ firstMaintenanceError }}
+                </p>
+            </form>
+            <div
+                v-else
+                class="flex items-center gap-3 text-sm text-muted-foreground"
+            >
+                <StatusBadge
+                    :label="
+                        maintenance.active
+                            ? t('system.maintenance.running')
+                            : t('system.maintenance.off')
+                    "
+                    :tone="maintenance.active ? 'yellow' : 'green'"
+                />
+                <a
+                    class="font-bold text-[var(--erin-primary-text-hover)]"
+                    href="/status"
+                    >{{ t('system.maintenance.statusPage') }}</a
+                >
+            </div>
+        </SectionCard>
+
+        <SectionCard
+            v-if="isSuperAdmin"
+            :title="t('system.platformNotification.title')"
+            :description="t('system.platformNotification.description')"
+        >
+            <form
+                class="grid gap-4 lg:grid-cols-2"
+                @submit.prevent="sendPlatformNotification"
+            >
+                <label class="lg:col-span-2">
+                    <span class="text-xs font-bold text-muted-foreground">{{
+                        t('system.platformNotification.audience')
+                    }}</span>
+                    <select
+                        v-model="platformNotificationForm.audience"
+                        class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-border px-3 text-sm"
+                    >
+                        <option value="all">
+                            {{ t('system.platformNotification.all') }}
+                        </option>
+                        <option value="candidate">
+                            {{ t('system.platformNotification.candidates') }}
+                        </option>
+                        <option value="company">
+                            {{ t('system.platformNotification.companies') }}
+                        </option>
+                    </select>
+                </label>
+                <label
+                    v-for="locale in supportedLocales"
+                    :key="`${locale}-title`"
+                >
+                    <span class="text-xs font-bold text-muted-foreground">{{
+                        t('system.platformNotification.fieldTitle', {
+                            locale: localeNames[locale],
+                        })
+                    }}</span>
+                    <input
+                        v-model="
+                            platformNotificationForm.translations[locale].title
+                        "
+                        required
+                        maxlength="120"
+                        class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-border px-3 text-sm"
+                    />
+                </label>
+                <label
+                    v-for="locale in supportedLocales"
+                    :key="`${locale}-message`"
+                >
+                    <span class="text-xs font-bold text-muted-foreground">{{
+                        t('system.platformNotification.fieldMessage', {
+                            locale: localeNames[locale],
+                        })
+                    }}</span>
+                    <Textarea
+                        v-model="
+                            platformNotificationForm.translations[locale]
+                                .message
+                        "
+                        required
+                        maxlength="500"
+                        rows="3"
+                        class="mt-1.5"
+                    />
+                </label>
+                <label>
+                    <span class="text-xs font-bold text-muted-foreground">{{
+                        t('system.platformNotification.url')
+                    }}</span>
+                    <input
+                        v-model="platformNotificationForm.url"
+                        required
+                        class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-border px-3 text-sm"
+                    />
+                </label>
+                <div class="flex items-end">
+                    <button
+                        type="submit"
+                        :disabled="platformNotificationForm.processing"
+                        class="erin-focus inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-5 text-xs font-bold text-white disabled:opacity-50"
+                    >
+                        <Save class="size-4" />
+                        {{ t('system.platformNotification.send') }}
+                    </button>
+                </div>
+                <p
+                    v-if="firstPlatformNotificationError"
+                    class="text-xs text-red-600 lg:col-span-2"
+                >
+                    {{ firstPlatformNotificationError }}
+                </p>
+            </form>
+        </SectionCard>
+
         <SystemOverview
             :runtime="runtime"
             :integrations="integrations"
@@ -701,14 +971,20 @@ function deleteFlag(flag: FeatureFlagRow): void {
         />
 
         <SectionCard
+            v-if="isSuperAdmin"
+            :title="t('system.matchScore.title')"
+            :description="t('system.matchScore.description')"
+        >
+            <SystemMatchScoreVersions :versions="match_score_versions" />
+        </SectionCard>
+
+        <SectionCard
             :title="t('system.gdpr.title')"
             :description="t('system.gdpr.description')"
             flush
         >
             <div class="grid xl:grid-cols-[22rem_minmax(0,1fr)]">
-                <aside
-                    class="border-b border-slate-200 xl:border-r xl:border-b-0"
-                >
+                <aside class="border-b border-border xl:border-r xl:border-b-0">
                     <div
                         v-if="gdpr_requests.data.length > 0"
                         class="space-y-2 p-3"
@@ -721,19 +997,19 @@ function deleteFlag(flag: FeatureFlagRow): void {
                             :class="
                                 selectedGdpr?.id === request.id
                                     ? 'border-blue-200 bg-blue-50'
-                                    : 'border-slate-200 hover:bg-slate-50'
+                                    : 'border-border hover:bg-muted'
                             "
                             @click="selectedGdprId = request.id"
                         >
                             <div class="flex items-start justify-between gap-3">
                                 <div class="min-w-0">
                                     <p
-                                        class="truncate text-sm font-bold text-slate-900"
+                                        class="truncate text-sm font-bold text-foreground"
                                     >
                                         {{ request.user.name }}
                                     </p>
                                     <p
-                                        class="mt-0.5 truncate text-xs text-slate-500"
+                                        class="mt-0.5 truncate text-xs text-muted-foreground"
                                     >
                                         {{ request.user.email }}
                                     </p>
@@ -744,7 +1020,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                 />
                             </div>
                             <div
-                                class="mt-3 flex items-center justify-between gap-3 text-xs text-slate-500"
+                                class="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground"
                             >
                                 <span>{{ humanize(request.type) }}</span>
                                 <span>{{
@@ -767,14 +1043,14 @@ function deleteFlag(flag: FeatureFlagRow): void {
                 <div class="space-y-6 p-5 sm:p-6">
                     <div
                         v-if="selectedGdpr"
-                        class="rounded-2xl border border-slate-200 p-5"
+                        class="rounded-2xl border border-border p-5"
                     >
                         <div
                             class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
                         >
                             <div>
                                 <p
-                                    class="text-xs font-bold tracking-wide text-blue-600 uppercase"
+                                    class="text-xs font-bold tracking-wide text-[var(--erin-primary-text)] uppercase"
                                 >
                                     {{
                                         t('system.gdpr.requestReference', {
@@ -782,10 +1058,10 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                         })
                                     }}
                                 </p>
-                                <h3 class="mt-1 font-bold text-slate-950">
+                                <h3 class="mt-1 font-bold text-foreground">
                                     {{ selectedGdpr.user.name }}
                                 </h3>
-                                <p class="mt-1 text-xs text-slate-500">
+                                <p class="mt-1 text-xs text-muted-foreground">
                                     {{ selectedGdpr.user.email }} ·
                                     {{ humanize(selectedGdpr.user.role) }}
                                 </p>
@@ -799,45 +1075,45 @@ function deleteFlag(flag: FeatureFlagRow): void {
                         <dl
                             class="mt-4 grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4"
                         >
-                            <div class="rounded-xl bg-slate-50 p-3">
-                                <dt class="font-bold text-slate-600">
+                            <div class="rounded-xl bg-muted p-3">
+                                <dt class="font-bold text-muted-foreground">
                                     {{ t('system.gdpr.type') }}
                                 </dt>
-                                <dd class="mt-1 text-slate-700">
+                                <dd class="mt-1 text-muted-foreground">
                                     {{ humanize(selectedGdpr.type) }}
                                 </dd>
                             </div>
-                            <div class="rounded-xl bg-slate-50 p-3">
-                                <dt class="font-bold text-slate-600">
+                            <div class="rounded-xl bg-muted p-3">
+                                <dt class="font-bold text-muted-foreground">
                                     {{ t('system.gdpr.dueAt') }}
                                 </dt>
-                                <dd class="mt-1 text-slate-700">
+                                <dd class="mt-1 text-muted-foreground">
                                     {{ formatDate(selectedGdpr.due_at) }}
                                 </dd>
                             </div>
-                            <div class="rounded-xl bg-slate-50 p-3">
-                                <dt class="font-bold text-slate-600">
+                            <div class="rounded-xl bg-muted p-3">
+                                <dt class="font-bold text-muted-foreground">
                                     {{ t('system.gdpr.handler') }}
                                 </dt>
-                                <dd class="mt-1 text-slate-700">
+                                <dd class="mt-1 text-muted-foreground">
                                     {{
                                         selectedGdpr.handler?.name ??
                                         t('common.notAssigned')
                                     }}
                                 </dd>
                             </div>
-                            <div class="rounded-xl bg-slate-50 p-3">
-                                <dt class="font-bold text-slate-600">
+                            <div class="rounded-xl bg-muted p-3">
+                                <dt class="font-bold text-muted-foreground">
                                     {{ t('common.created') }}
                                 </dt>
-                                <dd class="mt-1 text-slate-700">
+                                <dd class="mt-1 text-muted-foreground">
                                     {{ formatDate(selectedGdpr.created_at) }}
                                 </dd>
                             </div>
                         </dl>
                         <p
                             v-if="selectedGdpr.reason"
-                            class="mt-4 rounded-xl border border-slate-100 p-3 text-sm whitespace-pre-line text-slate-600"
+                            class="mt-4 rounded-xl border border-border p-3 text-sm whitespace-pre-line text-muted-foreground"
                         >
                             {{ selectedGdpr.reason }}
                         </p>
@@ -859,7 +1135,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
                         <a
                             v-if="selectedGdpr.download_url"
                             :href="selectedGdpr.download_url"
-                            class="erin-focus mt-4 inline-flex h-10 items-center gap-2 rounded-xl bg-teal-600 px-4 text-xs font-bold text-white"
+                            class="erin-focus mt-4 inline-flex h-10 items-center gap-2 rounded-xl bg-teal-600 px-4 text-xs font-bold text-[#0f172a]"
                         >
                             <Download class="size-4" />
                             {{ t('system.gdpr.downloadExport') }}
@@ -869,26 +1145,28 @@ function deleteFlag(flag: FeatureFlagRow): void {
                     <div v-if="isSuperAdmin" class="grid gap-6 2xl:grid-cols-2">
                         <form
                             v-if="selectedGdpr"
-                            class="rounded-2xl border border-slate-200 p-5"
+                            class="rounded-2xl border border-border p-5"
                             @submit.prevent="updateGdprRequest"
                         >
                             <div class="flex items-center gap-2">
-                                <PencilLine class="size-4 text-blue-600" />
-                                <h3 class="font-bold text-slate-950">
+                                <PencilLine
+                                    class="size-4 text-[var(--erin-primary-text)]"
+                                />
+                                <h3 class="font-bold text-foreground">
                                     {{ t('system.gdpr.editTitle') }}
                                 </h3>
                             </div>
                             <div class="mt-4 grid gap-3 sm:grid-cols-2">
                                 <label>
                                     <span
-                                        class="text-xs font-bold text-slate-600"
+                                        class="text-xs font-bold text-muted-foreground"
                                     >
                                         {{ t('system.gdpr.type') }}
                                     </span>
                                     <select
                                         v-model="gdprUpdateForm.type"
                                         disabled
-                                        class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                                        class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"
                                     >
                                         <option
                                             v-for="type in gdpr_types"
@@ -901,13 +1179,13 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                 </label>
                                 <label>
                                     <span
-                                        class="text-xs font-bold text-slate-600"
+                                        class="text-xs font-bold text-muted-foreground"
                                     >
                                         {{ t('system.gdpr.status') }}
                                     </span>
                                     <select
                                         v-model="gdprUpdateForm.status"
-                                        class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                                        class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"
                                     >
                                         <option
                                             v-for="status in allowedGdprStatuses"
@@ -920,7 +1198,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                 </label>
                             </div>
                             <label
-                                class="mt-3 flex items-start gap-3 rounded-xl border border-slate-200 p-3"
+                                class="mt-3 flex items-start gap-3 rounded-xl border border-border p-3"
                             >
                                 <input
                                     v-model="gdprUpdateForm.legal_hold"
@@ -929,12 +1207,12 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                 />
                                 <span>
                                     <span
-                                        class="block text-xs font-bold text-slate-700"
+                                        class="block text-xs font-bold text-muted-foreground"
                                     >
                                         {{ t('system.gdpr.legalHold') }}
                                     </span>
                                     <span
-                                        class="mt-1 block text-xs text-slate-500"
+                                        class="mt-1 block text-xs text-muted-foreground"
                                     >
                                         {{ t('system.gdpr.legalHoldHint') }}
                                     </span>
@@ -944,7 +1222,9 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                 v-if="gdprUpdateForm.legal_hold"
                                 class="mt-3 block"
                             >
-                                <span class="text-xs font-bold text-slate-600">
+                                <span
+                                    class="text-xs font-bold text-muted-foreground"
+                                >
                                     {{ t('system.gdpr.legalHoldReason') }}
                                 </span>
                                 <Textarea
@@ -954,17 +1234,21 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                 />
                             </label>
                             <label class="mt-3 block">
-                                <span class="text-xs font-bold text-slate-600">
+                                <span
+                                    class="text-xs font-bold text-muted-foreground"
+                                >
                                     {{ t('system.gdpr.dueAt') }}
                                 </span>
                                 <input
                                     v-model="gdprUpdateForm.due_at"
                                     type="datetime-local"
-                                    class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                                    class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-border px-3 text-sm"
                                 />
                             </label>
                             <label class="mt-3 block">
-                                <span class="text-xs font-bold text-slate-600">
+                                <span
+                                    class="text-xs font-bold text-muted-foreground"
+                                >
                                     {{ t('system.gdpr.reason') }}
                                 </span>
                                 <Textarea
@@ -993,19 +1277,19 @@ function deleteFlag(flag: FeatureFlagRow): void {
                         </form>
 
                         <form
-                            class="rounded-2xl border border-slate-200 p-5"
+                            class="rounded-2xl border border-border p-5"
                             @submit.prevent="createGdprRequest"
                         >
                             <div class="flex items-center gap-2">
                                 <Plus class="size-4 text-teal-600" />
-                                <h3 class="font-bold text-slate-950">
+                                <h3 class="font-bold text-foreground">
                                     {{ t('system.gdpr.createTitle') }}
                                 </h3>
                             </div>
                             <div class="mt-4 grid gap-3 sm:grid-cols-2">
                                 <label>
                                     <span
-                                        class="text-xs font-bold text-slate-600"
+                                        class="text-xs font-bold text-muted-foreground"
                                     >
                                         {{ t('system.gdpr.userId') }}
                                     </span>
@@ -1014,18 +1298,18 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                         type="number"
                                         min="1"
                                         placeholder="123"
-                                        class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                                        class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-border px-3 text-sm"
                                     />
                                 </label>
                                 <label>
                                     <span
-                                        class="text-xs font-bold text-slate-600"
+                                        class="text-xs font-bold text-muted-foreground"
                                     >
                                         {{ t('system.gdpr.type') }}
                                     </span>
                                     <select
                                         v-model="gdprCreateForm.type"
-                                        class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                                        class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"
                                     >
                                         <option
                                             v-for="type in gdpr_types"
@@ -1038,17 +1322,21 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                 </label>
                             </div>
                             <label class="mt-3 block">
-                                <span class="text-xs font-bold text-slate-600">
+                                <span
+                                    class="text-xs font-bold text-muted-foreground"
+                                >
                                     {{ t('system.gdpr.dueAt') }}
                                 </span>
                                 <input
                                     v-model="gdprCreateForm.due_at"
                                     type="datetime-local"
-                                    class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                                    class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-border px-3 text-sm"
                                 />
                             </label>
                             <label class="mt-3 block">
-                                <span class="text-xs font-bold text-slate-600">
+                                <span
+                                    class="text-xs font-bold text-muted-foreground"
+                                >
                                     {{ t('system.gdpr.reason') }}
                                 </span>
                                 <Textarea
@@ -1066,7 +1354,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
                             <button
                                 type="submit"
                                 :disabled="gdprCreateForm.processing"
-                                class="erin-focus mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-teal-600 px-4 text-xs font-bold text-white disabled:opacity-50"
+                                class="erin-focus mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-teal-600 px-4 text-xs font-bold text-[#0f172a] disabled:opacity-50"
                             >
                                 <FileLock2 class="size-4" />
                                 {{ t('system.gdpr.saveRequest') }}
@@ -1084,12 +1372,12 @@ function deleteFlag(flag: FeatureFlagRow): void {
         >
             <div class="grid xl:grid-cols-[22rem_minmax(0,1fr)]">
                 <aside
-                    class="border-b border-slate-200 p-3 xl:border-r xl:border-b-0"
+                    class="border-b border-border p-3 xl:border-r xl:border-b-0"
                 >
                     <button
                         v-if="isSuperAdmin"
                         type="button"
-                        class="erin-focus mb-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 text-xs font-bold text-blue-700"
+                        class="erin-focus mb-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 text-xs font-bold text-[var(--erin-primary-text-hover)]"
                         @click="newAccessEntry"
                     >
                         <Plus class="size-4" />
@@ -1108,18 +1396,20 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                 selectedAccessEntry?.id === entry.id &&
                                 accessMode === 'edit'
                                     ? 'border-blue-200 bg-blue-50'
-                                    : 'border-slate-200 hover:bg-slate-50'
+                                    : 'border-border hover:bg-muted'
                             "
                             @click="editAccessEntry(entry)"
                         >
                             <div class="flex items-start justify-between gap-3">
                                 <div class="min-w-0">
                                     <p
-                                        class="truncate font-mono text-xs font-bold text-slate-900"
+                                        class="truncate font-mono text-xs font-bold text-foreground"
                                     >
                                         {{ entry.value }}
                                     </p>
-                                    <p class="mt-1 text-xs text-slate-500">
+                                    <p
+                                        class="mt-1 text-xs text-muted-foreground"
+                                    >
                                         {{ humanize(entry.subject_type) }}
                                     </p>
                                 </div>
@@ -1132,7 +1422,9 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                     "
                                 />
                             </div>
-                            <p class="mt-3 truncate text-xs text-slate-500">
+                            <p
+                                class="mt-3 truncate text-xs text-muted-foreground"
+                            >
                                 {{ entry.reason }}
                             </p>
                         </button>
@@ -1148,16 +1440,18 @@ function deleteFlag(flag: FeatureFlagRow): void {
                 <div class="p-5 sm:p-6">
                     <form
                         v-if="isSuperAdmin"
-                        class="rounded-2xl border border-slate-200 p-5"
+                        class="rounded-2xl border border-border p-5"
                         @submit.prevent="saveAccessEntry"
                     >
                         <div
                             class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
                         >
                             <div class="flex items-center gap-2">
-                                <ListChecks class="size-4 text-blue-600" />
+                                <ListChecks
+                                    class="size-4 text-[var(--erin-primary-text)]"
+                                />
                                 <div>
-                                    <h3 class="font-bold text-slate-950">
+                                    <h3 class="font-bold text-foreground">
                                         {{
                                             accessMode === 'edit'
                                                 ? t('system.access.editTitle')
@@ -1166,7 +1460,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                     </h3>
                                     <p
                                         v-if="selectedAccessEntry"
-                                        class="mt-0.5 text-xs text-slate-600"
+                                        class="mt-0.5 text-xs text-muted-foreground"
                                     >
                                         {{
                                             t('system.access.createdByAt', {
@@ -1198,12 +1492,14 @@ function deleteFlag(flag: FeatureFlagRow): void {
                             class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
                         >
                             <label>
-                                <span class="text-xs font-bold text-slate-600">
+                                <span
+                                    class="text-xs font-bold text-muted-foreground"
+                                >
                                     {{ t('system.access.listType') }}
                                 </span>
                                 <select
                                     v-model="accessForm.list_type"
-                                    class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                                    class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"
                                 >
                                     <option value="blacklist">
                                         {{ humanize('blacklist') }}
@@ -1214,12 +1510,14 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                 </select>
                             </label>
                             <label>
-                                <span class="text-xs font-bold text-slate-600">
+                                <span
+                                    class="text-xs font-bold text-muted-foreground"
+                                >
                                     {{ t('system.access.subjectType') }}
                                 </span>
                                 <select
                                     v-model="accessForm.subject_type"
-                                    class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                                    class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-border bg-card px-3 text-sm"
                                 >
                                     <option value="email">
                                         {{ humanize('email') }}
@@ -1233,7 +1531,9 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                 </select>
                             </label>
                             <label>
-                                <span class="text-xs font-bold text-slate-600">
+                                <span
+                                    class="text-xs font-bold text-muted-foreground"
+                                >
                                     {{ t('system.access.value') }}
                                 </span>
                                 <input
@@ -1246,22 +1546,26 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                               ? 'example.org'
                                               : '203.0.113.10'
                                     "
-                                    class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 font-mono text-xs"
+                                    class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-border px-3 font-mono text-xs"
                                 />
                             </label>
                             <label>
-                                <span class="text-xs font-bold text-slate-600">
+                                <span
+                                    class="text-xs font-bold text-muted-foreground"
+                                >
                                     {{ t('system.access.expiresAt') }}
                                 </span>
                                 <input
                                     v-model="accessForm.expires_at"
                                     type="datetime-local"
-                                    class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                                    class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-border px-3 text-sm"
                                 />
                             </label>
                         </div>
                         <label class="mt-3 block">
-                            <span class="text-xs font-bold text-slate-600">
+                            <span
+                                class="text-xs font-bold text-muted-foreground"
+                            >
                                 {{ t('system.access.reason') }}
                             </span>
                             <Textarea
@@ -1292,16 +1596,16 @@ function deleteFlag(flag: FeatureFlagRow): void {
 
                     <div
                         v-else-if="selectedAccessEntry"
-                        class="rounded-2xl border border-slate-200 p-5"
+                        class="rounded-2xl border border-border p-5"
                     >
                         <div class="flex items-start justify-between gap-3">
                             <div>
                                 <p
-                                    class="font-mono text-sm font-bold text-slate-900"
+                                    class="font-mono text-sm font-bold text-foreground"
                                 >
                                     {{ selectedAccessEntry.value }}
                                 </p>
-                                <p class="mt-1 text-xs text-slate-500">
+                                <p class="mt-1 text-xs text-muted-foreground">
                                     {{
                                         humanize(
                                             selectedAccessEntry.subject_type,
@@ -1320,11 +1624,11 @@ function deleteFlag(flag: FeatureFlagRow): void {
                             />
                         </div>
                         <p
-                            class="mt-4 rounded-xl bg-slate-50 p-4 text-sm whitespace-pre-line text-slate-600"
+                            class="mt-4 rounded-xl bg-muted p-4 text-sm whitespace-pre-line text-muted-foreground"
                         >
                             {{ selectedAccessEntry.reason }}
                         </p>
-                        <p class="mt-4 text-xs text-slate-600">
+                        <p class="mt-4 text-xs text-muted-foreground">
                             {{
                                 t('system.access.expiresAtValue', {
                                     date: formatDate(
@@ -1348,12 +1652,12 @@ function deleteFlag(flag: FeatureFlagRow): void {
         >
             <div class="grid xl:grid-cols-[22rem_minmax(0,1fr)]">
                 <aside
-                    class="border-b border-slate-200 p-3 xl:border-r xl:border-b-0"
+                    class="border-b border-border p-3 xl:border-r xl:border-b-0"
                 >
                     <button
                         v-if="isSuperAdmin"
                         type="button"
-                        class="erin-focus mb-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 text-xs font-bold text-blue-700"
+                        class="erin-focus mb-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 text-xs font-bold text-[var(--erin-primary-text-hover)]"
                         @click="newTemplate"
                     >
                         <Plus class="size-4" />
@@ -1372,18 +1676,20 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                 selectedTemplate?.key === template.key &&
                                 templateMode === 'edit'
                                     ? 'border-blue-200 bg-blue-50'
-                                    : 'border-slate-200 hover:bg-slate-50'
+                                    : 'border-border hover:bg-muted'
                             "
                             @click="editTemplate(template)"
                         >
                             <div class="flex items-start justify-between gap-3">
                                 <div class="min-w-0">
                                     <p
-                                        class="truncate font-mono text-xs font-bold text-slate-900"
+                                        class="truncate font-mono text-xs font-bold text-foreground"
                                     >
                                         {{ template.key }}
                                     </p>
-                                    <p class="mt-1 text-xs text-slate-500">
+                                    <p
+                                        class="mt-1 text-xs text-muted-foreground"
+                                    >
                                         DE {{ template.de ? '✓' : '–' }} · EN
                                         {{ template.en ? '✓' : '–' }}
                                     </p>
@@ -1399,7 +1705,9 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                     "
                                 />
                             </div>
-                            <p class="mt-3 truncate text-xs text-slate-500">
+                            <p
+                                class="mt-3 truncate text-xs text-muted-foreground"
+                            >
                                 {{
                                     template.de?.subject ??
                                     template.en?.subject ??
@@ -1419,16 +1727,18 @@ function deleteFlag(flag: FeatureFlagRow): void {
                 <div class="p-5 sm:p-6">
                     <form
                         v-if="isSuperAdmin"
-                        class="rounded-2xl border border-slate-200 p-5"
+                        class="rounded-2xl border border-border p-5"
                         @submit.prevent="saveTemplate"
                     >
                         <div
                             class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
                         >
                             <div class="flex items-center gap-2">
-                                <Mail class="size-4 text-blue-600" />
+                                <Mail
+                                    class="size-4 text-[var(--erin-primary-text)]"
+                                />
                                 <div>
-                                    <h3 class="font-bold text-slate-950">
+                                    <h3 class="font-bold text-foreground">
                                         {{
                                             templateMode === 'edit'
                                                 ? t(
@@ -1441,7 +1751,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                     </h3>
                                     <p
                                         v-if="selectedTemplate"
-                                        class="mt-0.5 text-xs text-slate-600"
+                                        class="mt-0.5 text-xs text-muted-foreground"
                                     >
                                         {{
                                             selectedTemplate.updater
@@ -1482,23 +1792,25 @@ function deleteFlag(flag: FeatureFlagRow): void {
 
                         <div class="mt-4 grid gap-3 sm:grid-cols-2">
                             <label>
-                                <span class="text-xs font-bold text-slate-600">
+                                <span
+                                    class="text-xs font-bold text-muted-foreground"
+                                >
                                     {{ t('system.templates.technicalKey') }}
                                 </span>
                                 <input
                                     v-model="templateForm.key"
                                     :readonly="templateMode === 'edit'"
                                     placeholder="application.status_changed"
-                                    class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 font-mono text-xs read-only:bg-slate-50 read-only:text-slate-500"
+                                    class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-border px-3 font-mono text-xs read-only:bg-muted read-only:text-muted-foreground"
                                 />
                             </label>
                             <label
-                                class="flex items-end gap-2 pb-2 text-sm font-semibold text-slate-700"
+                                class="flex items-end gap-2 pb-2 text-sm font-semibold text-muted-foreground"
                             >
                                 <input
                                     v-model="templateForm.is_active"
                                     type="checkbox"
-                                    class="size-4 rounded border-slate-300 text-blue-600"
+                                    class="size-4 rounded border-border text-[var(--erin-primary-text)]"
                                 />
                                 {{ t('system.templates.enabled') }}
                             </label>
@@ -1506,22 +1818,18 @@ function deleteFlag(flag: FeatureFlagRow): void {
 
                         <div class="mt-5 grid gap-5 2xl:grid-cols-2">
                             <fieldset
-                                v-for="locale in ['de', 'en'] as const"
+                                v-for="locale in supportedLocales"
                                 :key="locale"
-                                class="rounded-2xl border border-slate-200 p-4"
+                                class="rounded-2xl border border-border p-4"
                             >
                                 <legend
-                                    class="px-2 text-xs font-black tracking-wide text-slate-500 uppercase"
+                                    class="px-2 text-xs font-black tracking-wide text-muted-foreground uppercase"
                                 >
-                                    {{
-                                        locale === 'de'
-                                            ? t('system.templates.german')
-                                            : t('system.templates.english')
-                                    }}
+                                    {{ localeNames[locale] }}
                                 </legend>
                                 <label class="block">
                                     <span
-                                        class="text-xs font-bold text-slate-600"
+                                        class="text-xs font-bold text-muted-foreground"
                                     >
                                         {{ t('system.templates.subject') }}
                                     </span>
@@ -1530,12 +1838,12 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                             templateForm.translations[locale]
                                                 .subject
                                         "
-                                        class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                                        class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-border px-3 text-sm"
                                     />
                                 </label>
                                 <label class="mt-3 block">
                                     <span
-                                        class="text-xs font-bold text-slate-600"
+                                        class="text-xs font-bold text-muted-foreground"
                                     >
                                         {{ t('system.templates.htmlBody') }}
                                     </span>
@@ -1550,7 +1858,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                 </label>
                                 <label class="mt-3 block">
                                     <span
-                                        class="text-xs font-bold text-slate-600"
+                                        class="text-xs font-bold text-muted-foreground"
                                     >
                                         {{ t('system.templates.textBody') }}
                                     </span>
@@ -1571,14 +1879,62 @@ function deleteFlag(flag: FeatureFlagRow): void {
                         >
                             {{ firstTemplateError }}
                         </p>
-                        <button
-                            type="submit"
-                            :disabled="templateForm.processing"
-                            class="erin-focus mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 text-xs font-bold text-white disabled:opacity-50"
-                        >
-                            <Save class="size-4" />
-                            {{ t('system.templates.saveBoth') }}
-                        </button>
+                        <div class="mt-4 flex flex-wrap items-end gap-3">
+                            <button
+                                type="submit"
+                                :disabled="templateForm.processing"
+                                class="erin-focus inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 text-xs font-bold text-white disabled:opacity-50"
+                            >
+                                <Save class="size-4" />
+                                {{ t('system.templates.saveBoth') }}
+                            </button>
+                            <template
+                                v-if="
+                                    templateMode === 'edit' && selectedTemplate
+                                "
+                            >
+                                <button
+                                    v-for="locale in supportedLocales"
+                                    :key="`preview-${locale}`"
+                                    type="button"
+                                    class="erin-focus inline-flex h-10 items-center rounded-xl border border-border px-4 text-xs font-bold text-muted-foreground"
+                                    @click="previewTemplate(locale)"
+                                >
+                                    {{
+                                        t('system.templates.preview', {
+                                            locale: locale.toUpperCase(),
+                                        })
+                                    }}
+                                </button>
+                                <label class="min-w-56 flex-1">
+                                    <span
+                                        class="text-xs font-bold text-muted-foreground"
+                                        >{{
+                                            t('system.templates.testRecipient')
+                                        }}</span
+                                    >
+                                    <input
+                                        v-model="templateTestForm.email"
+                                        type="email"
+                                        class="erin-focus mt-1 h-10 w-full rounded-xl border border-border px-3 text-sm"
+                                    />
+                                </label>
+                                <button
+                                    v-for="locale in supportedLocales"
+                                    :key="`test-${locale}`"
+                                    type="button"
+                                    :disabled="templateTestForm.processing"
+                                    class="erin-focus inline-flex h-10 items-center rounded-xl border border-blue-200 bg-blue-50 px-4 text-xs font-bold text-[var(--erin-primary-text-hover)] disabled:opacity-50"
+                                    @click="sendTemplateTest(locale)"
+                                >
+                                    {{
+                                        t('system.templates.sendTest', {
+                                            locale: locale.toUpperCase(),
+                                        })
+                                    }}
+                                </button>
+                            </template>
+                        </div>
                     </form>
 
                     <div
@@ -1586,23 +1942,23 @@ function deleteFlag(flag: FeatureFlagRow): void {
                         class="grid gap-5 2xl:grid-cols-2"
                     >
                         <article
-                            v-for="locale in ['de', 'en'] as const"
+                            v-for="locale in supportedLocales"
                             :key="locale"
-                            class="rounded-2xl border border-slate-200 p-5"
+                            class="rounded-2xl border border-border p-5"
                         >
                             <p
-                                class="text-xs font-black tracking-wide text-blue-600 uppercase"
+                                class="text-xs font-black tracking-wide text-[var(--erin-primary-text)] uppercase"
                             >
                                 {{ locale }}
                             </p>
-                            <h3 class="mt-2 font-bold text-slate-950">
+                            <h3 class="mt-2 font-bold text-foreground">
                                 {{
                                     selectedTemplate[locale]?.subject ??
                                     t('system.templates.noTranslation')
                                 }}
                             </h3>
                             <pre
-                                class="mt-4 max-h-64 overflow-auto rounded-xl bg-slate-50 p-4 font-sans text-xs whitespace-pre-wrap text-slate-600"
+                                class="mt-4 max-h-64 overflow-auto rounded-xl bg-muted p-4 font-sans text-xs whitespace-pre-wrap text-muted-foreground"
                                 >{{
                                     selectedTemplate[locale]?.body_text ??
                                     selectedTemplate[locale]?.body_html ??
@@ -1621,7 +1977,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
         >
             <div class="grid xl:grid-cols-[20rem_minmax(0,1fr)]">
                 <aside
-                    class="border-b border-slate-200 p-3 xl:border-r xl:border-b-0"
+                    class="border-b border-border p-3 xl:border-r xl:border-b-0"
                 >
                     <div v-if="feature_flags.length > 0">
                         <button
@@ -1632,19 +1988,19 @@ function deleteFlag(flag: FeatureFlagRow): void {
                             :class="
                                 selectedFlag?.id === flag.id
                                     ? 'border-blue-200 bg-blue-50'
-                                    : 'border-slate-200 hover:bg-slate-50'
+                                    : 'border-border hover:bg-muted'
                             "
                             @click="selectedFlagId = flag.id"
                         >
                             <div class="flex items-start justify-between gap-3">
                                 <div class="min-w-0">
                                     <p
-                                        class="truncate text-sm font-bold text-slate-900"
+                                        class="truncate text-sm font-bold text-foreground"
                                     >
                                         {{ flag.name }}
                                     </p>
                                     <p
-                                        class="mt-1 truncate font-mono text-[11px] text-slate-600"
+                                        class="mt-1 truncate font-mono text-[11px] text-muted-foreground"
                                     >
                                         {{ flag.key }}
                                     </p>
@@ -1658,7 +2014,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                     :tone="flag.enabled ? 'green' : 'slate'"
                                 />
                             </div>
-                            <p class="mt-3 text-xs text-slate-500">
+                            <p class="mt-3 text-xs text-muted-foreground">
                                 {{
                                     t('system.flags.rollout', {
                                         value: flag.rollout_percentage,
@@ -1681,15 +2037,17 @@ function deleteFlag(flag: FeatureFlagRow): void {
                 >
                     <form
                         v-if="selectedFlag"
-                        class="rounded-2xl border border-slate-200 p-5"
+                        class="rounded-2xl border border-border p-5"
                         @submit.prevent="updateFlag"
                     >
                         <div class="flex items-start justify-between gap-3">
                             <div>
-                                <p class="text-xs font-bold text-blue-600">
+                                <p
+                                    class="text-xs font-bold text-[var(--erin-primary-text)]"
+                                >
                                     {{ selectedFlag.key }}
                                 </p>
-                                <h3 class="mt-1 font-bold text-slate-950">
+                                <h3 class="mt-1 font-bold text-foreground">
                                     {{ t('system.flags.editTitle') }}
                                 </h3>
                             </div>
@@ -1699,7 +2057,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                 class="erin-focus rounded-lg px-3 py-2 text-xs font-bold"
                                 :class="
                                     selectedFlag.enabled
-                                        ? 'bg-slate-100 text-slate-700'
+                                        ? 'bg-muted text-muted-foreground'
                                         : 'bg-emerald-50 text-emerald-700'
                                 "
                                 @click="toggleFlag(selectedFlag)"
@@ -1713,16 +2071,20 @@ function deleteFlag(flag: FeatureFlagRow): void {
                         </div>
 
                         <label class="mt-4 block">
-                            <span class="text-xs font-bold text-slate-600">
+                            <span
+                                class="text-xs font-bold text-muted-foreground"
+                            >
                                 {{ t('system.flags.name') }}
                             </span>
                             <input
                                 v-model="updateForm.name"
-                                class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                                class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-border px-3 text-sm"
                             />
                         </label>
                         <label class="mt-3 block">
-                            <span class="text-xs font-bold text-slate-600">
+                            <span
+                                class="text-xs font-bold text-muted-foreground"
+                            >
                                 {{ t('system.flags.descriptionLabel') }}
                             </span>
                             <Textarea
@@ -1732,7 +2094,9 @@ function deleteFlag(flag: FeatureFlagRow): void {
                             />
                         </label>
                         <label class="mt-3 block">
-                            <span class="text-xs font-bold text-slate-600">
+                            <span
+                                class="text-xs font-bold text-muted-foreground"
+                            >
                                 {{ t('system.flags.rolloutPercentage') }}
                             </span>
                             <input
@@ -1740,11 +2104,13 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                 type="number"
                                 min="0"
                                 max="100"
-                                class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                                class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-border px-3 text-sm"
                             />
                         </label>
                         <label class="mt-3 block">
-                            <span class="text-xs font-bold text-slate-600">
+                            <span
+                                class="text-xs font-bold text-muted-foreground"
+                            >
                                 {{ t('system.flags.conditions') }}
                             </span>
                             <Textarea
@@ -1776,7 +2142,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                 {{ t('system.flags.saveChanges') }}
                             </button>
                         </div>
-                        <p class="mt-4 text-[11px] text-slate-600">
+                        <p class="mt-4 text-[11px] text-muted-foreground">
                             {{
                                 selectedFlag.updater
                                     ? t('system.flags.lastChangedBy', {
@@ -1795,36 +2161,42 @@ function deleteFlag(flag: FeatureFlagRow): void {
                     </form>
 
                     <form
-                        class="rounded-2xl border border-slate-200 p-5"
+                        class="rounded-2xl border border-border p-5"
                         @submit.prevent="createFlag"
                     >
                         <div class="flex items-center gap-2">
                             <Plus class="size-4 text-teal-600" />
-                            <h3 class="font-bold text-slate-950">
+                            <h3 class="font-bold text-foreground">
                                 {{ t('system.flags.createTitle') }}
                             </h3>
                         </div>
                         <label class="mt-4 block">
-                            <span class="text-xs font-bold text-slate-600">
+                            <span
+                                class="text-xs font-bold text-muted-foreground"
+                            >
                                 {{ t('system.flags.technicalKey') }}
                             </span>
                             <input
                                 v-model="createForm.key"
                                 placeholder="bereich.funktion"
-                                class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 font-mono text-xs"
+                                class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-border px-3 font-mono text-xs"
                             />
                         </label>
                         <label class="mt-3 block">
-                            <span class="text-xs font-bold text-slate-600">
+                            <span
+                                class="text-xs font-bold text-muted-foreground"
+                            >
                                 {{ t('system.flags.name') }}
                             </span>
                             <input
                                 v-model="createForm.name"
-                                class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                                class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-border px-3 text-sm"
                             />
                         </label>
                         <label class="mt-3 block">
-                            <span class="text-xs font-bold text-slate-600">
+                            <span
+                                class="text-xs font-bold text-muted-foreground"
+                            >
                                 {{ t('system.flags.descriptionLabel') }}
                             </span>
                             <Textarea
@@ -1835,7 +2207,9 @@ function deleteFlag(flag: FeatureFlagRow): void {
                         </label>
                         <div class="mt-3 grid gap-3 sm:grid-cols-2">
                             <label>
-                                <span class="text-xs font-bold text-slate-600">
+                                <span
+                                    class="text-xs font-bold text-muted-foreground"
+                                >
                                     {{ t('system.flags.rolloutPercentage') }}
                                 </span>
                                 <input
@@ -1843,22 +2217,24 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                     type="number"
                                     min="0"
                                     max="100"
-                                    class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm"
+                                    class="erin-focus mt-1.5 h-10 w-full rounded-xl border border-border px-3 text-sm"
                                 />
                             </label>
                             <label
-                                class="flex items-end gap-2 pb-2 text-sm font-semibold text-slate-700"
+                                class="flex items-end gap-2 pb-2 text-sm font-semibold text-muted-foreground"
                             >
                                 <input
                                     v-model="createForm.enabled"
                                     type="checkbox"
-                                    class="size-4 rounded border-slate-300 text-blue-600"
+                                    class="size-4 rounded border-border text-[var(--erin-primary-text)]"
                                 />
                                 {{ t('system.flags.activeImmediately') }}
                             </label>
                         </div>
                         <label class="mt-3 block">
-                            <span class="text-xs font-bold text-slate-600">
+                            <span
+                                class="text-xs font-bold text-muted-foreground"
+                            >
                                 {{ t('system.flags.conditions') }}
                             </span>
                             <Textarea
@@ -1876,7 +2252,7 @@ function deleteFlag(flag: FeatureFlagRow): void {
                         <button
                             type="submit"
                             :disabled="createForm.processing"
-                            class="erin-focus mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-teal-600 text-xs font-bold text-white disabled:opacity-50"
+                            class="erin-focus mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-teal-600 text-xs font-bold text-[#0f172a] disabled:opacity-50"
                         >
                             <Flag class="size-4" />
                             {{ t('system.flags.create') }}
@@ -1886,14 +2262,16 @@ function deleteFlag(flag: FeatureFlagRow): void {
                 <div v-else class="p-5 sm:p-6">
                     <div
                         v-if="selectedFlag"
-                        class="rounded-2xl border border-slate-200 p-5"
+                        class="rounded-2xl border border-border p-5"
                     >
                         <div class="flex items-start justify-between gap-3">
                             <div>
-                                <p class="font-mono text-xs text-blue-600">
+                                <p
+                                    class="font-mono text-xs text-[var(--erin-primary-text)]"
+                                >
                                     {{ selectedFlag.key }}
                                 </p>
-                                <h3 class="mt-1 font-bold text-slate-950">
+                                <h3 class="mt-1 font-bold text-foreground">
                                     {{ selectedFlag.name }}
                                 </h3>
                             </div>
@@ -1906,26 +2284,26 @@ function deleteFlag(flag: FeatureFlagRow): void {
                                 :tone="selectedFlag.enabled ? 'green' : 'slate'"
                             />
                         </div>
-                        <p class="mt-4 text-sm text-slate-600">
+                        <p class="mt-4 text-sm text-muted-foreground">
                             {{
                                 selectedFlag.description ??
                                 t('system.flags.noDescription')
                             }}
                         </p>
                         <dl class="mt-4 grid gap-3 text-xs sm:grid-cols-2">
-                            <div class="rounded-xl bg-slate-50 p-3">
-                                <dt class="font-bold text-slate-600">
+                            <div class="rounded-xl bg-muted p-3">
+                                <dt class="font-bold text-muted-foreground">
                                     {{ t('system.flags.rolloutPercentage') }}
                                 </dt>
-                                <dd class="mt-1 text-slate-700">
+                                <dd class="mt-1 text-muted-foreground">
                                     {{ selectedFlag.rollout_percentage }} %
                                 </dd>
                             </div>
-                            <div class="rounded-xl bg-slate-50 p-3">
-                                <dt class="font-bold text-slate-600">
+                            <div class="rounded-xl bg-muted p-3">
+                                <dt class="font-bold text-muted-foreground">
                                     {{ t('common.updated') }}
                                 </dt>
-                                <dd class="mt-1 text-slate-700">
+                                <dd class="mt-1 text-muted-foreground">
                                     {{ formatDate(selectedFlag.updated_at) }}
                                 </dd>
                             </div>

@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Models\Plan;
 use App\Models\PlanStripePrice;
 use App\Models\StripeAddonPrice;
+use App\Services\Platform\ProductNotificationDispatcher;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
@@ -320,6 +321,7 @@ class StripeSubscriptionSynchronizer
      */
     private function syncCompany(Company $company, array $snapshot): void
     {
+        $previousStatus = $company->subscription_status;
         $plan = $this->planFor($snapshot);
         $status = (string) ($snapshot['status'] ?? 'incomplete');
         $items = $this->items($snapshot);
@@ -374,6 +376,35 @@ class StripeSubscriptionSynchronizer
                 ? CompanyStatus::Active
                 : $company->status,
         ])->save();
+
+        if ($status === 'past_due' && $previousStatus !== 'past_due') {
+            $companyId = (int) $company->getKey();
+            $subscriptionId = (string) $company->stripe_subscription_id;
+            DB::afterCommit(function () use ($companyId, $subscriptionId): void {
+                $company = Company::query()->with('users')->find($companyId);
+                if ($company === null) {
+                    return;
+                }
+
+                foreach ($company->users->whereNotNull('pivot.accepted_at') as $user) {
+                    app(ProductNotificationDispatcher::class)->dispatch(
+                        $user,
+                        'billing.payment_warning',
+                        "subscription:{$subscriptionId}:past-due",
+                        [
+                            'title' => 'Zahlung fehlgeschlagen',
+                            'message' => 'Eine Abonnementzahlung konnte nicht verarbeitet werden. Bitte prüfe die Zahlungsdaten.',
+                            'translations' => [
+                                'de' => ['title' => 'Zahlung fehlgeschlagen', 'message' => 'Eine Abonnementzahlung konnte nicht verarbeitet werden. Bitte prüfe die Zahlungsdaten.'],
+                                'en' => ['title' => 'Payment failed', 'message' => 'A subscription payment could not be processed. Please review the payment details.'],
+                            ],
+                            'url' => route('billing.index'),
+                            'company_id' => $companyId,
+                        ],
+                    );
+                }
+            });
+        }
     }
 
     /**

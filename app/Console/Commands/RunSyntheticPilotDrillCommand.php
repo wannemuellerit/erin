@@ -31,7 +31,13 @@ class RunSyntheticPilotDrillCommand extends Command
         }
 
         $scenario = $this->option('scenario');
-        if (! is_string($scenario) || ! in_array($scenario, $drill->scenarios(), true)) {
+        if (! is_string($scenario)) {
+            $this->error('Das Szenario muss als Zeichenkette angegeben werden.');
+
+            return self::INVALID;
+        }
+
+        if (! in_array($scenario, $drill->scenarios(), true)) {
             $this->error('Unbekanntes Szenario. Erlaubt: '.implode(', ', $drill->scenarios()));
 
             return self::INVALID;

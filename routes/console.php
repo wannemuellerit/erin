@@ -48,8 +48,13 @@ Schedule::command('telescope:prune --hours=72')
     ->onOneServer()
     ->withoutOverlapping();
 
-Schedule::command('erin:reminders:send-due')
-    ->everyMinute()
+Schedule::command('erin:interviews:send-reminders')
+    ->everyFiveMinutes()
+    ->onOneServer()
+    ->withoutOverlapping();
+
+Schedule::command('erin:visa:send-deadline-notifications')
+    ->hourly()
     ->onOneServer()
     ->withoutOverlapping();
 
@@ -58,7 +63,22 @@ Schedule::command('erin:referrals:notify-eligible')
     ->onOneServer()
     ->withoutOverlapping();
 
+Schedule::command('erin:payouts:reconcile --limit=100')
+    ->everyFiveMinutes()
+    ->onOneServer()
+    ->withoutOverlapping();
+
+Schedule::command('erin:notifications:operational')
+    ->hourly()
+    ->onOneServer()
+    ->withoutOverlapping();
+
 Schedule::command('erin:ops:queue-health --json')
+    ->everyFiveMinutes()
+    ->onOneServer()
+    ->withoutOverlapping();
+
+Schedule::command('horizon:snapshot')
     ->everyFiveMinutes()
     ->onOneServer()
     ->withoutOverlapping();
@@ -120,5 +140,9 @@ Schedule::call(
 
 Schedule::command('erin:support:prune-orphan-attachments --execute --json')
     ->dailyAt('03:45')
+    ->onOneServer()
+    ->withoutOverlapping();
+Schedule::command('erin:support:prune-chats --execute --json')
+    ->dailyAt('03:25')
     ->onOneServer()
     ->withoutOverlapping();

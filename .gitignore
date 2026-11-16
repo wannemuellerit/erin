@@ -29,6 +29,6 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
-
-# Python CI guard regression tests
+/.localization-cache.json
 __pycache__/
+*.py[cod]
