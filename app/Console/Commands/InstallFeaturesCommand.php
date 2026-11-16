@@ -40,7 +40,7 @@ class InstallFeaturesCommand extends Command
         /** @var Script $script */
         $script = require base_path('chisel.php');
 
-        $answersOption = $this->option('answers');
+        $answersOption = $this->input->getOption('answers');
         if ($answersOption !== null && ! is_string($answersOption)) {
             $this->error('Die vorgegebenen Antworten müssen als JSON-Zeichenkette übergeben werden.');
 

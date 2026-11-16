@@ -53,10 +53,6 @@ class StripePlanSynchronizer
             $actions[] = 'create_price';
 
             if ($apply) {
-                if ($productId === null) {
-                    throw new LogicException('Das Stripe-Produkt konnte nicht bereitgestellt werden.');
-                }
-
                 $priceId = $this->gateway->createPrice(
                     $this->priceParameters($plan, $productId),
                     $this->priceIdempotencyKey($plan),

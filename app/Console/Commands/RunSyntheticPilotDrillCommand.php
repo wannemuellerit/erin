@@ -82,7 +82,7 @@ class RunSyntheticPilotDrillCommand extends Command
 
     private function outputPath(string $scenario): string
     {
-        $configured = $this->option('output');
+        $configured = $this->input->getOption('output');
         if ($configured === null || $configured === '') {
             return sprintf(
                 'pilot/pilot-%s-%s-%s.json',
