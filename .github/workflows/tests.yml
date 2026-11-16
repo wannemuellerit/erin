@@ -15,8 +15,14 @@ concurrency:
 
 jobs:
   ci:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    runs-on: >-
+      ${{
+        (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+        vars.ERIN_USE_CONTABO_CI == 'true' &&
+        vars.CI_RUNNER_LABELS != '' && fromJSON(vars.CI_RUNNER_LABELS) ||
+        'ubuntu-latest'
+      }}
+    timeout-minutes: 120
 
     services:
       mysql:
@@ -67,6 +73,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Verify public-runner event guard
+        run: python3 tests/ci/test_runner_event_guard.py
 
       - name: Setup PHP
         uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
@@ -126,8 +135,14 @@ jobs:
 
   production-image:
     name: Production image
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
+    runs-on: >-
+      ${{
+        (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+        vars.ERIN_USE_CONTABO_CI == 'true' &&
+        vars.CI_RUNNER_LABELS != '' && fromJSON(vars.CI_RUNNER_LABELS) ||
+        'ubuntu-latest'
+      }}
+    timeout-minutes: 120
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -158,8 +173,14 @@ jobs:
           cache-to: type=gha,mode=max,scope=production-image
 
   e2e:
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
+    runs-on: >-
+      ${{
+        (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+        vars.ERIN_USE_CONTABO_CI == 'true' &&
+        vars.CI_RUNNER_LABELS != '' && fromJSON(vars.CI_RUNNER_LABELS) ||
+        'ubuntu-latest'
+      }}
+    timeout-minutes: 120
 
     services:
       mysql:
