@@ -56,7 +56,7 @@ COPY . .
 RUN php artisan package:discover --ansi \
     && php artisan wayfinder:generate --with-form
 
-FROM node:26-bookworm-slim@sha256:cd565714d4da3e84bfd341e31448f81d47c6362198f152345297c9c1154e6341 AS frontend-builder
+FROM node:26-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1 AS frontend-builder
 
 ARG VITE_APP_NAME=Faden
 ARG VITE_BROADCAST_CONNECTION=reverb
@@ -112,7 +112,7 @@ USER www-data
 ENTRYPOINT ["erin-entrypoint"]
 CMD ["php-fpm", "--nodaemonize"]
 
-FROM nginx:1.30.1-alpine@sha256:c819f83c54b0361f5557601bf5eb4943d09360e7a7fdf426afc466570f45874d AS nginx
+FROM nginx:1.31.8-alpine@sha256:fed7e14be83cbd2661a75cdc5b872d936cf155d46c327084d30b8df19ae88d72 AS nginx
 
 ARG ERIN_BUILD_SHA
 ARG ERIN_BUILD_ENV=production
